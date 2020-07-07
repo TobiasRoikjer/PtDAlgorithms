@@ -451,6 +451,7 @@ static int kingman_visit_vertex(vertex_t **out,
                                 vec_entry_t *state,
                                 avl_vec_node_t *bst,
                                 vertex_t *abs_vertex,
+                                size_t n_remaining,
                                 const size_t m) {
     avl_vec_node_t *bst_node = (avl_vec_node_t*)avl_vec_find(bst, state, m);
 
@@ -458,23 +459,6 @@ static int kingman_visit_vertex(vertex_t **out,
         *out = bst_node->entry;
         return 0;
     } else {
-        bool only_tail = true;
-
-        for (vec_entry_t i = 0; i < m-1; i++) {
-            if (state[i] != 0) {
-                only_tail = false;
-                break;
-            }
-        }
-
-        if (only_tail) {
-            *out = abs_vertex;
-            vec_entry_t *vertex_state = (vec_entry_t*) malloc(sizeof(vec_entry_t) * m);
-            memcpy(vertex_state, state, sizeof(vec_entry_t) * m);
-            avl_vec_insert(&bst, vertex_state, *out, m);
-            return 0;
-        }
-
         vec_entry_t *vertex_state;
 
         vertex_state = (vec_entry_t*) malloc(sizeof(vec_entry_t) * m);
@@ -487,6 +471,10 @@ static int kingman_visit_vertex(vertex_t **out,
         vec_entry_t *v = state;
 
         for (vec_entry_t i = 0; i < m; i++) {
+            if (v[i] == 0) {
+                continue;
+            }
+            
             for (vec_entry_t j = i; j < m; j++) {
                 if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
                     double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
@@ -497,10 +485,17 @@ static int kingman_visit_vertex(vertex_t **out,
                     v[inc_pos]++;
 
                     vertex_t *new_vertex;
-                    kingman_visit_vertex(&new_vertex,
+                    const bool only_tail = (v[m-1] == n_remaining);
+
+                    if (only_tail) {
+                        new_vertex = abs_vertex;
+                    } else {
+                        kingman_visit_vertex(&new_vertex,
                                          v, bst,
                                          abs_vertex,
+                                         n_remaining - 1,
                                          m);
+                    }
 
                     v[i]++;
                     v[j]++;
@@ -531,6 +526,7 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
     vertex_t *state_graph;
 
     kingman_visit_vertex(&state_graph, initial, BST, absorbing_vertex,
+            n,
             m);
 
     vec_entry_t *start_state = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
