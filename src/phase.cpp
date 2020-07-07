@@ -6,6 +6,24 @@
 
 using namespace std;
 
+static void print_vector_spacing(FILE *stream,vec_entry_t *v, size_t nmemb, size_t spacing) {
+    if (v == NULL) {
+        fprintf(stream, "(NULL)");
+        return;
+    }
+
+    fprintf(stream, "(");
+
+    for (size_t i = 0; i < nmemb; i++) {
+        if (i % spacing == 0) {
+            fprintf(stream, "-");
+        }
+
+        fprintf(stream, "%zu", v[i]);
+    }
+    fprintf(stream, ")");
+}
+
 void _reset_graph_visited(vertex_t *node, size_t reset_int) {
     if (node->reset_int == reset_int) {
         return;
@@ -432,43 +450,56 @@ static vertex_t *get_abs_vertex(vertex_t *graph) {
 static int kingman_visit_vertex(vertex_t **out,
                                 vec_entry_t *state,
                                 avl_vec_node_t *bst,
-                                size_t state_size,
-                                size_t vector_length,
-                                const size_t vec_nmemb,
-                                size_t m) {
-    avl_vec_node_t *bst_node = (avl_vec_node_t*)avl_vec_find(bst, state, vector_length);
+                                vertex_t *abs_vertex,
+                                const size_t m) {
+    avl_vec_node_t *bst_node = (avl_vec_node_t*)avl_vec_find(bst, state, m);
 
     if (bst_node != nullptr) {
         *out = bst_node->entry;
         return 0;
     } else {
-        vec_entry_t *vertex_state = (vec_entry_t*) malloc(sizeof(vec_entry_t) * vector_length);
-        memcpy(vertex_state, state, sizeof(vec_entry_t) * vector_length);
+        bool only_tail = true;
 
-        *out = new vertex_t(vertex_state, state_size);
+        for (vec_entry_t i = 0; i < m-1; i++) {
+            if (state[i] != 0) {
+                only_tail = false;
+                break;
+            }
+        }
 
-        avl_vec_insert(&bst, vertex_state, *out, vector_length);
+        if (only_tail) {
+            *out = abs_vertex;
+            vec_entry_t *vertex_state = (vec_entry_t*) malloc(sizeof(vec_entry_t) * m);
+            memcpy(vertex_state, state, sizeof(vec_entry_t) * m);
+            avl_vec_insert(&bst, vertex_state, *out, m);
+            return 0;
+        }
+
+        vec_entry_t *vertex_state;
+
+        vertex_state = (vec_entry_t*) malloc(sizeof(vec_entry_t) * m);
+        memcpy(vertex_state, state, sizeof(vec_entry_t) * m);
+
+        *out = new vertex_t(vertex_state, m);
+
+        avl_vec_insert(&bst, vertex_state, *out, m);
 
         vec_entry_t *v = state;
 
-        for (vec_entry_t i = 0; i < state_size; i++) {
-            for (vec_entry_t j = i; j < state_size; j++) {
+        for (vec_entry_t i = 0; i < m; i++) {
+            for (vec_entry_t j = i; j < m; j++) {
                 if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
                     double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
 
+                    const size_t inc_pos = min((i + j + 2) - 1, m-1);
                     v[i]--;
                     v[j]--;
-
-                    const size_t inc_pos = min((i + j + 2) - 1, m+1);
-
                     v[inc_pos]++;
 
                     vertex_t *new_vertex;
                     kingman_visit_vertex(&new_vertex,
                                          v, bst,
-                                         state_size,
-                                         vector_length,
-                                         vec_nmemb,
+                                         abs_vertex,
                                          m);
 
                     v[i]++;
@@ -485,27 +516,26 @@ static int kingman_visit_vertex(vertex_t **out,
 }
 
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
-    size_t state_size = n;
+    m += 1;
+    vec_entry_t *initial = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
+    initial[0] = n;
 
-    vec_entry_t *initial = (vec_entry_t*)calloc(state_size, sizeof(vec_entry_t));
-    initial[0] = state_size;
+    vec_entry_t *mrca = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
+    mrca[m-1] = 1;
 
-    vec_entry_t *mrca = (vec_entry_t*)calloc(state_size, sizeof(vec_entry_t));
-    mrca[state_size-1] = 1;
-
-    vertex_t *absorbing_vertex = new vertex_t(mrca, state_size);
+    vertex_t *absorbing_vertex = new vertex_t(mrca, m);
 
     avl_vec_node_t *BST;
     avl_vec_node_create(&BST, mrca, absorbing_vertex, nullptr);
 
     vertex_t *state_graph;
 
-    kingman_visit_vertex(&state_graph, initial, BST, state_size, state_size,
-                         state_size, m);
+    kingman_visit_vertex(&state_graph, initial, BST, absorbing_vertex,
+            m);
 
-    vec_entry_t *start_state = (vec_entry_t*)calloc(state_size, sizeof(vec_entry_t));
+    vec_entry_t *start_state = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
 
-    vertex_t *start = new vertex_t(start_state, state_size);
+    vertex_t *start = new vertex_t(start_state, m);
 
     add_edge(start, state_graph, 1);
     avl_free(BST);
@@ -514,26 +544,6 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
 
     return 0;
 }
-
-
-static void print_vector_spacing(FILE *stream,vec_entry_t *v, size_t nmemb, size_t spacing) {
-    if (v == NULL) {
-        fprintf(stream, "(NULL)");
-        return;
-    }
-
-    fprintf(stream, "(");
-
-    for (size_t i = 0; i < nmemb; i++) {
-        if (i % spacing == 0) {
-            fprintf(stream, "-");
-        }
-
-        fprintf(stream, "%zu", v[i]);
-    }
-    fprintf(stream, ")");
-}
-
 
 static void _print_graph_list(FILE *stream, vertex_t *node,
                               bool indexed,
