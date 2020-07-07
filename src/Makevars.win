@@ -1,0 +1,1 @@
+PKG_CXXFLAGS=-I../api/cpp -I../api/c -Ic/ -Icpp/
