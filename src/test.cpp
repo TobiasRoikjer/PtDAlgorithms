@@ -1,0 +1,24 @@
+#include <cstddef>
+#include <cstdio>
+#include <algorithm>
+#include "phase.h"
+
+int main(int argv, char **argc) {
+    size_t n =  10;
+    size_t m = 5;
+
+    vertex_t *graph;
+    gen_kingman_graph(&graph, n, m);
+    cov_exp_return ret = mph_cov_exp_all(graph, m);
+
+    for (size_t i = 0; i < (size_t)m; ++i) {
+        for (size_t j = 0; j < (size_t)m; ++j) {
+            fprintf(stdout, "Cov %zu %zu %f \n",
+                    i, j, (*ret.cov)[max(i,j)][min(i,j)]);
+        }
+    }
+
+    graph_free(graph);
+
+    return 0;
+}
