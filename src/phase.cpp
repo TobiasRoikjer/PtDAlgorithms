@@ -485,7 +485,7 @@ static int kingman_visit_vertex(vertex_t **out,
                     v[inc_pos]++;
 
                     vertex_t *new_vertex;
-                    const bool only_tail = (v[m-1] == n_remaining);
+                    const bool only_tail = (v[m-1] == n_remaining - 1);
 
                     if (only_tail) {
                         new_vertex = abs_vertex;
