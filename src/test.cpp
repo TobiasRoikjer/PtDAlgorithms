@@ -4,16 +4,23 @@
 #include "phase.h"
 
 int main(int argv, char **argc) {
-    size_t n = 5;
-    size_t m = 5;
+    size_t n = 10;
+    size_t m = 6;
 
     vertex_t *graph;
     gen_kingman_graph(&graph, n, m);
+    reward_transform(graph, 5);
 
     double **mat;
     vertex_t **vertices;
     size_t size;
     graph_as_mat(&mat, &vertices, &size, graph);
+
+    for (size_t i = 2; i < size; ++i) {
+        fprintf(stdout, "%f ", mat[1][i]);
+    }
+
+    fprintf(stdout, "\n\n");
 
     for (size_t i = 2; i < size; ++i) {
         for (size_t j = 2; j < size; ++j) {

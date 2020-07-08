@@ -53,6 +53,49 @@ List kingman_gen_mat(int n, int m) {
 }
 
 // [[Rcpp::export]]
+List kingman_gen_reward(int n, int r) {
+  if (n <= 0) {
+    throw std::invalid_argument("'n' must be strictly positive");
+  }
+  if (r <= 0 || r > n) {
+    throw std::invalid_argument("'r' must be strictly positive and no larger than 'n'");
+  }
+  
+  vertex_t *graph;
+  gen_kingman_graph(&graph, n, r+1);
+  reward_transform(graph, r-1);
+  
+  double **mat;
+  vertex_t **vertices;
+  size_t size;
+  graph_as_mat(&mat, &vertices, &size, graph);
+  
+  NumericMatrix SIM(size - 2, size - 2);
+  NumericVector IPV(size - 2);
+  
+  for (size_t i = 2; i < size; ++i) {
+    IPV(i - 2) = mat[1][i];
+    
+    for (size_t j = 2; j < size; ++j) {
+      SIM(i - 2, j - 2) = mat[i][j];
+    }
+    
+    fprintf(stdout, "\n");
+  }
+  
+  for (size_t i = 0; i < size; ++i) {
+    free(mat[i]);
+  }
+  
+  free(mat);
+  free(vertices);
+  
+  graph_free(graph);
+  
+  return List::create(Named("IPV") = IPV , _["SIM"] = SIM);
+}
+
+// [[Rcpp::export]]
 List kingman_exp_cov(int n, int m) {
   if (n <= 0) {
     throw std::invalid_argument("'n' must be strictly positive");

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stack>
 #include <queue>
+#include <algorithm>
 #include "phase.h"
 
 using namespace std;
@@ -31,7 +32,6 @@ void _reset_graph_visited(vertex_t *vertex, size_t reset_int) {
     }
 
     vertex->reset_int = reset_int;
-
 
     for (vertex_t *child : vertex->children) {
         _reset_graph_visited(child, reset_int);
@@ -400,12 +400,54 @@ static size_t avl_vec_get_size(avl_vec_vertex_t *vertex) {
     return 1 + avl_vec_get_size(vertex->left) + avl_vec_get_size(vertex->right);
 }
 
+static void remove_edge(vertex_t *from, vertex_t *to){
+    if (from == to) {
+        return;
+    }
+
+    auto elem = find(from->children.begin(),
+                     from->children.end(), to);
+    auto dist = distance(from->children.begin(), elem);
+
+    auto elem_parent = find(to->parents.begin(),
+                     to->parents.end(), from);
+    auto dist_parent = distance(to->parents.begin(), elem_parent);
+
+    from->rate -= from->weights[dist];
+    from->children.erase(elem);
+    from->weights.erase(from->weights.begin() + dist);
+    to->parents.erase(elem_parent);
+    to->weights_parent.erase(to->weights_parent.begin() + dist_parent);
+}
+
 static void add_edge(vertex_t *from, vertex_t *to, double weight) {
+    if (from == to) {
+        return;
+    }
+    
     from->children.push_back(to);
     from->weights.push_back(weight);
     from->rate += weight;
     to->parents.push_back(from);
     to->weights_parent.push_back(weight);
+}
+
+static void increase_weight(vertex_t *from, vertex_t *to, double inc_weight) {
+    if (from == to) {
+        return;
+    }
+
+    auto elem = find(from->children.begin(),
+                     from->children.end(), to);
+    auto dist = distance(from->children.begin(), elem);
+
+    auto elem_parent = find(to->parents.begin(),
+                            to->parents.end(), from);
+    auto dist_parent = distance(to->parents.begin(), elem_parent);
+
+    from->weights[dist] += inc_weight;
+    from->rate += inc_weight;
+    to->weights_parent[dist_parent] += inc_weight;
 }
 
 static void avl_free(avl_vec_vertex_t *vertex) {
@@ -738,6 +780,88 @@ void graph_free(vertex_t *graph) {
     }
 
     delete vertex_to_free;
+}
+
+double calculate_rate(vertex_t *vertex) {
+    double rate = 0;
+
+    for (size_t i = 0; i < vertex->children.size(); ++i) {
+        rate += vertex->weights[i];
+    }
+
+    return rate;
+}
+
+int _reward_transform(vertex_t *vertex, size_t reward_index) {
+    if (vertex->visited) {
+        return 0;
+    }
+
+    vertex->visited = true;
+
+    for (ssize_t i = vertex->children.size() - 1; i >= 0; --i) {
+        _reward_transform(vertex->children[i], reward_index);
+    }
+
+    if (vertex->children.empty()) {
+        // Absorbing vertex
+        return 0;
+    }
+
+    if (vertex->parents.empty()) {
+        return 0;
+    }
+
+    double reward = vertex->rewards[reward_index];
+
+
+    if (reward == 0) {
+        size_t n_parents = vertex->parents.size();
+
+        for (ssize_t j = n_parents - 1; j >= 0; --j) {
+            vertex_t *parent = vertex->parents[j];
+
+            // Take all my edges and add to my parent instead.
+            for (size_t i = 0; i < vertex->children.size(); ++i) {
+                vertex_t *child = vertex->children[i];
+                double prob = vertex->weights[i] / vertex->rate;
+                double weight = prob * vertex->weights_parent[j];
+
+                auto elem = find(parent->children.begin(), parent->children.end(), child);
+
+                if (elem == parent->children.end()) {
+                    add_edge(parent, child, weight);
+                } else {
+                    increase_weight(parent, child, weight);
+                }
+            }
+
+            remove_edge(parent, vertex);
+        }
+
+        for (ssize_t i = vertex->children.size() - 1; i >= 0; --i) {
+            remove_edge(vertex, vertex->children[i]);
+        }
+
+        delete vertex;
+    } else {
+        for (size_t i = 0; i < vertex->children.size(); ++i) {
+            vertex->weights[i] /= reward;
+
+            auto elem = find(vertex->children[i]->parents.begin(), vertex->children[i]->parents.end(), vertex);
+            long index = distance(vertex->children[i]->parents.begin(), elem);
+            vertex->children[i]->weights_parent[index] /= reward;
+        }
+
+        vertex->rate /= reward;
+    }
+
+    return 0;
+}
+
+int reward_transform(vertex_t *graph, size_t reward_index) {
+    reset_graph_visited(graph);
+    return _reward_transform(graph, reward_index);
 }
 
 /*
