@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstring>
 #include <stack>
+#include <queue>
 #include "phase.h"
 
 using namespace std;
@@ -24,33 +25,33 @@ static void print_vector_spacing(FILE *stream,vec_entry_t *v, size_t nmemb, size
     fprintf(stream, ")");
 }
 
-void _reset_graph_visited(vertex_t *node, size_t reset_int) {
-    if (node->reset_int == reset_int) {
+void _reset_graph_visited(vertex_t *vertex, size_t reset_int) {
+    if (vertex->reset_int == reset_int) {
         return;
     }
 
-    node->reset_int = reset_int;
+    vertex->reset_int = reset_int;
 
 
-    for (vertex_t *child : node->children) {
+    for (vertex_t *child : vertex->children) {
         _reset_graph_visited(child, reset_int);
     }
 
-    node->visited = false;
+    vertex->visited = false;
 }
 
-static void reset_graph_visited(vertex_t *node) {
-    _reset_graph_visited(node, node->reset_int + 1);
+static void reset_graph_visited(vertex_t *vertex) {
+    _reset_graph_visited(vertex, vertex->reset_int + 1);
 }
 
-typedef struct avl_vec_node {
-    struct avl_vec_node *left;
-    struct avl_vec_node *right;
-    struct avl_vec_node *parent;
+typedef struct avl_vec_vertex {
+    struct avl_vec_vertex *left;
+    struct avl_vec_vertex *right;
+    struct avl_vec_vertex *parent;
     signed short balance;
     vec_entry_t *key;
     vertex_t *entry;
-} avl_vec_node_t;
+} avl_vec_vertex_t;
 
 static inline int radix_cmp(const vec_entry_t* a, const vec_entry_t* b,
                             const size_t vec_length) {
@@ -67,9 +68,9 @@ static inline int radix_cmp(const vec_entry_t* a, const vec_entry_t* b,
 *  B: parent
 *  D: child_right
 */
-avl_vec_node_t *rotate_left_right(avl_vec_node_t *parent, avl_vec_node_t *child) {
-    avl_vec_node_t *child_right_left, *child_right_right;
-    avl_vec_node_t *child_right = child->right;
+avl_vec_vertex_t *rotate_left_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
+    avl_vec_vertex_t *child_right_left, *child_right_right;
+    avl_vec_vertex_t *child_right = child->right;
     child_right_left = child_right->left;
     child->right = child_right_left;
 
@@ -115,9 +116,9 @@ avl_vec_node_t *rotate_left_right(avl_vec_node_t *parent, avl_vec_node_t *child)
 *  B: parent
 *  D: child_left
 */
-avl_vec_node_t *rotate_right_left(avl_vec_node_t *parent, avl_vec_node_t *child) {
-    avl_vec_node_t *child_left_right, *child_left_left;
-    avl_vec_node_t *child_left = child->left;
+avl_vec_vertex_t *rotate_right_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
+    avl_vec_vertex_t *child_left_right, *child_left_left;
+    avl_vec_vertex_t *child_left = child->left;
 
     child_left_right = child_left->right;
 
@@ -162,8 +163,8 @@ avl_vec_node_t *rotate_right_left(avl_vec_node_t *parent, avl_vec_node_t *child)
 *    B   (left) A   C
 *      C   ->
 */
-avl_vec_node_t *rotate_left(avl_vec_node_t *parent, avl_vec_node_t *child) {
-    avl_vec_node_t *child_left;
+avl_vec_vertex_t *rotate_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
+    avl_vec_vertex_t *child_left;
 
     child_left = child->left;
     parent->right = child_left;
@@ -192,8 +193,8 @@ avl_vec_node_t *rotate_left(avl_vec_node_t *parent, avl_vec_node_t *child) {
 *    B    (right) C   A
 *  C        ->
 */
-avl_vec_node_t *rotate_right(avl_vec_node_t *parent, avl_vec_node_t *child) {
-    avl_vec_node_t *child_right;
+avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
+    avl_vec_vertex_t *child_right;
 
     child_right = child->right;
     parent->left = child_right;
@@ -216,61 +217,61 @@ avl_vec_node_t *rotate_right(avl_vec_node_t *parent, avl_vec_node_t *child) {
     return child;
 }
 
-int avl_vec_node_create(avl_vec_node_t **node, vec_entry_t *key, vertex_t *entry, avl_vec_node_t *parent) {
-    if ((*node = (avl_vec_node_t*) malloc(sizeof(avl_vec_node_t))) == nullptr) {
+int avl_vec_vertex_create(avl_vec_vertex_t **vertex, vec_entry_t *key, vertex_t *entry, avl_vec_vertex_t *parent) {
+    if ((*vertex = (avl_vec_vertex_t*) malloc(sizeof(avl_vec_vertex_t))) == nullptr) {
         return 1;
     }
 
-    (*node)->key = key;
-    (*node)->entry = entry;
-    (*node)->left = nullptr;
-    (*node)->right = nullptr;
-    (*node)->parent = parent;
-    (*node)->balance = 0;
+    (*vertex)->key = key;
+    (*vertex)->entry = entry;
+    (*vertex)->left = nullptr;
+    (*vertex)->right = nullptr;
+    (*vertex)->parent = parent;
+    (*vertex)->balance = 0;
 
     return 0;
 }
 
-void avl_vec_node_destroy(avl_vec_node_t *node) {
-    if (node == nullptr) {
+void avl_vec_vertex_destroy(avl_vec_vertex_t *vertex) {
+    if (vertex == nullptr) {
         return;
     }
 
-    avl_vec_node_destroy(node->left);
-    avl_vec_node_destroy(node->right);
+    avl_vec_vertex_destroy(vertex->left);
+    avl_vec_vertex_destroy(vertex->right);
 
-    free(node);
+    free(vertex);
 }
 
-const avl_vec_node_t * avl_vec_find(const avl_vec_node_t *rootptr, const vec_entry_t *key, const size_t vec_length) {
+const avl_vec_vertex_t * avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size_t vec_length) {
     if (rootptr == nullptr) {
         return nullptr;
     }
 
-    const avl_vec_node_t *node = rootptr;
+    const avl_vec_vertex_t *vertex = rootptr;
 
     while (true) {
-        int res = radix_cmp(key, node->key, vec_length);
+        int res = radix_cmp(key, vertex->key, vec_length);
         if (res < 0) {
-            if (node->left == nullptr) {
+            if (vertex->left == nullptr) {
                 return nullptr;
             } else {
-                node = node->left;
+                vertex = vertex->left;
             }
         } else if (res > 0) {
-            if (node->right == nullptr) {
+            if (vertex->right == nullptr) {
                 return nullptr;
             } else {
-                node = node->right;
+                vertex = vertex->right;
             }
         } else {
-            return node;
+            return vertex;
         }
     }
 }
 
-int find_or_insert_vec(avl_vec_node_t **out, avl_vec_node_t *rootptr, vec_entry_t *key, vertex_t *entry, const size_t vec_length) {
-    if (avl_vec_node_create(out, key, entry, nullptr)) {
+int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_entry_t *key, vertex_t *entry, const size_t vec_length) {
+    if (avl_vec_vertex_create(out, key, entry, nullptr)) {
         return -1;
     }
 
@@ -278,39 +279,39 @@ int find_or_insert_vec(avl_vec_node_t **out, avl_vec_node_t *rootptr, vec_entry_
         return 1;
     }
 
-    avl_vec_node_t *node = rootptr;
+    avl_vec_vertex_t *vertex = rootptr;
 
     while(true) {
-        int res = radix_cmp(key, node->key, vec_length);
+        int res = radix_cmp(key, vertex->key, vec_length);
         if (res < 0) {
-            if (node->left == nullptr) {
-                node->left = *out;
+            if (vertex->left == nullptr) {
+                vertex->left = *out;
                 break;
             } else {
-                node = node->left;
+                vertex = vertex->left;
             }
         } else if (res > 0) {
-            if (node->right == nullptr) {
-                node->right = *out;
+            if (vertex->right == nullptr) {
+                vertex->right = *out;
                 break;
             } else {
-                node = node->right;
+                vertex = vertex->right;
             }
         } else {
-            *out = node;
+            *out = vertex;
         }
     }
 
-    (*out)->parent = node;
+    (*out)->parent = vertex;
 
     return 0;
 }
 
-int avl_vec_insert(avl_vec_node_t **root, vec_entry_t *key, vertex_t *entry, const size_t vec_length) {
-    avl_vec_node_t *child;
+int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, vertex_t *entry, const size_t vec_length) {
+    avl_vec_vertex_t *child;
 
     if (*root == nullptr) {
-        if (avl_vec_node_create(root, key, entry, nullptr)) {
+        if (avl_vec_vertex_create(root, key, entry, nullptr)) {
             return 1;
         }
 
@@ -327,9 +328,9 @@ int avl_vec_insert(avl_vec_node_t **root, vec_entry_t *key, vertex_t *entry, con
         return 0;
     }
 
-    avl_vec_node_t *pivot, *rotated_parent;
+    avl_vec_vertex_t *pivot, *rotated_parent;
 
-    for (avl_vec_node_t *parent = child->parent; parent != nullptr; parent = child->parent) {
+    for (avl_vec_vertex_t *parent = child->parent; parent != nullptr; parent = child->parent) {
         if (child == parent->right) {
             if (parent->balance > 0) {
                 pivot = parent->parent;
@@ -391,12 +392,12 @@ int avl_vec_insert(avl_vec_node_t **root, vec_entry_t *key, vertex_t *entry, con
     return 0;
 }
 
-static size_t avl_vec_get_size(avl_vec_node_t *node) {
-    if (node == nullptr) {
+static size_t avl_vec_get_size(avl_vec_vertex_t *vertex) {
+    if (vertex == nullptr) {
         return 0;
     }
 
-    return 1 + avl_vec_get_size(node->left) + avl_vec_get_size(node->right);
+    return 1 + avl_vec_get_size(vertex->left) + avl_vec_get_size(vertex->right);
 }
 
 static void add_edge(vertex_t *from, vertex_t *to, double weight) {
@@ -407,16 +408,16 @@ static void add_edge(vertex_t *from, vertex_t *to, double weight) {
     to->weights_parent.push_back(weight);
 }
 
-static void avl_free(avl_vec_node_t *node) {
-    if (node->left != nullptr) {
-        avl_free(node->left);
+static void avl_free(avl_vec_vertex_t *vertex) {
+    if (vertex->left != nullptr) {
+        avl_free(vertex->left);
     }
 
-    if (node->right != nullptr) {
-        avl_free(node->right);
+    if (vertex->right != nullptr) {
+        avl_free(vertex->right);
     }
 
-    free(node);
+    free(vertex);
 }
 
 static void _get_abs_vertex(vertex_t **abs_vertex, vertex_t *graph) {
@@ -449,14 +450,14 @@ static vertex_t *get_abs_vertex(vertex_t *graph) {
 
 static int kingman_visit_vertex(vertex_t **out,
                                 vec_entry_t *state,
-                                avl_vec_node_t *bst,
+                                avl_vec_vertex_t *bst,
                                 vertex_t *abs_vertex,
-                                size_t n_remaining,
+                                const size_t n_remaining,
                                 const size_t m) {
-    avl_vec_node_t *bst_node = (avl_vec_node_t*)avl_vec_find(bst, state, m);
+    avl_vec_vertex_t *bst_vertex = (avl_vec_vertex_t*)avl_vec_find(bst, state, m);
 
-    if (bst_node != nullptr) {
-        *out = bst_node->entry;
+    if (bst_vertex != nullptr) {
+        *out = bst_vertex->entry;
         return 0;
     } else {
         vec_entry_t *vertex_state;
@@ -474,7 +475,7 @@ static int kingman_visit_vertex(vertex_t **out,
             if (v[i] == 0) {
                 continue;
             }
-            
+
             for (vec_entry_t j = i; j < m; j++) {
                 if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
                     double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
@@ -511,7 +512,10 @@ static int kingman_visit_vertex(vertex_t **out,
 }
 
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
-    m += 1;
+    if (m < n) {
+        m += 1;
+    }
+
     vec_entry_t *initial = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
     initial[0] = n;
 
@@ -520,8 +524,8 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
 
     vertex_t *absorbing_vertex = new vertex_t(mrca, m);
 
-    avl_vec_node_t *BST;
-    avl_vec_node_create(&BST, mrca, absorbing_vertex, nullptr);
+    avl_vec_vertex_t *BST;
+    avl_vec_vertex_create(&BST, mrca, absorbing_vertex, nullptr);
 
     vertex_t *state_graph;
 
@@ -541,42 +545,40 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
     return 0;
 }
 
-static void _print_graph_list(FILE *stream, vertex_t *node,
+static void _print_graph_list(FILE *stream, vertex_t *vertex,
                               bool indexed,
                               size_t vec_length, size_t vec_spacing) {
-    if (node->visited) {
+    if (vertex->visited) {
         return;
     }
 
-    node->visited = true;
+    vertex->visited = true;
 
-    fprintf(stream, "Node: ");
-    print_vector_spacing(stream, node->state,
+    fprintf(stream, "vertex: ");
+    print_vector_spacing(stream, vertex->state,
                          vec_length, vec_spacing);
     if (indexed) {
-        fprintf(stream, " (%zu)", node->vertex_index);
+        fprintf(stream, " (%zu)", vertex->vertex_index);
     }
     fprintf(stream, ":\n");
 
 
-    for (size_t i = 0; i < node->children.size(); ++i) {
+    for (size_t i = 0; i < vertex->children.size(); ++i) {
         fprintf(stream, "\t");
-        fprintf(stream, "(%f) ", node->weights[i]);
-        print_vector_spacing(stream, node->children[i]->state,
+        fprintf(stream, "(%f) ", vertex->weights[i]);
+        print_vector_spacing(stream, vertex->children[i]->state,
                              vec_length, vec_spacing);
 
-        fprintf(stream, "e %f d %f ", node->exp[0], node->desc[0]);
-
         if (indexed) {
-            fprintf(stream, " (%zu)", node->vertex_index);
+            fprintf(stream, " (%zu)", vertex->vertex_index);
         }
 
         fprintf(stream, "\n");
     }
 
     fprintf(stream, "\n");
-    for (size_t i = 0; i < node->children.size(); i++) {
-        _print_graph_list(stream, node->children[i],
+    for (size_t i = 0; i < vertex->children.size(); i++) {
+        _print_graph_list(stream, vertex->children[i],
                           indexed,
                           vec_length, vec_spacing);
     }
@@ -590,92 +592,92 @@ void print_graph_list(FILE *stream, vertex_t *graph,
     fflush(stream);
 }
 
-void mph_cov_assign_vertex_all(vertex_t *node, size_t m) {
-    if (node->visited) {
+void mph_cov_assign_vertex_all(vertex_t *vertex, size_t m) {
+    if (vertex->visited) {
         return;
     }
 
-    node->visited = true;
+    vertex->visited = true;
 
-    if (node->parents.empty()) {
+    if (vertex->parents.empty()) {
         // Starting vertex
-        node->prob = 1.0f;
+        vertex->prob = 1.0f;
     } else {
-        node->prob = 0.0f;
+        vertex->prob = 0.0f;
     }
 
-    for (size_t i = 0; i < node->parents.size(); i++) {
-        vertex_t *parent = node->parents[i];
+    for (size_t i = 0; i < vertex->parents.size(); i++) {
+        vertex_t *parent = vertex->parents[i];
 
         mph_cov_assign_vertex_all(parent, m);
 
-        node->prob += node->weights_parent[i]/parent->rate * parent->prob;
+        vertex->prob += vertex->weights_parent[i]/parent->rate * parent->prob;
     }
 
 
-    node->exp = vector<double>();
+    vertex->exp = vector<double>();
 
     for (size_t j = 0; j < m; ++j) {
-        if (node->rate != 0) {
-            node->exp.push_back(node->prob * node->state[j] / node->rate);
+        if (vertex->rate != 0) {
+            vertex->exp.push_back(vertex->prob * vertex->state[j] / vertex->rate);
         } else {
-            node->exp.push_back(0);
+            vertex->exp.push_back(0);
         }
     }
 }
 
-void mph_cov_assign_desc_all(vertex_t *node, size_t m) {
-    if (node->visited) {
+void mph_cov_assign_desc_all(vertex_t *vertex, size_t m) {
+    if (vertex->visited) {
         return;
     }
 
-    node->visited = true;
+    vertex->visited = true;
 
-    node->desc = vector<double>(m);
+    vertex->desc = vector<double>(m);
 
-    for (vertex_t *child : node->children) {
+    for (vertex_t *child : vertex->children) {
         mph_cov_assign_desc_all(child, m);
     }
 
-    for (size_t i = 0; i < node->children.size(); i++) {
+    for (size_t i = 0; i < vertex->children.size(); i++) {
         for (size_t j = 0; j < m; ++j) {
-            node->desc[j] += node->weights[i] / node->rate * node->children[i]->desc[j];
+            vertex->desc[j] += vertex->weights[i] / vertex->rate * vertex->children[i]->desc[j];
         }
     }
 
     vector<double> exp(m);
 
     for (size_t j = 0; j < m; ++j) {
-        if (node->rate != 0) {
-            exp[j] = node->state[j] / node->rate;
+        if (vertex->rate != 0) {
+            exp[j] = vertex->state[j] / vertex->rate;
         } else {
             exp[j] = 0;
         }
     }
 
     for (size_t j = 0; j < m; ++j) {
-        node->desc[j] += exp[j];
+        vertex->desc[j] += exp[j];
     }
 }
 
 double **cov;
 double *expectation;
 
-void _mph_cov_all(vertex_t *node, size_t m) {
-    if (node->visited) {
+void _mph_cov_all(vertex_t *vertex, size_t m) {
+    if (vertex->visited) {
         return;
     }
 
     for (size_t i = 0; i < m; ++i) {
         for (size_t j = 0; j <= i; ++j) {
-            cov[i][j] += node->desc[i] * node->exp[j];
-            cov[i][j] += node->desc[j] * node->exp[i];
+            cov[i][j] += vertex->desc[i] * vertex->exp[j];
+            cov[i][j] += vertex->desc[j] * vertex->exp[i];
         }
     }
 
-    node->visited = true;
+    vertex->visited = true;
 
-    for (vertex_t *child : node->children) {
+    for (vertex_t *child : vertex->children) {
         _mph_cov_all(child, m);
     }
 }
@@ -736,5 +738,86 @@ void graph_free(vertex_t *graph) {
     }
 
     delete vertex_to_free;
+}
+
+/*
+ * Also ensures that the absorbing vertex has index 0
+ */
+int label_vertex_index(size_t *largest_index, vertex_t *graph) {
+    vertex_t *abs_vertex;
+    abs_vertex = get_abs_vertex(graph);
+    reset_graph_visited(graph);
+    queue<vertex_t*> queue;
+    size_t index = 0;
+
+    // The absorbing vertex should have index 0
+    queue.push(abs_vertex);
+    queue.push(graph);
+
+    while(!queue.empty()) {
+        vertex_t *vertex = queue.front();
+        queue.pop();
+
+        if (vertex->visited) {
+            continue;
+        }
+
+        vertex->visited = true;
+
+        vertex->vertex_index = index++;
+
+        for (auto child : vertex->children) {
+            queue.push(child);
+        }
+    }
+
+    if (largest_index != nullptr) {
+        *largest_index = index - 1;
+    }
+
+    return 0;
+}
+
+
+/*
+ * Assumes visited state reset and indexed vertices.
+ */
+void insert_into_weight_mat(double **weights, vertex_t **vertices, vertex_t *vertex) {
+    if (vertex->visited) {
+        return;
+    }
+
+    vertex->visited = true;
+
+    for (size_t i = 0; i < vertex->children.size(); ++i) {
+        vertex_t *child = vertex->children[i];
+
+        weights[vertex->vertex_index][child->vertex_index] = vertex->weights[i];
+        weights[vertex->vertex_index][vertex->vertex_index] -= vertex->weights[i];
+    }
+
+    vertices[vertex->vertex_index] = vertex;
+
+    for (auto child : vertex->children) {
+        insert_into_weight_mat(weights, vertices, child);
+    }
+}
+
+int graph_as_mat(double ***weights, vertex_t ***vertices, size_t *out_size, vertex_t *graph) {
+    size_t largest_index;
+    label_vertex_index(&largest_index, graph);
+    reset_graph_visited(graph);
+    size_t size = largest_index+1;
+    *out_size = size;
+    *weights = (double**)malloc(sizeof(double*)*size);
+
+    for (size_t i = 0; i < size; ++i) {
+        (*weights)[i] = (double*)calloc(size, sizeof(double));
+    }
+
+    *vertices = (vertex_t **)calloc(size, sizeof(vertex_t*));
+
+    insert_into_weight_mat(*weights, *vertices, graph);
+    return 0;
 }
 
