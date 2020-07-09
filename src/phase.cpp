@@ -416,17 +416,27 @@ static void remove_edge(vertex_t *from, vertex_t *to){
     to->parents.erase(elem_parent);
 }
 
+static void add_edge_unsorted(vertex_t *from, vertex_t *to, double weight) {
+    if (from == to) {
+        return;
+    }
+
+    from->children.push_back({.vertex = to, .weight = weight});
+    from->rate += weight;
+    to->parents.push_back({.vertex = from, .weight = weight});
+}
+
 static void add_edge(vertex_t *from, vertex_t *to, double weight) {
     if (from == to) {
         return;
     }
 
-    from->children.insert(upper_bound(
-            from->children.begin(), from->children.end(), *to),
+    from->children.insert(lower_bound(
+            from->children.begin(), from->children.end(), to),
                     {.vertex = to, .weight = weight});
     from->rate += weight;
-    to->parents.insert(upper_bound(
-            to->parents.begin(), to->parents.end(), *from),
+    to->parents.insert(lower_bound(
+            to->parents.begin(), to->parents.end(), from),
                     {.vertex = from, .weight = weight});
 }
 
@@ -567,7 +577,7 @@ static int kingman_visit_vertex(vertex_t **out,
                     v[j]++;
                     v[inc_pos]--;
 
-                    add_edge(*out, new_vertex, t);
+                    add_edge_unsorted(*out, new_vertex, t);
                 }
             }
         }
@@ -605,6 +615,17 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
     add_edge(start, state_graph, 1);
     avl_free(BST);
     free(initial);
+
+    auto queue = enqueue_vertices(start);
+
+    while (!queue.empty()) {
+        auto vertex = queue.front();
+        queue.pop();
+
+        sort(vertex->children.begin(), vertex->children.end());
+        sort(vertex->parents.begin(), vertex->parents.end());
+    }
+
     *graph = start;
 
     return 0;
