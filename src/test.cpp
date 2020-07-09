@@ -4,12 +4,12 @@
 #include "phase.h"
 
 int main(int argv, char **argc) {
-    size_t n = 10;
-    size_t m = 6;
+    size_t n = 2;
+    size_t m = 9;
 
     vertex_t *graph;
     gen_kingman_graph(&graph, n, m);
-    reward_transform(graph, 5);
+    reward_transform(graph, 3);
 
     double **mat;
     vertex_t **vertices;
@@ -43,7 +43,7 @@ int main(int argv, char **argc) {
 }
 
 int main2(int argv, char **argc) {
-    size_t n = 10;
+    size_t n = 25;
     size_t m = 5;
 
     vertex_t *graph;

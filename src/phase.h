@@ -45,12 +45,30 @@ typedef struct vertex {
         free(this->state);
     }
 
-    vec_entry_t *state;
-    vector<struct vertex*> children = vector<struct vertex*>();
-    vector<double> weights = vector<double>();
+    bool operator<(const struct vertex& b) {
+        return (this->vertex_index < b.vertex_index);
+    }
 
-    vector<struct vertex*> parents = vector<struct vertex*>();
-    vector<double> weights_parent = vector<double>();
+    typedef struct edge {
+        struct vertex* vertex;
+        double weight;
+
+        bool operator==(const struct vertex* b) {
+            return (vertex == b);
+        }
+
+        bool operator<(const struct vertex* b) {
+            return (vertex->vertex_index < b->vertex_index);
+        }
+
+        bool operator<(const struct edge& b) {
+            return (vertex->vertex_index < b.vertex->vertex_index);
+        }
+    } edge_t;
+
+    vec_entry_t *state;
+    vector<edge_t> children;
+    vector<edge_t> parents;
 
     bool visited = false;
     double rate = 0;

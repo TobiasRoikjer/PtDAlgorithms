@@ -33,8 +33,8 @@ void _reset_graph_visited(vertex_t *vertex, size_t reset_int) {
 
     vertex->reset_int = reset_int;
 
-    for (vertex_t *child : vertex->children) {
-        _reset_graph_visited(child, reset_int);
+    for (auto child : vertex->children) {
+        _reset_graph_visited(child.vertex, reset_int);
     }
 
     vertex->visited = false;
@@ -413,41 +413,34 @@ static void remove_edge(vertex_t *from, vertex_t *to){
                      to->parents.end(), from);
     auto dist_parent = distance(to->parents.begin(), elem_parent);
 
-    from->rate -= from->weights[dist];
+    from->rate -= from->children[dist].weight;
     from->children.erase(elem);
-    from->weights.erase(from->weights.begin() + dist);
     to->parents.erase(elem_parent);
-    to->weights_parent.erase(to->weights_parent.begin() + dist_parent);
 }
 
 static void add_edge(vertex_t *from, vertex_t *to, double weight) {
     if (from == to) {
         return;
     }
-    
-    from->children.push_back(to);
-    from->weights.push_back(weight);
+
+    from->children.push_back({.vertex = to, .weight = weight});
     from->rate += weight;
-    to->parents.push_back(from);
-    to->weights_parent.push_back(weight);
+    to->parents.push_back({.vertex = from, .weight = weight});
 }
 
-static void increase_weight(vertex_t *from, vertex_t *to, double inc_weight) {
+static void increase_weight(vertex_t *from, vertex_t *to,
+        vector<vertex::edge, std::allocator<vertex::edge>>::iterator elem_child,
+        double inc_weight) {
     if (from == to) {
         return;
     }
 
-    auto elem = find(from->children.begin(),
-                     from->children.end(), to);
-    auto dist = distance(from->children.begin(), elem);
-
     auto elem_parent = find(to->parents.begin(),
                             to->parents.end(), from);
-    auto dist_parent = distance(to->parents.begin(), elem_parent);
 
-    from->weights[dist] += inc_weight;
+    (*elem_child).weight += inc_weight;
     from->rate += inc_weight;
-    to->weights_parent[dist_parent] += inc_weight;
+    (*elem_parent).weight += inc_weight;
 }
 
 static void avl_free(avl_vec_vertex_t *vertex) {
@@ -477,8 +470,8 @@ static void _get_abs_vertex(vertex_t **abs_vertex, vertex_t *graph) {
         }
     }
 
-    for (vertex_t *child : graph->children) {
-        _get_abs_vertex(abs_vertex, child);
+    for (auto child : graph->children) {
+        _get_abs_vertex(abs_vertex, child.vertex);
     }
 }
 
@@ -607,8 +600,8 @@ static void _print_graph_list(FILE *stream, vertex_t *vertex,
 
     for (size_t i = 0; i < vertex->children.size(); ++i) {
         fprintf(stream, "\t");
-        fprintf(stream, "(%f) ", vertex->weights[i]);
-        print_vector_spacing(stream, vertex->children[i]->state,
+        fprintf(stream, "(%f) ", vertex->children[i].weight);
+        print_vector_spacing(stream, vertex->children[i].vertex->state,
                              vec_length, vec_spacing);
 
         if (indexed) {
@@ -620,7 +613,7 @@ static void _print_graph_list(FILE *stream, vertex_t *vertex,
 
     fprintf(stream, "\n");
     for (size_t i = 0; i < vertex->children.size(); i++) {
-        _print_graph_list(stream, vertex->children[i],
+        _print_graph_list(stream, vertex->children[i].vertex,
                           indexed,
                           vec_length, vec_spacing);
     }
@@ -649,11 +642,11 @@ void mph_cov_assign_vertex_all(vertex_t *vertex, size_t m) {
     }
 
     for (size_t i = 0; i < vertex->parents.size(); i++) {
-        vertex_t *parent = vertex->parents[i];
+        vertex_t *parent = vertex->parents[i].vertex;
 
         mph_cov_assign_vertex_all(parent, m);
 
-        vertex->prob += vertex->weights_parent[i]/parent->rate * parent->prob;
+        vertex->prob += vertex->parents[i].weight/parent->rate * parent->prob;
     }
 
 
@@ -677,13 +670,13 @@ void mph_cov_assign_desc_all(vertex_t *vertex, size_t m) {
 
     vertex->desc = vector<double>(m);
 
-    for (vertex_t *child : vertex->children) {
-        mph_cov_assign_desc_all(child, m);
+    for (auto child : vertex->children) {
+        mph_cov_assign_desc_all(child.vertex, m);
     }
 
     for (size_t i = 0; i < vertex->children.size(); i++) {
         for (size_t j = 0; j < m; ++j) {
-            vertex->desc[j] += vertex->weights[i] / vertex->rate * vertex->children[i]->desc[j];
+            vertex->desc[j] += vertex->children[i].weight / vertex->rate * vertex->children[i].vertex->desc[j];
         }
     }
 
@@ -719,8 +712,8 @@ void _mph_cov_all(vertex_t *vertex, size_t m) {
 
     vertex->visited = true;
 
-    for (vertex_t *child : vertex->children) {
-        _mph_cov_all(child, m);
+    for (auto child : vertex->children) {
+        _mph_cov_all(child.vertex, m);
     }
 }
 
@@ -766,7 +759,7 @@ static void mark_for_deletion(vertex_t *vertex) {
     vertex_to_free->push_back(vertex);
 
     for (auto child : vertex->children) {
-        mark_for_deletion(child);
+        mark_for_deletion(child.vertex);
     }
 }
 
@@ -786,7 +779,7 @@ double calculate_rate(vertex_t *vertex) {
     double rate = 0;
 
     for (size_t i = 0; i < vertex->children.size(); ++i) {
-        rate += vertex->weights[i];
+        rate += vertex->children[i].weight;
     }
 
     return rate;
@@ -799,58 +792,68 @@ int _reward_transform(vertex_t *vertex, size_t reward_index) {
 
     vertex->visited = true;
 
-    for (ssize_t i = vertex->children.size() - 1; i >= 0; --i) {
-        _reward_transform(vertex->children[i], reward_index);
-    }
-
     if (vertex->children.empty()) {
         // Absorbing vertex
         return 0;
     }
 
     if (vertex->parents.empty()) {
+        auto children = vertex->children;
+
+        for (auto child : children) {
+            _reward_transform(child.vertex, reward_index);
+        }
+
         return 0;
     }
 
     double reward = vertex->rewards[reward_index];
 
-
     if (reward == 0) {
-        size_t n_parents = vertex->parents.size();
+        // Take all my edges and add to my parent instead.
+        auto parents = vertex->parents;
+        auto children = vertex->children;
 
-        for (ssize_t j = n_parents - 1; j >= 0; --j) {
-            vertex_t *parent = vertex->parents[j];
+        for (auto child : children) {
+            double prob = child.weight / vertex->rate;
 
-            // Take all my edges and add to my parent instead.
-            for (size_t i = 0; i < vertex->children.size(); ++i) {
-                vertex_t *child = vertex->children[i];
-                double prob = vertex->weights[i] / vertex->rate;
-                double weight = prob * vertex->weights_parent[j];
+            for (auto parent : parents) {
+                double weight = prob * parent.weight;
 
-                auto elem = find(parent->children.begin(), parent->children.end(), child);
+                auto elem = find(parent.vertex->children.begin(), parent.vertex->children.end(), child.vertex);
 
-                if (elem == parent->children.end()) {
-                    add_edge(parent, child, weight);
+                if (elem == parent.vertex->children.end()) {
+                    add_edge(parent.vertex, child.vertex, weight);
                 } else {
-                    increase_weight(parent, child, weight);
+                    increase_weight(parent.vertex, child.vertex, elem, weight);
                 }
             }
-
-            remove_edge(parent, vertex);
         }
 
-        for (ssize_t i = vertex->children.size() - 1; i >= 0; --i) {
-            remove_edge(vertex, vertex->children[i]);
+        for (auto parent : parents) {
+            remove_edge(parent.vertex, vertex);
+        }
+
+        for (auto child : children) {
+            remove_edge(vertex, child.vertex);
+        }
+
+        for (auto child : children) {
+            _reward_transform(child.vertex, reward_index);
         }
 
         delete vertex;
     } else {
-        for (size_t i = 0; i < vertex->children.size(); ++i) {
-            vertex->weights[i] /= reward;
+        auto children = vertex->children;
 
-            auto elem = find(vertex->children[i]->parents.begin(), vertex->children[i]->parents.end(), vertex);
-            long index = distance(vertex->children[i]->parents.begin(), elem);
-            vertex->children[i]->weights_parent[index] /= reward;
+        for (auto child : children) {
+            _reward_transform(child.vertex, reward_index);
+        }
+
+        for (size_t i = 0; i < children.size(); ++i) {
+            vertex->children[i].weight /= reward;
+            auto elem = find(vertex->children[i].vertex->parents.begin(), vertex->children[i].vertex->parents.end(), vertex);
+            (*elem).weight /= reward;
         }
 
         vertex->rate /= reward;
@@ -891,7 +894,7 @@ int label_vertex_index(size_t *largest_index, vertex_t *graph) {
         vertex->vertex_index = index++;
 
         for (auto child : vertex->children) {
-            queue.push(child);
+            queue.push(child.vertex);
         }
     }
 
@@ -914,16 +917,16 @@ void insert_into_weight_mat(double **weights, vertex_t **vertices, vertex_t *ver
     vertex->visited = true;
 
     for (size_t i = 0; i < vertex->children.size(); ++i) {
-        vertex_t *child = vertex->children[i];
+        vertex_t *child = vertex->children[i].vertex;
 
-        weights[vertex->vertex_index][child->vertex_index] = vertex->weights[i];
-        weights[vertex->vertex_index][vertex->vertex_index] -= vertex->weights[i];
+        weights[vertex->vertex_index][child->vertex_index] = vertex->children[i].weight;
+        weights[vertex->vertex_index][vertex->vertex_index] -= vertex->children[i].weight;
     }
 
     vertices[vertex->vertex_index] = vertex;
 
     for (auto child : vertex->children) {
-        insert_into_weight_mat(weights, vertices, child);
+        insert_into_weight_mat(weights, vertices, child.vertex);
     }
 }
 
