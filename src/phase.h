@@ -45,10 +45,6 @@ typedef struct vertex {
         free(this->state);
     }
 
-    bool operator<(const struct vertex& b) {
-        return (this->vertex_index < b.vertex_index);
-    }
-
     typedef struct edge {
         struct vertex* vertex;
         double weight;
@@ -61,10 +57,14 @@ typedef struct vertex {
             return (vertex->vertex_index < b->vertex_index);
         }
 
-        bool operator<(const struct edge& b) {
+        bool operator<(const struct edge& b) const {
             return (vertex->vertex_index < b.vertex->vertex_index);
         }
     } edge_t;
+
+    bool operator<(const struct edge& b) const {
+        return (this->vertex_index < b.vertex->vertex_index);
+    }
 
     vec_entry_t *state;
     vector<edge_t> children;
