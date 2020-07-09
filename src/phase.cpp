@@ -850,7 +850,7 @@ int _reward_transform(vertex_t *vertex, size_t reward_index) {
             _reward_transform(child.vertex, reward_index);
         }
 
-        for (size_t i = 0; i < children.size(); ++i) {
+        for (size_t i = 0; i < vertex->children.size(); ++i) {
             vertex->children[i].weight /= reward;
             auto elem = find(vertex->children[i].vertex->parents.begin(), vertex->children[i].vertex->parents.end(), vertex);
             (*elem).weight /= reward;
