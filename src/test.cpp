@@ -3,13 +3,21 @@
 #include <algorithm>
 #include "phase.h"
 
+
+thread_local size_t r;
+
+double reward_by_index(vertex_t *vertex) {
+    return vertex->rewards[r];
+}
+
 int main(int argv, char **argc) {
-    size_t n = 2;
-    size_t m = 9;
+    size_t n = 7;
+    size_t m = n;
 
     vertex_t *graph;
     gen_kingman_graph(&graph, n, m);
-    reward_transform(graph, 3);
+    r = 2;
+    reward_transform(graph, reward_by_index);
 
     double **mat;
     vertex_t **vertices;

@@ -836,7 +836,7 @@ double calculate_rate(vertex_t *vertex) {
     return rate;
 }
 
-int reward_transform(vertex_t *graph, size_t reward_index) {
+int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t*)) {
     queue<vertex_t *> queue = enqueue_vertices(graph);
 
     while (!queue.empty()) {
@@ -852,7 +852,7 @@ int reward_transform(vertex_t *graph, size_t reward_index) {
             continue;
         }
 
-        double reward = vertex->rewards[reward_index];
+        double reward = reward_func(vertex);
 
         if (reward == 0) {
             // Take all my edges and add to my parent instead.

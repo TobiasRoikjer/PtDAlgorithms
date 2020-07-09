@@ -87,7 +87,7 @@ cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
 void graph_free(vertex_t *graph);
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m);
 int graph_as_mat(double ***weights, vertex_t ***vertices, size_t *out_size, vertex_t *graph);
-int reward_transform(vertex_t *vertex, size_t reward_index);
+int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t*));
 void print_graph_list(FILE *stream, vertex_t *graph, bool indexed, size_t vec_length, size_t vec_spacing);
 
 #endif //PTDALGORITHMS_PHASE_H
