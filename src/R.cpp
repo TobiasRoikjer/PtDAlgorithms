@@ -36,8 +36,6 @@ List kingman_gen_mat(int n, int m) {
         RW(i - 2, j - 2) = vertices[i]->rewards[j - 2];
       }
     }
-    
-    fprintf(stdout, "\n");
   }
   
   for (size_t i = 0; i < size; ++i) {
@@ -59,7 +57,7 @@ double reward_by_index(vertex_t *vertex) {
 }
 
 // [[Rcpp::export]]
-List kingman_gen_reward(int n, const int r) {
+List kingman_gen_reward(int n, int r) {
   if (n <= 0) {
     throw std::invalid_argument("'n' must be strictly positive");
   }
@@ -68,8 +66,8 @@ List kingman_gen_reward(int n, const int r) {
   }
   
   vertex_t *graph;
-  gen_kingman_graph(&graph, n, r+1);
-  reward_index = r+1;
+  gen_kingman_graph(&graph, n, r);
+  reward_index = r-1;
   reward_transform(graph, reward_by_index);
   
   double **mat;
@@ -86,8 +84,6 @@ List kingman_gen_reward(int n, const int r) {
     for (size_t j = 2; j < size; ++j) {
       SIM(i - 2, j - 2) = mat[i][j];
     }
-    
-    fprintf(stdout, "\n");
   }
   
   for (size_t i = 0; i < size; ++i) {
@@ -147,8 +143,6 @@ List kingman_gen_reward_by(int n, int m, Rcpp::Function reward_function) {
         RW(i - 2, j - 2) = vertices[i]->rewards[j - 2];
       }
     }
-    
-    fprintf(stdout, "\n");
   }
   
   for (size_t i = 0; i < size; ++i) {
