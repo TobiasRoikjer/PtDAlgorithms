@@ -484,14 +484,12 @@ static void increase_weight(vertex_t *from, vertex_t *to, double inc_weight) {
 }
 
 static void avl_free(avl_vec_vertex_t *vertex) {
-    if (vertex->left != nullptr) {
-        avl_free(vertex->left);
+    if (vertex == nullptr) {
+        return;
     }
 
-    if (vertex->right != nullptr) {
-        avl_free(vertex->right);
-    }
-
+    avl_free(vertex->left);
+    avl_free(vertex->right);
     free(vertex);
 }
 
@@ -523,28 +521,30 @@ static vertex_t *get_abs_vertex(vertex_t *graph) {
     return abs_vertex;
 }
 
-static int kingman_visit_vertex(vertex_t **out,
-                                vec_entry_t *state,
-                                avl_vec_vertex_t *bst,
+static int kingman_visit_vertex(vertex_t **out_initial_vertex,
+                                vec_entry_t *initial_state,
                                 vertex_t *abs_vertex,
-                                const size_t n_remaining,
                                 const size_t m) {
-    avl_vec_vertex_t *bst_vertex = (avl_vec_vertex_t*)avl_vec_find(bst, state, m);
+    avl_vec_vertex_t *bst = nullptr;
 
-    if (bst_vertex != nullptr) {
-        *out = bst_vertex->entry;
-        return 0;
-    } else {
-        vec_entry_t *vertex_state;
+    queue<vertex_t *> vertices_to_visit;
+    vertex_t *initial_vertex = new vertex_t(initial_state, m);
+    vertices_to_visit.push(initial_vertex);
+    vec_entry_t *v = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
+    avl_vec_vertex_t *bst_vertex;
 
-        vertex_state = (vec_entry_t*) malloc(sizeof(vec_entry_t) * m);
-        memcpy(vertex_state, state, sizeof(vec_entry_t) * m);
+    queue<vertex_t*> sorting_queue;
 
-        *out = new vertex_t(vertex_state, m);
+    while (!vertices_to_visit.empty()) {
+        vertex_t *vertex = vertices_to_visit.front();
+        sorting_queue.push(vertex);
+        vertices_to_visit.pop();
+        memcpy(v, vertex->state, sizeof(vec_entry_t) * m);
+        size_t n_remaining = 0;
 
-        avl_vec_insert(&bst, vertex_state, *out, m);
-
-        vec_entry_t *v = state;
+        for (vec_entry_t i = 0; i < m; i++) {
+            n_remaining += v[i];
+        }
 
         for (vec_entry_t i = 0; i < m; i++) {
             if (v[i] == 0) {
@@ -555,35 +555,54 @@ static int kingman_visit_vertex(vertex_t **out,
                 if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
                     double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
 
-                    const size_t inc_pos = min((i + j + 2) - 1, m-1);
+                    const size_t inc_pos = min((i + j + 2) - 1, m - 1);
                     v[i]--;
                     v[j]--;
                     v[inc_pos]++;
 
                     vertex_t *new_vertex;
-                    const bool only_tail = (v[m-1] == n_remaining - 1);
+                    const bool only_tail = (v[m - 1] == n_remaining - 1);
 
                     if (only_tail) {
                         new_vertex = abs_vertex;
                     } else {
-                        kingman_visit_vertex(&new_vertex,
-                                         v, bst,
-                                         abs_vertex,
-                                         n_remaining - 1,
-                                         m);
+                        bst_vertex = (avl_vec_vertex_t *) avl_vec_find(bst, v, m);
+
+                        if (bst_vertex == nullptr) {
+                            vec_entry_t *new_state = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
+                            memcpy(new_state, v, sizeof(vec_entry_t) * m);
+                            vertex_t *to = new vertex_t(new_state, m);
+
+                            avl_vec_insert(&bst, new_state, to, m);
+                            vertices_to_visit.push(to);
+                            new_vertex = to;
+                        } else {
+                            new_vertex = bst_vertex->entry;
+                        }
                     }
 
                     v[i]++;
                     v[j]++;
                     v[inc_pos]--;
 
-                    add_edge_unsorted(*out, new_vertex, t);
+                    add_edge_unsorted(vertex, new_vertex, t);
                 }
             }
         }
-
-        return 0;
     }
+
+    while (!sorting_queue.empty()) {
+        auto vertex = sorting_queue.front();
+        sorting_queue.pop();
+
+        sort(vertex->children.begin(), vertex->children.end());
+        sort(vertex->parents.begin(), vertex->parents.end());
+    }
+
+    free(v);
+    *out_initial_vertex = initial_vertex;
+    avl_free(bst);
+    return 0;
 }
 
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
@@ -599,13 +618,10 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
 
     vertex_t *absorbing_vertex = new vertex_t(mrca, m);
 
-    avl_vec_vertex_t *BST;
-    avl_vec_vertex_create(&BST, mrca, absorbing_vertex, nullptr);
-
     vertex_t *state_graph;
 
-    kingman_visit_vertex(&state_graph, initial, BST, absorbing_vertex,
-            n,
+    kingman_visit_vertex(&state_graph,
+            initial, absorbing_vertex,
             m);
 
     vec_entry_t *start_state = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
@@ -613,18 +629,6 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
     vertex_t *start = new vertex_t(start_state, m);
 
     add_edge(start, state_graph, 1);
-    avl_free(BST);
-    free(initial);
-
-    auto queue = enqueue_vertices(start);
-
-    while (!queue.empty()) {
-        auto vertex = queue.front();
-        queue.pop();
-
-        sort(vertex->children.begin(), vertex->children.end());
-        sort(vertex->parents.begin(), vertex->parents.end());
-    }
 
     *graph = start;
 
@@ -798,32 +802,14 @@ cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m) {
     return (cov_exp_return) {.cov = &cov, .exp = &expectation};
 }
 
-vector<vertex_t *> *vertex_to_free;
-
-static void mark_for_deletion(vertex_t *vertex) {
-    if (vertex->visited) {
-        return;
-    }
-
-    vertex->visited = true;
-
-    vertex_to_free->push_back(vertex);
-
-    for (auto child : vertex->children) {
-        mark_for_deletion(child.vertex);
-    }
-}
-
 void graph_free(vertex_t *graph) {
-    vertex_to_free = new vector<vertex_t *>();
-    reset_graph_visited(graph);
-    mark_for_deletion(graph);
+    queue<vertex_t*> to_free = enqueue_vertices(graph);
 
-    for (auto vertex : *vertex_to_free) {
+    while (!to_free.empty()) {
+        vertex_t *vertex = to_free.front();
+        to_free.pop();
         delete vertex;
     }
-
-    delete vertex_to_free;
 }
 
 double calculate_rate(vertex_t *vertex) {
