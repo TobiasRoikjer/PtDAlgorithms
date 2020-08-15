@@ -1,3 +1,5 @@
+#include <utility>
+
 #ifndef PTDALGORITHMS_PHASE_H
 #define PTDALGORITHMS_PHASE_H
 
@@ -34,11 +36,11 @@ typedef size_t vec_entry_t;
 static size_t id = 0;
 
 typedef struct vertex {
-    vertex(vec_entry_t *state, size_t state_length) {
+    vertex(vec_entry_t *state, vector<double> rewards, size_t state_length) {
         this->vertex_index = id;
         id++;
         this->state = state;
-        this->rewards = vector<double>(state, state + state_length);
+        this->rewards = std::move(rewards);
     }
 
     ~vertex() {

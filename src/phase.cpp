@@ -528,7 +528,9 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
     avl_vec_vertex_t *bst = nullptr;
 
     queue<vertex_t *> vertices_to_visit;
-    vertex_t *initial_vertex = new vertex_t(initial_state, m);
+    vertex_t *initial_vertex = new vertex_t(initial_state,
+                                            vector<double>(initial_state, initial_state + m),
+                                            m);
     vertices_to_visit.push(initial_vertex);
     vec_entry_t *v = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
     avl_vec_vertex_t *bst_vertex;
@@ -571,7 +573,9 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
                         if (bst_vertex == nullptr) {
                             vec_entry_t *new_state = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
                             memcpy(new_state, v, sizeof(vec_entry_t) * m);
-                            vertex_t *to = new vertex_t(new_state, m);
+                            vertex_t *to = new vertex_t(new_state,
+                                                        vector<double>(new_state, new_state + m),
+                                                                m);
 
                             avl_vec_insert(&bst, new_state, to, m);
                             vertices_to_visit.push(to);
@@ -616,7 +620,9 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
     vec_entry_t *mrca = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
     mrca[m-1] = 1;
 
-    vertex_t *absorbing_vertex = new vertex_t(mrca, m);
+    vertex_t *absorbing_vertex = new vertex_t(mrca,
+                                              vector<double>(mrca, mrca + m),
+                                              m);
 
     vertex_t *state_graph;
 
@@ -626,7 +632,7 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
 
     vec_entry_t *start_state = (vec_entry_t*)calloc(m, sizeof(vec_entry_t));
 
-    vertex_t *start = new vertex_t(start_state, m);
+    vertex_t *start = new vertex_t(start_state, vector<double>(start_state, start_state + m), m);
 
     add_edge(start, state_graph, 1);
 
@@ -709,7 +715,7 @@ void mph_cov_assign_vertex_all(vertex_t *vertex, size_t m) {
 
     for (size_t j = 0; j < m; ++j) {
         if (vertex->rate != 0) {
-            vertex->exp.push_back(vertex->prob * vertex->state[j] / vertex->rate);
+            vertex->exp.push_back(vertex->prob * vertex->rewards[j] / vertex->rate);
         } else {
             vertex->exp.push_back(0);
         }
@@ -739,7 +745,7 @@ void mph_cov_assign_desc_all(vertex_t *vertex, size_t m) {
 
     for (size_t j = 0; j < m; ++j) {
         if (vertex->rate != 0) {
-            exp[j] = vertex->state[j] / vertex->rate;
+            exp[j] = vertex->rewards[j] / vertex->rate;
         } else {
             exp[j] = 0;
         }
