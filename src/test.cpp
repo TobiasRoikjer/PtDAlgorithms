@@ -10,18 +10,20 @@ double reward_by_index(vertex_t *vertex) {
     return vertex->rewards[r];
 }
 
-int main(int argv, char **argc) {
-    size_t n = 7;
+int main2(int argv, char **argc) {
+    size_t n = atoi(argc[1]);
     size_t m = n;
 
     vertex_t *graph;
     gen_kingman_graph(&graph, n, m);
     r = 2;
-    reward_transform(graph, reward_by_index);
+    //reward_transform(graph, reward_by_index);
 
     double **mat;
     vertex_t **vertices;
     size_t size;
+    return 0;
+
     graph_as_mat(&mat, &vertices, &size, graph);
 
     for (size_t i = 2; i < size; ++i) {
@@ -50,9 +52,9 @@ int main(int argv, char **argc) {
     return 0;
 }
 
-int main2(int argv, char **argc) {
-    size_t n = 25;
-    size_t m = 5;
+int main(int argv, char **argc) {
+    size_t n = atoi(argc[1]);
+    size_t m = atoi(argc[2]);
 
     vertex_t *graph;
     gen_kingman_graph(&graph, n, m);
