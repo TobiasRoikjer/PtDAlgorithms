@@ -416,7 +416,7 @@ static void remove_edge(vertex_t *from, vertex_t *to){
     to->parents.erase(elem_parent);
 }
 
-static void add_edge_unsorted(vertex_t *from, vertex_t *to, double weight) {
+static inline void add_edge_unsorted(vertex_t *from, vertex_t *to, double weight) {
     if (from == to) {
         return;
     }
@@ -426,7 +426,7 @@ static void add_edge_unsorted(vertex_t *from, vertex_t *to, double weight) {
     to->parents.push_back({.vertex = from, .weight = weight});
 }
 
-static void add_edge(vertex_t *from, vertex_t *to, double weight) {
+static inline void add_edge(vertex_t *from, vertex_t *to, double weight) {
     if (from == to) {
         return;
     }
@@ -536,6 +536,7 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
     avl_vec_vertex_t *bst_vertex;
 
     queue<vertex_t*> sorting_queue;
+    size_t end = 0;
 
     while (!vertices_to_visit.empty()) {
         vertex_t *vertex = vertices_to_visit.front();
@@ -543,17 +544,26 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
         vertices_to_visit.pop();
         memcpy(v, vertex->state, sizeof(vec_entry_t) * m);
         size_t n_remaining = 0;
+        size_t start = -1;
 
         for (vec_entry_t i = 0; i < m; i++) {
             n_remaining += v[i];
+
+            if (v[i] > 0) {
+                end = i;
+
+                if (start == -1) {
+                    start = i;
+                }
+            }
         }
 
-        for (vec_entry_t i = 0; i < m; i++) {
+        for (vec_entry_t i = start; i <= end; i++) {
             if (v[i] == 0) {
                 continue;
             }
 
-            for (vec_entry_t j = i; j < m; j++) {
+            for (vec_entry_t j = i; j <= end; j++) {
                 if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
                     double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
 
