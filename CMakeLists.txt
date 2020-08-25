@@ -8,5 +8,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-add_executable(cpp_test src/test.cpp src/phase.cpp src/phase.h)
+add_executable(cpp_test src/test.cpp src/phase.h src/generation.h src/phase.cpp src/generation.cpp)
 add_library(PtDAlgorithms src/phase.cpp src/phase.h)
+set(CMAKE_CXX_FLAGS_DEBUG "-O3")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")

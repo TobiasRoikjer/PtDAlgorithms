@@ -416,7 +416,7 @@ static void remove_edge(vertex_t *from, vertex_t *to){
     to->parents.erase(elem_parent);
 }
 
-static inline void add_edge_unsorted(vertex_t *from, vertex_t *to, double weight) {
+void add_edge_unsorted(vertex_t *from, vertex_t *to, double weight) {
     if (from == to) {
         return;
     }
@@ -426,7 +426,7 @@ static inline void add_edge_unsorted(vertex_t *from, vertex_t *to, double weight
     to->parents.push_back({.vertex = from, .weight = weight});
 }
 
-static inline void add_edge(vertex_t *from, vertex_t *to, double weight) {
+void add_edge(vertex_t *from, vertex_t *to, double weight) {
     if (from == to) {
         return;
     }
@@ -552,7 +552,7 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
             if (v[i] > 0) {
                 end = i;
 
-                if (start == -1) {
+                if (start == (size_t)-1) {
                     start = i;
                 }
             }
