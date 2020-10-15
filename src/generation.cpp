@@ -4,10 +4,13 @@
 #include "phase.h"
 
 inline bool has_child(vertex_t *vertex, vertex_t *child) {
-    for (auto c : vertex->children) {
-        if (c.vertex == child) {
+    llc_t *llc  = vertex->edges->next;
+    while (llc != NULL) {
+        if (llc->child == child) {
             return true;
         }
+
+        llc = llc->next;
     }
 
     return false;
@@ -27,8 +30,8 @@ vertex_t *generate_graph(unsigned int seed,
     for (size_t i = 0; i < n_states; ++i) {
         vertices[i] = new vertex_t(nullptr, {2.0f}, 0);
         vertices[i]->vertex_index = i+2;
-        add_edge(ipv, vertices[i], 1.0f);
-        add_edge(vertices[i], abs, 1.0f);
+        vertex_add_edge(ipv, vertices[i], 1.0f);
+        vertex_add_edge(vertices[i], abs, 1.0f);
     }
 
     vector<pair<size_t, size_t>> combinations;
@@ -46,13 +49,8 @@ vertex_t *generate_graph(unsigned int seed,
     random_shuffle(combinations.begin(), combinations.end());
 
     for (size_t i = 0; i < n_edges; ++i) {
-        add_edge_unsorted(vertices[combinations[i].first],
+        vertex_add_edge(vertices[combinations[i].first],
                 vertices[combinations[i].second], 1.0f);
-    }
-
-    for (size_t i = 0; i < n_states; ++i) {
-        sort(vertices[i]->children.begin(), vertices[i]->children.end());
-        sort(vertices[i]->parents.begin(), vertices[i]->parents.end());
     }
 
     for (size_t i = 0; i < n_zero_rewards; ++i) {
