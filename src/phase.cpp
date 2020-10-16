@@ -12,39 +12,6 @@ void print_graph_list(FILE *stream, vertex_t *graph,
                       bool indexed,
                       size_t vec_length, size_t vec_spacing);
 
-static void verify_next(ll_t *ll) {
-    return;
-    ll_t *s = ll;
-    vertex_t *seen[50];
-    size_t seen_count = 0;
-
-    while (s != NULL) {
-        if (s->prev != NULL) {
-            if (s->prev->next != s) {
-                DIE_ERROR(1, "No <->\n");
-            }
-        }
-
-
-        if (s->next != NULL) {
-            if (s->next->prev != s) {
-                DIE_ERROR(1, "No <->\n");
-            }
-        }
-
-
-        for (size_t i = 0; i < seen_count; ++i) {
-            if (seen[i] == s->vertex) {
-                DIE_ERROR(1, "ALREADY SEEN \n");
-            }
-        }
-
-        seen[seen_count] = s->vertex;
-        seen_count++;
-        s = s->next;
-    }
-}
-
 static void ll_destroy(ll_t *ll) {
     if (ll != NULL) {
         ll_destroy(ll->next);
@@ -66,12 +33,6 @@ static void ll_remove(llc_t *ll) {
     if (ll->llp->next != NULL) {
         ll->llp->next->prev = ll->llp->prev;
     }
-
-    verify_next((ll_t *) ll->prev);
-    verify_next((ll_t *) ll->next);
-
-    verify_next((ll_t *) ll->llp->prev);
-    verify_next((ll_t *) ll->llp->next);
 
     free(ll->llp);
     free(ll);
@@ -98,8 +59,6 @@ struct ll_init ll_init(vertex_t *from, vertex_t *to, double weight) {
 }
 
 void ll_insert(vertex_t *from, vertex_t *to, double weight) {
-    verify_next((ll_t*)from->edges);
-    verify_next((ll_t*)to->parents);
     struct ll_init ll = ll_init(from, to, weight);
     llc_t *current = from->edges;
 
@@ -131,9 +90,6 @@ void ll_insert(vertex_t *from, vertex_t *to, double weight) {
     if (next != NULL) {
         next->prev = ll.llp;
     }
-
-    verify_next((ll_t*)from->edges);
-    verify_next((ll_t*)to->parents);
 }
 
 vertex_t *vertex_init(vec_entry_t *state, vector<double> rewards, size_t state_length) {
@@ -726,7 +682,6 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
     ll_insert(start, state_graph, 1);
 
     *graph = start;
-    print_graph_list(stderr, start, true, n, n);
 
     return 0;
 }
@@ -799,7 +754,6 @@ static void _print_graph_list(FILE *stream, vertex_t *vertex,
 void print_graph_list(FILE *stream, vertex_t *graph,
                       bool indexed,
                       size_t vec_length, size_t vec_spacing) {
-    return;
     reset_graph_visited(graph);
     fprintf(stream, "-- Graph list --\n");
     _print_graph_list(stream, graph, indexed, vec_length, vec_spacing);
@@ -959,17 +913,12 @@ double calculate_rate(vertex_t *vertex) {
     return rate;
 }
 
-// TODO: use parents->next and children->next everywhere
-
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
     queue<vertex_t *> queue = enqueue_vertices(graph);
-    print_graph_list(stderr, graph, false, 1, 1);
+
     while (!queue.empty()) {
         vertex_t *vertex = queue.front();
         queue.pop();
-
-        //fprintf(stderr, "============ VERTEX  %zu  =============\n",
-        //        *vertex->state);
 
         if (vertex->edges->next == NULL) {
             // Absorbing vertex
@@ -985,35 +934,15 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
 
 
         if (reward == 0) {
-
-            verify_next((ll_t *) vertex->edges);
-            verify_next((ll_t *) vertex->parents);
             // Take all my edges and add to my parent instead.
             llp_t *parent = vertex->parents->next;
 
             while (parent != NULL) {
-
-
-                verify_next((ll_t *) vertex->edges);
-                verify_next((ll_t *) vertex->parents);
-                verify_next((ll_t *) parent->parent->edges);
-                verify_next((ll_t *) parent->parent->parents);
                 llc_t *parent_child = parent->parent->edges;
                 llc_t *child = vertex->edges->next;
+                // make children into array
 
                 while (child != NULL) {
-                    //fprintf(stderr, "Visiting parent %zu and child %zu\n",
-                    //        *parent->parent->state,
-                    //        *child->child->state);
-
-
-                    verify_next((ll_t *) vertex->edges);
-                    verify_next((ll_t *) vertex->parents);
-                    verify_next((ll_t *) child->child->edges);
-                    verify_next((ll_t *) child->child->parents);
-                    verify_next((ll_t *) parent->parent->edges);
-                    verify_next((ll_t *) parent->parent->parents);
-
                     double prob = child->weight / vertex->rate;
 
                     if (vertex->rate == 0) {
@@ -1026,10 +955,7 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
 
                     if (parent_child->next == NULL ||
                         child->child < parent_child->next->child) {
-                        //fprintf(stderr, "A\n");
 
-                        verify_next((ll_t *) child->child->edges);
-                        verify_next((ll_t *) child->child->parents);
                         // We must insert new
                         struct ll_init ll = ll_init(parent->parent, child->child, prob * parent->llc->weight);
 
@@ -1042,10 +968,6 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
                             next_child->prev = ll.llc;
                         }
 
-
-                        verify_next((ll_t *) child->child->edges);
-                        verify_next((ll_t *) child->child->parents);
-
                         llp_t *next_parent = child->child->parents->next;
                         child->child->parents->next = ll.llp;
                         (ll.llp)->next = next_parent;
@@ -1055,83 +977,28 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
                             next_parent->prev = ll.llp;
                         }
 
-                        verify_next((ll_t *) vertex->edges);
-                        verify_next((ll_t *) vertex->parents);
-                        verify_next((ll_t *) child->child->edges);
-                        verify_next((ll_t *) child->child->parents);
-                        verify_next((ll_t *) parent->parent->edges);
-                        verify_next((ll_t *) parent->parent->parents);
-
                         child = child->next;
                     } else if (child->child > parent_child->next->child) {
-                        verify_next((ll_t *) child->child->edges);
-                        verify_next((ll_t *) child->child->parents);
-                        //fprintf(stderr, "B\n");
                         parent_child = parent_child->next;
                     } else {
-                        verify_next((ll_t *) child->child->edges);
-                        verify_next((ll_t *) child->child->parents);
-                        //fprintf(stderr, "C prob %f weight %f\n", prob, parent->llc->weight);
                         // ==
                         parent_child->next->weight += prob * parent->llc->weight;
 
-                        verify_next((ll_t *) child->child->edges);
-                        verify_next((ll_t *) child->child->parents);
                         child = child->next;
                         parent_child = parent_child->next;
-                        if (child != NULL) {
-                            verify_next((ll_t *) child->child->edges);
-                            verify_next((ll_t *) child->child->parents);
-                        }
                     }
-
-                    verify_next((ll_t *) vertex->edges);
-                    verify_next((ll_t *) vertex->parents);
-                    if (child != NULL) {
-                        verify_next((ll_t *) child->child->edges);
-                        verify_next((ll_t *) child->child->parents);
-                    }
-                    verify_next((ll_t *) parent->parent->edges);
-                    verify_next((ll_t *) parent->parent->parents);
-                    print_graph_list(stderr, graph, false, 1, 1);
                 }
 
-                //fprintf(stderr, "Pre remove parents\n");
-                print_graph_list(stderr, graph, false, 1, 1);
                 ll_remove(parent->llc);
                 parent = vertex->parents->next;
-
-                //fprintf(stderr, "POST remove parents\n");
-                print_graph_list(stderr, graph, false, 1, 1);
             }
 
             llc_t *child = vertex->edges->next;
 
-            verify_next((ll_t *) vertex->edges);
-            verify_next((ll_t *) vertex->parents);
-
             while (child != NULL) {
-                if (*vertex->state == 3) {
-                    //fprintf(stderr, "SPECIAL 3 PRE CHILD RM\n");
-                    print_graph_list(stderr, graph, false, 1, 1);
-                }
                 ll_remove(child);
                 child = vertex->edges->next;
             }
-
-            //fprintf(stderr, "POST remove children\n");
-            print_graph_list(stderr, graph, false, 1, 1);
-            parent = vertex->parents->next;
-
-            while (parent != NULL) {
-                // ll_remove(parent->llc);
-
-                parent = vertex->parents->next;
-            }
-
-
-            //fprintf(stderr, "POST remove parents2\n");
-            print_graph_list(stderr, graph, false, 1, 1);
 
             vertex_destroy(vertex);
         } else {

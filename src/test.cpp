@@ -11,8 +11,8 @@ double reward_by_index(vertex_t *vertex) {
 
 int main5(int argv, char **argc) {
     size_t n_states = 2046;//atoi(argc[1]);
-    size_t n_edges = (size_t)50*50;//atoi(argc[2]);
-    size_t n_zero_rewards = (size_t)(2022*0.5);//atoi(argc[3]);
+    size_t n_edges = (size_t) 50 * 50;//atoi(argc[2]);
+    size_t n_zero_rewards = (size_t) (2022 * 0.5);//atoi(argc[3]);
 
     vertex_t *graph = generate_graph(80002020, n_states, n_edges, n_zero_rewards);
     r = 0;
@@ -51,25 +51,20 @@ int main5(int argv, char **argc) {
     return 0;
 }
 
-int main(int argv, char **argc) {
-    size_t n = 20;
-    size_t m = 15;
+int main(int argc, char **argv) {
+    size_t n = 50;
+    size_t m = 10;
 
     vertex_t *graph;
-    gen_kingman_graph(&graph, n, m);
-
-    cov_exp_return ret = mph_cov_exp_all(graph, m);
-
-    for (size_t i = 0; i < (size_t)m; ++i) {
-        for (size_t j = 0; j < (size_t)m; ++j) {
-            fprintf(stdout, "Cov %zu %zu %f \n",
-                    i, j, (*ret.cov)[max(i,j)][min(i,j)]);
-        }
-    }
-
-    r = 7;
+    //gen_kingman_graph(&graph, n, m);
+    graph = generate_graph(1234,
+                           (size_t) atoi(argv[1]),
+                           (size_t) atoi(argv[2]),
+                           (size_t) atoi(argv[3]));
+    fprintf(stderr, "Done generating\n");
+    r = 0;
     reward_transform(graph, reward_by_index);
-
+    return 0;
     double **mat;
     vertex_t **vertices;
     size_t size;
@@ -152,10 +147,10 @@ int main2(int argv, char **argc) {
     gen_kingman_graph(&graph, n, m);
     cov_exp_return ret = mph_cov_exp_all(graph, m);
 
-    for (size_t i = 0; i < (size_t)m; ++i) {
-        for (size_t j = 0; j < (size_t)m; ++j) {
+    for (size_t i = 0; i < (size_t) m; ++i) {
+        for (size_t j = 0; j < (size_t) m; ++j) {
             fprintf(stdout, "Cov %zu %zu %f \n",
-                    i, j, (*ret.cov)[max(i,j)][min(i,j)]);
+                    i, j, (*ret.cov)[max(i, j)][min(i, j)]);
         }
     }
 

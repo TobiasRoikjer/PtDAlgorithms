@@ -25,11 +25,11 @@ double reward_by_index(vertex_t *vertex) {
     }
 
     if (vertex == c) {
-        return 0;
+        return 1;
     }
 
     if (vertex == d) {
-        return 0;
+        return 2;
     }
 
     if (vertex == e) {
