@@ -20,18 +20,19 @@ vertex_t *generate_graph(unsigned int seed,
         size_t n_states, size_t n_edges,
         size_t n_zero_rewards) {
     srand(seed);
-    vertex_t *ipv = new vertex_t(nullptr, {1.0f}, 0);
-    vertex_t *abs = new vertex_t(nullptr, {0.0f}, 0);
+    vertex_t *ipv = vertex_init(nullptr, {1.0f}, 0);
+    vertex_t *abs = vertex_init(nullptr, {0.0f}, 0);
     vertex_t **vertices = (vertex_t**)calloc(n_states, sizeof(vertex_t*));
 
     ipv->vertex_index = 1;
     abs->vertex_index = 0;
 
     for (size_t i = 0; i < n_states; ++i) {
-        vertices[i] = new vertex_t(nullptr, {2.0f}, 0);
+        vertices[i] = vertex_init(nullptr, {2.0f}, 0);
         vertices[i]->vertex_index = i+2;
         vertex_add_edge(ipv, vertices[i], 1.0f);
         vertex_add_edge(vertices[i], abs, 1.0f);
+        vertices[i]->rewards[0] = 2.0f;
     }
 
     vector<pair<size_t, size_t>> combinations;
