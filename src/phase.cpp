@@ -12,100 +12,108 @@ void print_graph_list(FILE *stream, vertex_t *graph,
                       bool indexed,
                       size_t vec_length, size_t vec_spacing);
 
-static void ll_destroy(ll_t *ll) {
-    if (ll != NULL) {
-        ll_destroy(ll->next);
-    }
-
-    free(ll);
-}
-
-static void ll_remove(llc_t *ll) {
-    ll->llp->parent->rate -= ll->weight;
-    ll->prev->next = ll->next;
-
-    if (ll->next != NULL) {
-        ll->next->prev = ll->prev;
-    }
-
-    ll->llp->prev->next = ll->llp->next;
-
-    if (ll->llp->next != NULL) {
-        ll->llp->next->prev = ll->llp->prev;
-    }
-
-    free(ll->llp);
-    free(ll);
-}
-
-struct ll_init ll_init(vertex_t *from, vertex_t *to, double weight) {
-    llc_t *llc = (llc_t *) malloc(sizeof(llc_t));
-
-    llc->child = to;
-    llc->weight = weight;
-    llc->next = NULL;
-    llc->prev = NULL;
-
-    llp_t *llp = (llp_t *) malloc(sizeof(llp_t));
-
-    llp->parent = from;
-    llp->next = NULL;
-    llp->prev = NULL;
-
-    llc->llp = llp;
-    llp->llc = llc;
-
-    return {.llc = llc, .llp = llp};
-}
-
-void ll_insert(vertex_t *from, vertex_t *to, double weight) {
-    struct ll_init ll = ll_init(from, to, weight);
-    llc_t *current = from->edges;
-
-    while (true) {
-        if (current->next == NULL
-            || current->next->child > to) {
-            llc_t *next = current->next;
-            current->next = ll.llc;
-            (ll.llc)->prev = current;
-            (ll.llc)->next = next;
-
-            if (next != NULL) {
-                next->prev = ll.llc;
-            }
-
-            break;
-        }
-
-        current = current->next;
-    }
-
-    from->rate += weight;
-
-    llp_t *next = to->parents->next;
-    to->parents->next = ll.llp;
-    (ll.llp)->next = next;
-    (ll.llp)->prev = to->parents;
-
-    if (next != NULL) {
-        next->prev = ll.llp;
-    }
-}
-
 vertex_t *vertex_init(vec_entry_t *state, vector<double> rewards, size_t state_length) {
     vertex_t *vertex = new vertex_t(state, rewards, state_length);
-    llc_t *llc_dummy = (llc_t *) calloc(1, sizeof(llc_t));
     llp_t *llp_dummy = (llp_t *) calloc(1, sizeof(llp_t));
 
-    vertex->edges = llc_dummy;
+    vertex->edges = NULL;
     vertex->parents = llp_dummy;
+    vertex->nedges = 0;
+    vertex->nparents = 0;
 
     return vertex;
 }
 
+void ll_destroy(llp_t *llp) {
+    if (llp != NULL) {
+        ll_destroy(llp->next);
+    }
+
+    fprintf(stderr, "ll_destroy freeing %p\n", (void*)llp);
+    free(llp);
+}
+
+void ll_remove(llp_t *llp) {
+    llp_t *prev = llp->prev;
+    llp_t *next = llp->next;
+
+    if (prev != NULL) {
+        prev->next = next;
+    }
+
+    if (next != NULL) {
+        next->prev = prev;
+    }
+
+
+    fprintf(stderr, "ll_remove prev, next is %p, %p\n",
+            (void*)llp->prev,(void*)llp->next);
+
+    fprintf(stderr, "ll_remove freeing %p\n", (void*)llp);
+
+    free(llp);
+}
+
 void vertex_destroy(vertex_t *vertex) {
-    // TODO: Delete edges?
+    fprintf(stderr, "I am vertex %p, I will be destroyed\n", (void*)vertex);
+
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        if (vertex->edges[i].child == NULL) {
+            DIE_ERROR(1, "NULL child\n");
+        }
+
+        if (vertex->edges[i].weight <= 0.0001) {
+            DIE_ERROR(1, "zero weight\n");
+        }
+
+        if (vertex->edges[i].llp == NULL) {
+            DIE_ERROR(1, "NULL parent edge\n");
+        }
+
+
+        fprintf(stderr, "My child %zu is %p, the llp is %p. I will remove that as I am no longer its parent\n",
+                i,(void*)(vertex->edges[i].child), (void*)vertex->edges[i].llp);
+
+        ll_remove(vertex->edges[i].llp);
+
+        if (vertex->nparents == 0 && i == 1) {
+            exit(0);
+        }
+
+    }
+
+    ll_destroy(vertex->parents);
+    free(vertex->edges);
     delete (vertex);
+}
+
+inline void add_edge(vertex_t *from, vertex_t *to, llc_t *position, double weight) {
+    position->weight = weight;
+    position->child = to;
+    llp_t *llp = (llp_t *) malloc(sizeof(llp_t));
+    llp->llc = position;
+    llp->parent = from;
+    position->llp = llp;
+
+    llp_t *next = to->parents->next;
+    llp->next = next;
+    llp->prev = to->parents;
+
+    if (next != NULL) {
+        next->prev = llp;
+    }
+
+    to->parents->next = llp;
+
+    from->nedges++;
+    to->nparents++;
+    from->rate += weight;
+}
+
+
+void vertex_add_edge(vertex_t *from, vertex_t *to, double weight) {
+    from->edges = (llc_t *) reallocarray(from->edges, from->nedges + 1, sizeof(llc_t));
+    add_edge(from, to, &(from->edges[from->nedges]), weight);
 }
 
 static void print_vector_spacing(FILE *stream, vec_entry_t *v, size_t nmemb, size_t spacing) {
@@ -133,11 +141,9 @@ void _reset_graph_visited(vertex_t *vertex, size_t reset_int) {
 
     vertex->reset_int = reset_int;
 
-    llc_t *child = vertex->edges->next;
-
-    while (child != NULL) {
-        _reset_graph_visited(child->child, reset_int);
-        child = child->next;
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        vertex_t *child = vertex->edges[i].child;
+        _reset_graph_visited(child, reset_int);
     }
 
     vertex->visited = false;
@@ -531,11 +537,10 @@ static queue<vertex_t *> enqueue_vertices(vertex_t *graph) {
 
         vertex->visited = true;
         ret.push(vertex);
-        llc_t *child = vertex->edges->next;
 
-        while (child != NULL) {
-            queue.push(child->child);
-            child = child->next;
+        for (size_t i = 0; i < vertex->nedges; ++i) {
+            vertex_t *child = vertex->edges[i].child;
+            queue.push(child);
         }
     }
 
@@ -550,7 +555,7 @@ static vertex_t *get_abs_vertex(vertex_t *graph) {
         vertex_t *vertex = queue.front();
         queue.pop();
 
-        if (vertex->edges->next == NULL) {
+        if (vertex->nedges == 0) {
             if (abs_vertex == nullptr) {
                 abs_vertex = vertex;
             } else {
@@ -608,6 +613,16 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
 
             for (vec_entry_t j = i; j <= end; j++) {
                 if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
+                    vertex->nedges++;
+                }
+            }
+
+            vertex->edges = (llc_t *) calloc(vertex->nedges, sizeof(llc_t));
+
+            size_t pos = 0;
+
+            for (vec_entry_t j = i; j <= end; j++) {
+                if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
                     double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
 
                     const size_t inc_pos = min((i + j + 2) - 1, m - 1);
@@ -642,7 +657,8 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
                     v[j]++;
                     v[inc_pos]--;
 
-                    ll_insert(vertex, new_vertex, t);
+                    add_edge(vertex, new_vertex, &(vertex->edges[pos]), t);
+                    pos++;
                 }
             }
         }
@@ -679,7 +695,9 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
 
     vertex_t *start = vertex_init(start_state, vector<double>(start_state, start_state + m), m);
 
-    ll_insert(start, state_graph, 1);
+    start->nedges = 1;
+    start->edges = (llc_t *) calloc(1, sizeof(llc_t));
+    add_edge(start, state_graph, &(start->edges[0]), 1);
 
     *graph = start;
 
@@ -703,13 +721,12 @@ static void _print_graph_list(FILE *stream, vertex_t *vertex,
     }
     fprintf(stream, ":\n");
 
-
-    llc_t *child = vertex->edges->next;
-
-    while (child != NULL) {
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        llc_t child_edge = vertex->edges[i];
+        vertex_t *child = child_edge.child;
         fprintf(stream, "\t");
-        fprintf(stream, "(%f) ", child->weight);
-        print_vector_spacing(stream, child->child->state,
+        fprintf(stream, "(%f) ", child_edge.weight);
+        print_vector_spacing(stream, child->state,
                              vec_length, vec_spacing);
 
         if (indexed) {
@@ -717,7 +734,6 @@ static void _print_graph_list(FILE *stream, vertex_t *vertex,
         }
 
         //fprintf(stream, "\n");
-        child = child->next;
     }
 
 
@@ -741,13 +757,11 @@ static void _print_graph_list(FILE *stream, vertex_t *vertex,
 
     fprintf(stream, "\n");
 
-    child = vertex->edges->next;
-
-    while (child != NULL) {
-        _print_graph_list(stream, child->child,
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        vertex_t *child = vertex->edges[i].child;
+        _print_graph_list(stream, child,
                           indexed,
                           vec_length, vec_spacing);
-        child = child->next;
     }
 }
 
@@ -804,21 +818,17 @@ void mph_cov_assign_desc_all(vertex_t *vertex, size_t m) {
 
     vertex->desc = vector<double>(m);
 
-    llc_t *child = vertex->edges->next;
-
-    while (child != NULL) {
-        mph_cov_assign_desc_all(child->child, m);
-        child = child->next;
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        vertex_t *child = vertex->edges[i].child;
+        mph_cov_assign_desc_all(child, m);
     }
 
-    child = vertex->edges->next;
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        llc_t child_edge = vertex->edges[i];
 
-    while (child != NULL) {
         for (size_t j = 0; j < m; ++j) {
-            vertex->desc[j] += child->weight / vertex->rate * child->child->desc[j];
+            vertex->desc[j] += child_edge.weight / vertex->rate * child_edge.child->desc[j];
         }
-
-        child = child->next;
     }
 
     vector<double> exp(m);
@@ -852,11 +862,9 @@ void _mph_cov_all(vertex_t *vertex, size_t m) {
     }
 
     vertex->visited = true;
-    llc_t *child = vertex->edges->next;
-
-    while (child != NULL) {
-        _mph_cov_all(child->child, m);
-        child = child->next;
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        vertex_t *child = vertex->edges[i].child;
+        _mph_cov_all(child, m);
     }
 }
 
@@ -903,11 +911,10 @@ void graph_free(vertex_t *graph) {
 double calculate_rate(vertex_t *vertex) {
     double rate = 0;
 
-    llc_t *child = vertex->edges->next;
-
-    while (child != NULL) {
-        rate += child->weight;
-        child = child->next;
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        vertex_t *child = vertex->edges[i].child;
+        llc_t child_edge = vertex->edges[i];
+        rate += child_edge.weight;
     }
 
     return rate;
@@ -920,93 +927,107 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
         vertex_t *vertex = queue.front();
         queue.pop();
 
-        if (vertex->edges->next == NULL) {
+        if (vertex->nedges == 0) {
             // Absorbing vertex
             continue;
         }
 
-        if (vertex->parents->next == NULL) {
+        if (vertex->nparents == 0) {
             // Starting vertex
             continue;
         }
 
         double reward = reward_func(vertex);
 
-
         if (reward == 0) {
             // Take all my edges and add to my parent instead.
-            llp_t *parent = vertex->parents->next;
+            llp_t *parent_edge = vertex->parents->next;
 
-            while (parent != NULL) {
-                llc_t *parent_child = parent->parent->edges;
-                llc_t *child = vertex->edges->next;
-                // make children into array
+            while (parent_edge != NULL) {
+                vertex_t *parent = parent_edge->parent;
+                llc_t *parent_children = parent->edges;
+                size_t parent_nchildren = parent->nedges;
+                llc_t *children = vertex->edges;
+                size_t nchildren = vertex->nedges;
 
-                while (child != NULL) {
-                    double prob = child->weight / vertex->rate;
+                llc_t *new_parent_children = (llc_t *) calloc(
+                        parent->nedges + vertex->nedges,
+                        sizeof(llc_t)
+                );
+
+                double parent_weight = parent_edge->llc->weight;
+
+                size_t i = 0, j = 0, k;
+
+                for (k = 0; i < parent_nchildren || j < nchildren;) {
+                    double prob = children[j].weight / vertex->rate;
 
                     if (vertex->rate == 0) {
                         prob = 0;
                     }
 
-                    if (child->child == parent->parent) {
+                    if (j < nchildren &&
+                        children[j].child == parent) {
+                        parent->rate -= parent_weight * prob;
+                        j++;
                         continue;
                     }
 
-                    if (parent_child->next == NULL ||
-                        child->child < parent_child->next->child) {
+                    if (i < parent_nchildren &&
+                        parent_children[i].child == vertex) {
+                        i++;
+                        continue;
+                    }
 
-                        // We must insert new
-                        struct ll_init ll = ll_init(parent->parent, child->child, prob * parent->llc->weight);
-
-                        llc_t *next_child = parent_child->next;
-                        parent_child->next = ll.llc;
-                        (ll.llc)->next = next_child;
-                        (ll.llc)->prev = parent_child;
-
-                        if (next_child != NULL) {
-                            next_child->prev = ll.llc;
-                        }
-
-                        llp_t *next_parent = child->child->parents->next;
-                        child->child->parents->next = ll.llp;
-                        (ll.llp)->next = next_parent;
-                        (ll.llp)->prev = child->child->parents;
-
-                        if (next_parent != NULL) {
-                            next_parent->prev = ll.llp;
-                        }
-
-                        child = child->next;
-                    } else if (child->child > parent_child->next->child) {
-                        parent_child = parent_child->next;
+                    if (i >= parent_nchildren) {
+                        new_parent_children[k] = children[j];
+                        new_parent_children[k].weight = prob * parent_weight;
+                        new_parent_children[k].llp->parent = parent;
+                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                        j++;
+                    } else if (j >= nchildren ||
+                               parent_children[i].child < children[j].child) {
+                        new_parent_children[k] = parent_children[i];
+                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                        i++;
+                    } else if (parent_children[i].child > children[j].child) {
+                        new_parent_children[k] = children[j];
+                        new_parent_children[k].weight = prob * parent_weight;
+                        new_parent_children[k].llp->parent = parent;
+                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                        j++;
                     } else {
                         // ==
-                        parent_child->next->weight += prob * parent->llc->weight;
-
-                        child = child->next;
-                        parent_child = parent_child->next;
+                        new_parent_children[k] = parent_children[i];
+                        new_parent_children[k].weight += prob * parent_weight;
+                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                        i++;
+                        j++;
                     }
+
+                    for (size_t l = 0; l < k; ++l) {
+                        if (new_parent_children[l].child == NULL) {
+                            DIE_ERROR(1, "NULL child\n");
+                        }
+
+                        if (new_parent_children[l].weight <= 0.001) {
+                            DIE_ERROR(1, "Zero weight\n");
+                        }
+                    }
+
+                    k++;
                 }
 
-                ll_remove(parent->llc);
-                parent = vertex->parents->next;
-            }
-
-            llc_t *child = vertex->edges->next;
-
-            while (child != NULL) {
-                ll_remove(child);
-                child = vertex->edges->next;
+                parent->edges = new_parent_children;
+                parent->nedges = k;
+                free(parent_children);
+                parent_edge = parent_edge->next;
             }
 
             vertex_destroy(vertex);
         } else {
-            llc_t *child = vertex->edges->next;
-
-            while (child != NULL) {
-                child->weight /= reward;
-                child = child->next;
+            for (size_t i = 0; i < vertex->nedges; ++i) {
+                vertex->edges[i].weight /= reward;
             }
 
             vertex->rate /= reward;
@@ -1042,11 +1063,9 @@ int label_vertex_index(size_t *largest_index, vertex_t *graph) {
 
         vertex->vertex_index = index++;
 
-        llc_t *child = vertex->edges->next;
-
-        while (child != NULL) {
-            queue.push(child->child);
-            child = child->next;
+        for (size_t i = 0; i < vertex->nedges; ++i) {
+            llc_t child = vertex->edges[i];
+            queue.push(child.child);
         }
     }
 
@@ -1068,24 +1087,20 @@ void insert_into_weight_mat(double **weights, vertex_t **vertices, vertex_t *ver
 
     vertex->visited = true;
 
-    llc_t *child = vertex->edges->next;
 
-    while (child != NULL) {
-        vertex_t *child_vertex = child->child;
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        llc_t child = vertex->edges[i];
 
-        weights[vertex->vertex_index][child_vertex->vertex_index] = child->weight;
-        weights[vertex->vertex_index][vertex->vertex_index] -= child->weight;
-
-        child = child->next;
+        weights[vertex->vertex_index][child.child->vertex_index] = child.weight;
+        weights[vertex->vertex_index][vertex->vertex_index] -= child.weight;
     }
 
     vertices[vertex->vertex_index] = vertex;
 
-    child = vertex->edges->next;
 
-    while (child != NULL) {
-        insert_into_weight_mat(weights, vertices, child->child);
-        child = child->next;
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        llc_t child = vertex->edges[i];
+        insert_into_weight_mat(weights, vertices, child.child);
     }
 }
 
@@ -1105,9 +1120,5 @@ int graph_as_mat(double ***weights, vertex_t ***vertices, size_t *out_size, vert
 
     insert_into_weight_mat(*weights, *vertices, graph);
     return 0;
-}
-
-void vertex_add_edge(vertex_t *from, vertex_t *to, double weight) {
-    ll_insert(from, to, weight);
 }
 

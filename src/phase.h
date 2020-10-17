@@ -52,7 +52,9 @@ typedef struct vertex {
 
     vec_entry_t *state;
     struct llc *edges;
+    size_t nedges;
     struct llp *parents;
+    size_t nparents;
 
     bool visited = false;
     double rate = 0;
@@ -66,31 +68,18 @@ typedef struct vertex {
     size_t reset_int = 0;
 } vertex_t;
 
-typedef struct ll {
-    struct ll *next;
-    struct ll *prev;
-    struct vertex *vertex;
-} ll_t;
-
 typedef struct llc {
-    struct llc *next;
-    struct llc *prev;
     struct vertex *child;
     struct llp *llp;
     double weight;
 } llc_t;
 
 typedef struct llp {
-    struct llp *next;
-    struct llp *prev;
     struct vertex *parent;
     struct llc *llc;
+    struct llp *prev;
+    struct llp *next;
 } llp_t;
-
-struct ll_init {
-    struct llc *llc;
-    struct llp *llp;
-};
 
 vertex_t *vertex_init(vec_entry_t *state, vector<double> rewards, size_t state_length);
 void vertex_destroy(vertex_t *vertex);
