@@ -25,15 +25,15 @@ double reward_by_index(vertex_t *vertex) {
     }
 
     if (vertex == c) {
-        return 1;
+        return 0;
     }
 
     if (vertex == d) {
-        return 2;
+        return 4;
     }
 
     if (vertex == e) {
-        return 1;
+        return 5;
     }
 
     if (vertex == f) {
@@ -48,7 +48,7 @@ double reward_by_index(vertex_t *vertex) {
 }
 
 
-int main(int argv, char **argc) {
+int main(int argc, char **argv) {
     vec_entry_t *states =(vec_entry_t*) calloc(10, sizeof(vec_entry_t));
     vec_entry_t *statea =(vec_entry_t*) calloc(10, sizeof(vec_entry_t));
     vec_entry_t *stateb =(vec_entry_t*) calloc(10, sizeof(vec_entry_t));
@@ -79,10 +79,20 @@ int main(int argv, char **argc) {
     vertex_add_edge(s, a, 0.3);
     vertex_add_edge(s, b, 0.7);
     vertex_add_edge(a, b, 3);
-    vertex_add_edge(b, c, 4);
+    vertex_add_edge(b, a, 1);
+    vertex_add_edge(b, c, 2);
     vertex_add_edge(b, d, 5);
+    vertex_add_edge(c, b, 6);
     vertex_add_edge(c, t, 6);
     vertex_add_edge(d, c, 7);
+
+    fprintf(stderr, "Vertex a %p\n", (void*)a);
+    fprintf(stderr, "Vertex b %p\n", (void*)b);
+    fprintf(stderr, "Vertex c %p\n", (void*)c);
+    fprintf(stderr, "Vertex d %p\n", (void*)d);
+    fprintf(stderr, "Vertex s %p\n", (void*)s);
+    fprintf(stderr, "Vertex t %p\n", (void*)t);
+
     reward_transform(s, reward_by_index);
 
     double **mat;
@@ -104,6 +114,15 @@ int main(int argv, char **argc) {
 
         fprintf(stdout, "\n");
     }
+
+    for (size_t i = 0; i < size; ++i) {
+        free(mat[i]);
+    }
+
+    free(mat);
+    free(vertices);
+
+    graph_free(s);
 
     return 0;
 }
