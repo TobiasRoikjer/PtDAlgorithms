@@ -58,13 +58,13 @@ int main(int argc, char **argv) {
     vertex_t *graph;
     //gen_kingman_graph(&graph, n, m);
     graph = generate_graph(1234,
-                           (size_t) atoi(argv[1]),
-                           (size_t) atoi(argv[2]),
-                           (size_t) atoi(argv[3]));
-    fprintf(stderr, "Done generating\n");
+                           10,
+                           5,
+                           0);
+    fprintf(stdout, "Done generating\n");
     r = 0;
     reward_transform(graph, reward_by_index);
-    return 0;
+
     double **mat;
     vertex_t **vertices;
     size_t size;

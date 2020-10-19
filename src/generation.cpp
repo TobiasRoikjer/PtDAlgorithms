@@ -4,13 +4,10 @@
 #include "phase.h"
 
 inline bool has_child(vertex_t *vertex, vertex_t *child) {
-    llc_t *llc  = vertex->edges->next;
-    while (llc != NULL) {
-        if (llc->child == child) {
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        if (vertex->edges[i].child == child) {
             return true;
         }
-
-        llc = llc->next;
     }
 
     return false;
@@ -30,7 +27,7 @@ vertex_t *generate_graph(unsigned int seed,
     for (size_t i = 0; i < n_states; ++i) {
         vertices[i] = vertex_init(nullptr, {2.0f}, 0);
         vertices[i]->vertex_index = i+2;
-        vertex_add_edge(ipv, vertices[i], 1.0f);
+        vertex_add_edge(ipv, vertices[i], 1.0f/n_states);
         vertex_add_edge(vertices[i], abs, 1.0f);
         vertices[i]->rewards[0] = 2.0f;
     }
@@ -58,5 +55,6 @@ vertex_t *generate_graph(unsigned int seed,
         vertices[i]->rewards[0] = 0.0f;
     }
 
+    free(vertices);
     return ipv;
 }
