@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stack>
 #include <queue>
+#include <stdint.h>
 #include "phase.h"
 
 void print_graph_list(FILE *stream, vertex_t *graph,
@@ -65,7 +66,7 @@ void vertex_destroy_parents(vertex_t *vertex) {
 
 ssize_t total_add_edge_time = 0;
 
-inline void add_edge(vertex_t *from, vertex_t *to, size_t index, double weight) {
+inline void add_edge_no_rate(vertex_t *from, vertex_t *to, size_t index, double weight) {
     if (to == NULL) {
         DIE_ERROR(1, "to is NULL\n");
     }
@@ -102,11 +103,15 @@ inline void add_edge(vertex_t *from, vertex_t *to, size_t index, double weight) 
 
     from->nedges++;
     to->nparents++;
-    from->rate += weight;
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &end);
     ssize_t delta_us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
     total_add_edge_time += delta_us;
+}
+
+inline void add_edge(vertex_t *from, vertex_t *to, size_t index, double weight) {
+    add_edge_no_rate(from, to, index, weight);
+    from->rate += weight;
 }
 
 void vertex_add_edge(vertex_t *from, vertex_t *to, double weight) {
@@ -201,7 +206,7 @@ avl_vec_vertex_t *rotate_left_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *
     child_right_left = child_right->left;
     child->right = child_right_left;
 
-    if (child_right_left != nullptr) {
+    if (child_right_left != NULL) {
         child_right_left->parent = child;
     }
 
@@ -210,7 +215,7 @@ avl_vec_vertex_t *rotate_left_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *
     child_right_right = child_right->right;
     parent->left = child_right_right;
 
-    if (child_right_right != nullptr) {
+    if (child_right_right != NULL) {
         child_right_right->parent = parent;
     }
 
@@ -251,7 +256,7 @@ avl_vec_vertex_t *rotate_right_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *
 
     child->left = child_left_right;
 
-    if (child_left_right != nullptr) {
+    if (child_left_right != NULL) {
         child_left_right->parent = child;
     }
 
@@ -261,7 +266,7 @@ avl_vec_vertex_t *rotate_right_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *
     child_left_left = child_left->left;
     parent->right = child_left_left;
 
-    if (child_left_left != nullptr) {
+    if (child_left_left != NULL) {
         child_left_left->parent = parent;
     }
 
@@ -296,7 +301,7 @@ avl_vec_vertex_t *rotate_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *child)
     child_left = child->left;
     parent->right = child_left;
 
-    if (child_left != nullptr) {
+    if (child_left != NULL) {
         child_left->parent = parent;
     }
 
@@ -326,7 +331,7 @@ avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child
     child_right = child->right;
     parent->left = child_right;
 
-    if (child_right != nullptr) {
+    if (child_right != NULL) {
         child_right->parent = parent;
     }
 
@@ -345,14 +350,14 @@ avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child
 }
 
 int avl_vec_vertex_create(avl_vec_vertex_t **vertex, vec_entry_t *key, vertex_t *entry, avl_vec_vertex_t *parent) {
-    if ((*vertex = (avl_vec_vertex_t *) malloc(sizeof(avl_vec_vertex_t))) == nullptr) {
+    if ((*vertex = (avl_vec_vertex_t *) malloc(sizeof(avl_vec_vertex_t))) == NULL) {
         return 1;
     }
 
     (*vertex)->key = key;
     (*vertex)->entry = entry;
-    (*vertex)->left = nullptr;
-    (*vertex)->right = nullptr;
+    (*vertex)->left = NULL;
+    (*vertex)->right = NULL;
     (*vertex)->parent = parent;
     (*vertex)->balance = 0;
 
@@ -360,7 +365,7 @@ int avl_vec_vertex_create(avl_vec_vertex_t **vertex, vec_entry_t *key, vertex_t 
 }
 
 void avl_vec_vertex_destroy(avl_vec_vertex_t *vertex) {
-    if (vertex == nullptr) {
+    if (vertex == NULL) {
         return;
     }
 
@@ -371,7 +376,7 @@ void avl_vec_vertex_destroy(avl_vec_vertex_t *vertex) {
 }
 
 static void avl_free(avl_vec_vertex_t *vertex) {
-    if (vertex == nullptr) {
+    if (vertex == NULL) {
         return;
     }
 
@@ -382,8 +387,8 @@ static void avl_free(avl_vec_vertex_t *vertex) {
 
 const avl_vec_vertex_t *
 avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size_t vec_length) {
-    if (rootptr == nullptr) {
-        return nullptr;
+    if (rootptr == NULL) {
+        return NULL;
     }
 
     const avl_vec_vertex_t *vertex = rootptr;
@@ -391,14 +396,14 @@ avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size
     while (true) {
         int res = radix_cmp(key, vertex->key, vec_length);
         if (res < 0) {
-            if (vertex->left == nullptr) {
-                return nullptr;
+            if (vertex->left == NULL) {
+                return NULL;
             } else {
                 vertex = vertex->left;
             }
         } else if (res > 0) {
-            if (vertex->right == nullptr) {
-                return nullptr;
+            if (vertex->right == NULL) {
+                return NULL;
             } else {
                 vertex = vertex->right;
             }
@@ -410,11 +415,11 @@ avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size
 
 int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_entry_t *key, vertex_t *entry,
                        const size_t vec_length) {
-    if (avl_vec_vertex_create(out, key, entry, nullptr)) {
+    if (avl_vec_vertex_create(out, key, entry, NULL)) {
         return -1;
     }
 
-    if (rootptr == nullptr) {
+    if (rootptr == NULL) {
         return 1;
     }
 
@@ -423,14 +428,14 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_en
     while (true) {
         int res = radix_cmp(key, vertex->key, vec_length);
         if (res < 0) {
-            if (vertex->left == nullptr) {
+            if (vertex->left == NULL) {
                 vertex->left = *out;
                 break;
             } else {
                 vertex = vertex->left;
             }
         } else if (res > 0) {
-            if (vertex->right == nullptr) {
+            if (vertex->right == NULL) {
                 vertex->right = *out;
                 break;
             } else {
@@ -449,8 +454,8 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_en
 int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, vertex_t *entry, const size_t vec_length) {
     avl_vec_vertex_t *child;
 
-    if (*root == nullptr) {
-        if (avl_vec_vertex_create(root, key, entry, nullptr)) {
+    if (*root == NULL) {
+        if (avl_vec_vertex_create(root, key, entry, NULL)) {
             return 1;
         }
 
@@ -469,7 +474,7 @@ int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, vertex_t *entry, c
 
     avl_vec_vertex_t *pivot, *rotated_parent;
 
-    for (avl_vec_vertex_t *parent = child->parent; parent != nullptr; parent = child->parent) {
+    for (avl_vec_vertex_t *parent = child->parent; parent != NULL; parent = child->parent) {
         if (child == parent->right) {
             if (parent->balance > 0) {
                 pivot = parent->parent;
@@ -515,7 +520,7 @@ int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, vertex_t *entry, c
 
         rotated_parent->parent = pivot;
 
-        if (pivot != nullptr) {
+        if (pivot != NULL) {
             if (parent == pivot->left) {
                 pivot->left = rotated_parent;
             } else {
@@ -532,7 +537,7 @@ int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, vertex_t *entry, c
 }
 
 static size_t avl_vec_get_size(avl_vec_vertex_t *vertex) {
-    if (vertex == nullptr) {
+    if (vertex == NULL) {
         return 0;
     }
 
@@ -568,14 +573,14 @@ queue<vertex_t *> enqueue_vertices(vertex_t *graph) {
 
 static vertex_t *get_abs_vertex(vertex_t *graph) {
     queue<vertex_t *> queue = enqueue_vertices(graph);
-    vertex_t *abs_vertex = nullptr;
+    vertex_t *abs_vertex = NULL;
 
     while (!queue.empty()) {
         vertex_t *vertex = queue.front();
         queue.pop();
 
         if (vertex->nedges == 0) {
-            if (abs_vertex == nullptr) {
+            if (abs_vertex == NULL) {
                 abs_vertex = vertex;
             } else {
                 DIE_ERROR(1, "Found multiple absorbing vertices\n");
@@ -583,7 +588,7 @@ static vertex_t *get_abs_vertex(vertex_t *graph) {
         }
     }
 
-    if (abs_vertex == nullptr) {
+    if (abs_vertex == NULL) {
         DIE_ERROR(1, "No absorbing vertex found!\n");
     }
 
@@ -596,8 +601,8 @@ struct edge {
 };
 
 int edgecmp(const void *a, const void *b) {
-    uintptr_t vertex_position_a = (uintptr_t )((struct edge *) a)->vertex;
-    uintptr_t vertex_position_b = (uintptr_t )((struct edge *) b)->vertex;
+    uintptr_t vertex_position_a = (uintptr_t) ((struct edge *) a)->vertex;
+    uintptr_t vertex_position_b = (uintptr_t) ((struct edge *) b)->vertex;
     ptrdiff_t diff = vertex_position_a - vertex_position_b;
 
     return (int) diff;
@@ -608,7 +613,7 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
                                 vec_entry_t *initial_state,
                                 vertex_t *abs_vertex,
                                 const size_t m) {
-    avl_vec_vertex_t *bst = nullptr;
+    avl_vec_vertex_t *bst = NULL;
 
     queue<vertex_t *> vertices_to_visit;
     vertex_t *initial_vertex = vertex_init(initial_state,
@@ -663,7 +668,7 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
                     } else {
                         bst_vertex = (avl_vec_vertex_t *) avl_vec_find(bst, v, m);
 
-                        if (bst_vertex == nullptr) {
+                        if (bst_vertex == NULL) {
                             vec_entry_t *new_state = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
                             memcpy(new_state, v, sizeof(vec_entry_t) * m);
                             vertex_t *to = vertex_init(new_state,
@@ -693,7 +698,7 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
 
         if (edges.size() != 0) {
             vertex->edges = (llc_t *) calloc(edges.size(), sizeof(llc_t));
-            struct edge* e = &edges[0];
+            struct edge *e = &edges[0];
             qsort(e, edges.size(), sizeof(struct edge), edgecmp);
 
             for (size_t i = 0; i < edges.size(); ++i) {
@@ -1042,38 +1047,62 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
                 llc_t child_i, child_j;
 
                 for (k = 0; i < parent_nchildren || j < nchildren;) {
-
                     //TODO add null after all children in array
                     // loop over that instead
-                    if (i < parent_nchildren) {
-                        child_i = parent_old_children[i];
+                    if (i >= parent_nchildren) {
+                        while (j < nchildren) {
+                            child_j = children[j];
+                            double prob = children[j].weight / vertex->rate;
+
+                            if (child_j.child == parent) {
+                                parent->rate -= parent_weight * prob;
+                                j++;
+                                continue;
+                            }
+
+                            add_edge_no_rate(parent, child_j.child, k, prob * parent_weight);
+                            j++;
+                            k++;
+                        }
+
+                        break;
                     }
 
-                    if (j < nchildren) {
-                        child_j = children[j];
+                    if (j >= nchildren) {
+                        while (i < parent_nchildren) {
+                            child_i = parent_old_children[i];
+
+                            if (child_i.child == vertex) {
+                                i++;
+                                continue;
+                            }
+
+                            new_parent_children[k] = child_i;
+                            new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                            i++;
+                            k++;
+                        }
+
+                        break;
                     }
 
-                    if (j < nchildren &&
-                        child_j.child == parent) {
+                    child_i = parent_old_children[i];
+                    child_j = children[j];
+
+                    if (child_j.child == parent) {
                         double prob = children[j].weight / vertex->rate;
                         parent->rate -= parent_weight * prob;
                         j++;
                         continue;
                     }
 
-                    if (i < parent_nchildren &&
-                        child_i.child == vertex) {
+                    if (child_i.child == vertex) {
                         i++;
                         continue;
                     }
 
-                    if (i >= parent_nchildren) {
-                        double prob = child_j.weight / vertex->rate;
-                        add_edge(parent, child_j.child, k, prob * parent_weight);
-                        parent->rate -= prob * parent_weight;
-                        j++;
-                    } else if (j >= nchildren ||
-                               child_i.child < child_j.child) {
+                    if (j >= nchildren ||
+                        child_i.child < child_j.child) {
                         new_parent_children[k] = child_i;
                         new_parent_children[k].llp->llc = &(new_parent_children[k]);
                         i++;
@@ -1091,6 +1120,7 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
                         i++;
                         j++;
                     }
+
                     k++;
                 }
 
@@ -1159,7 +1189,7 @@ int label_vertex_index(size_t *largest_index, vertex_t *graph) {
         }
     }
 
-    if (largest_index != nullptr) {
+    if (largest_index != NULL) {
         *largest_index = index - 1;
     }
 

@@ -14,28 +14,28 @@ inline bool has_child(vertex_t *vertex, vertex_t *child) {
 }
 
 vertex_t *generate_graph(unsigned int seed,
-        size_t n_states, size_t n_edges,
-        size_t n_zero_rewards) {
+                         size_t n_states, size_t n_edges,
+                         size_t n_zero_rewards) {
     fprintf(stderr, "Generating matrix with %u, %zu, %zu, %zu\n",
             seed, n_states, n_edges, n_zero_rewards);
     srand(seed);
 
-    vertex_t *ipv = vertex_init(nullptr, {1.0f}, 0);
-    vertex_t *abs = vertex_init(nullptr, {0.0f}, 0);
-    vertex_t **vertices = (vertex_t**)calloc(n_states, sizeof(vertex_t*));
+    vertex_t *ipv = vertex_init(NULL, {1.0f}, 0);
+    vertex_t *abs = vertex_init(NULL, {0.0f}, 0);
+    vertex_t **vertices = (vertex_t **) calloc(n_states, sizeof(vertex_t *));
 
     ipv->vertex_index = 1;
     abs->vertex_index = 0;
 
     for (size_t i = 0; i < n_states; ++i) {
-        vertices[i] = vertex_init(nullptr, {2.0f}, 0);
-        vertices[i]->vertex_index = i+2;
-        vertex_add_edge(ipv, vertices[i], 1.0f/n_states);
+        vertices[i] = vertex_init(NULL, {2.0f}, 0);
+        vertices[i]->vertex_index = i + 2;
+        vertex_add_edge(ipv, vertices[i], 1.0f / n_states);
         vertex_add_edge(vertices[i], abs, 1.0f);
         vertices[i]->rewards[0] = 2.0f;
     }
 
-    vector<pair<size_t, size_t>> combinations;
+    vector<pair<size_t, size_t> > combinations;
 
     for (size_t i = 0; i < n_states; ++i) {
         for (size_t j = 0; j < n_states; ++j) {
@@ -43,7 +43,7 @@ vertex_t *generate_graph(unsigned int seed,
                 continue;
             }
 
-            combinations.push_back(pair<size_t,size_t>(i,j));
+            combinations.push_back(pair<size_t, size_t>(i, j));
         }
     }
 
@@ -51,7 +51,7 @@ vertex_t *generate_graph(unsigned int seed,
 
     for (size_t i = 0; i < n_edges; ++i) {
         vertex_add_edge(vertices[combinations[i].first],
-                vertices[combinations[i].second], 1.0f);
+                        vertices[combinations[i].second], 1.0f);
     }
 
     for (size_t i = 0; i < n_zero_rewards; ++i) {

@@ -4,6 +4,8 @@
 #include <vector>
 #include <utility>
 #include <queue>
+#include <stdlib.h>
+#include <stdio.h>
 
 typedef struct {
     double ***cov;
@@ -42,9 +44,13 @@ typedef struct vertex {
         this->vertex_index = id;
         id++;
         this->state = state;
-        this->rewards = std::move(rewards);
+        this->rewards = rewards;
         this->edges = NULL;
         this->parents = NULL;
+        this->visited = false;
+        this->rate = 0;
+        this->prob = 0;
+        this->reset_int = 0;
     }
 
     ~vertex() {
@@ -57,16 +63,16 @@ typedef struct vertex {
     struct llp *parents;
     size_t nparents;
 
-    bool visited = false;
-    double rate = 0;
-    double prob = 0;
+    bool visited;
+    double rate;
+    double prob;
     vector<double> rewards;
 
     vector<double> exp;
     vector<double> desc;
 
     size_t vertex_index;
-    size_t reset_int = 0;
+    size_t reset_int;
 } vertex_t;
 
 typedef struct llc {
