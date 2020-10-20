@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "phase.h"
+#include "io.h"
 
 void assert(bool a) {
     if (!a) {
@@ -21,11 +22,11 @@ double reward_by_index(vertex_t *vertex) {
     }
 
     if (vertex == b) {
-        return 0;
+        return 1;
     }
 
     if (vertex == c) {
-        return 0;
+        return 1;
     }
 
     if (vertex == d) {
@@ -96,10 +97,9 @@ int main(int argc, char **argv) {
     reward_transform(s, reward_by_index);
 
     double **mat;
-    vertex_t **vertices;
     size_t size;
 
-    graph_as_mat(&mat, &vertices, &size, s);
+    graph_as_mat(&mat, &size, s);
 
     for (size_t i = 2; i < size; ++i) {
         fprintf(stdout, "%f ", mat[1][i]);
@@ -120,7 +120,6 @@ int main(int argc, char **argv) {
     }
 
     free(mat);
-    free(vertices);
 
     graph_free(s);
 

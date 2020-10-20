@@ -16,7 +16,10 @@ inline bool has_child(vertex_t *vertex, vertex_t *child) {
 vertex_t *generate_graph(unsigned int seed,
         size_t n_states, size_t n_edges,
         size_t n_zero_rewards) {
+    fprintf(stderr, "Generating matrix with %u, %zu, %zu, %zu\n",
+            seed, n_states, n_edges, n_zero_rewards);
     srand(seed);
+
     vertex_t *ipv = vertex_init(nullptr, {1.0f}, 0);
     vertex_t *abs = vertex_init(nullptr, {0.0f}, 0);
     vertex_t **vertices = (vertex_t**)calloc(n_states, sizeof(vertex_t*));

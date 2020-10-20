@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <utility>
+#include <queue>
 
 typedef struct {
     double ***cov;
@@ -85,13 +86,14 @@ vertex_t *vertex_init(vec_entry_t *state, vector<double> rewards, size_t state_l
 void vertex_destroy(vertex_t *vertex);
 void vertex_add_edge(vertex_t *from, vertex_t *to, double weight);
 
+queue<vertex_t *> enqueue_vertices(vertex_t *graph);
+int label_vertex_index(size_t *largest_index, vertex_t *graph);
+
 cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
 
 void graph_free(vertex_t *graph);
 
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m);
-
-int graph_as_mat(double ***weights, vertex_t ***vertices, size_t *out_size, vertex_t *graph);
 
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *));
 

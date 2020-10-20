@@ -31,9 +31,8 @@ List gen_mat(unsigned int seed, int n_states, int n_edges, int n_zero_rewards) {
     generate_graph(seed, n_states, n_edges, n_zero_rewards);
   
   double **mat;
-  vertex_t **vertices;
   size_t size;
-  graph_as_mat(&mat, &vertices, &size, graph);
+  graph_as_mat(&mat, &size, graph);
   
   NumericMatrix SIM(size - 2, size - 2);
   NumericVector IPV(size - 2);
@@ -54,8 +53,6 @@ List gen_mat(unsigned int seed, int n_states, int n_edges, int n_zero_rewards) {
   }
   
   free(mat);
-  free(vertices);
-  
   graph_free(graph);
   
   return List::create(Named("IPV") = IPV , _["SIM"] = SIM, _["RW"] = RW);
