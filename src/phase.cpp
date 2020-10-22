@@ -81,9 +81,6 @@ inline void add_edge_no_rate(vertex_t *from, vertex_t *to, size_t index, double 
         }
     }*/
 
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-
     entry->weight = weight;
     entry->child = to;
     llp_t *llp = (llp_t *) malloc(sizeof(llp_t));
@@ -103,10 +100,6 @@ inline void add_edge_no_rate(vertex_t *from, vertex_t *to, size_t index, double 
 
     from->nedges++;
     to->nparents++;
-
-    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-    ssize_t delta_us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
-    total_add_edge_time += delta_us;
 }
 
 inline void add_edge(vertex_t *from, vertex_t *to, size_t index, double weight) {
@@ -983,14 +976,6 @@ double calculate_rate(vertex_t *vertex) {
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
     queue<vertex_t *> queue = enqueue_vertices(graph);
 
-    struct timespec start, end;
-    struct timespec start_tot, end_tot;
-    ssize_t total_time_p_iter = 0;
-    ssize_t total_time_k_loop = 0;
-    ssize_t total_zero_rewards = 0;
-    total_add_edge_time = 0;
-    ssize_t delta_us;
-
     while (!queue.empty()) {
         vertex_t *vertex = queue.front();
         queue.pop();
@@ -1008,18 +993,6 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
         double reward = reward_func(vertex);
 
         if (reward == 0) {
-            clock_gettime(CLOCK_MONOTONIC_RAW, &start_tot);
-            clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-
-            llp_t *p = vertex->parents->next;
-
-            while (p != NULL) {
-                p = p->next;
-            }
-            clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-            delta_us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
-            total_time_p_iter += delta_us;
-
             llc_t *children = vertex->edges;
             size_t nchildren = vertex->nedges;
 
@@ -1043,7 +1016,6 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
 
                 size_t i = 0, j = 0, k;
 
-                clock_gettime(CLOCK_MONOTONIC_RAW, &start);
                 llc_t child_i, child_j;
 
                 for (k = 0; i < parent_nchildren || j < nchildren;) {
@@ -1124,9 +1096,6 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
                     k++;
                 }
 
-                clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-                delta_us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
-                total_time_k_loop += delta_us;
 
                 parent->nedges = k;
                 free(parent_old_children);
@@ -1136,10 +1105,6 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
             vertex_destroy_parents(vertex);
             vertex_destroy(vertex);
 
-
-            clock_gettime(CLOCK_MONOTONIC_RAW, &end_tot);
-            delta_us = (end_tot.tv_sec - start_tot.tv_sec) * 1000000 + (end_tot.tv_nsec - start_tot.tv_nsec) / 1000;
-            total_zero_rewards += delta_us;
         } else {
             for (size_t i = 0; i < vertex->nedges; ++i) {
                 vertex->edges[i].weight /= reward;
@@ -1149,10 +1114,153 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
         }
     }
 
-    fprintf(stderr, "LL parents loop over took %Lf\n", ((long double) total_time_p_iter) / 1000);
-    fprintf(stderr, "K loop took %Lf\n", ((long double) total_time_k_loop) / 1000);
-    fprintf(stderr, "zero rewards tot took %Lf\n", ((long double) total_zero_rewards) / 1000);
-    fprintf(stderr, "total add time took %Lf\n", ((long double) total_add_edge_time) / 1000);
+    return 0;
+}
+
+int reward_transform_mat(vertex_t *graph, double (*reward_func)(vertex_t *)) {
+    size_t size;
+    label_vertex_index(&size, graph);
+    size_t length = size + 1;
+
+    queue<vertex_t *> queue = enqueue_vertices(graph);
+
+    while (!queue.empty()) {
+        vertex_t *vertex = queue.front();
+        queue.pop();
+
+        if (vertex->nedges == 0) {
+            // Absorbing vertex
+            continue;
+        }
+
+        if (vertex->nparents == 0) {
+            // Starting vertex
+            continue;
+        }
+
+        double reward = reward_func(vertex);
+
+        if (reward == 0) {
+            llc_t *children = vertex->edges;
+            size_t nchildren = vertex->nedges;
+
+
+            // Take all my edges and add to my parent instead.
+            llp_t *parent_edge = vertex->parents->next;
+
+            while (parent_edge != NULL) {
+                vertex_t *parent = parent_edge->parent;
+                llc_t *parent_old_children = parent->edges;
+                size_t parent_nchildren = parent->nedges;
+
+                llc_t *new_parent_children = (llc_t *) calloc(
+                        parent_nchildren + nchildren,
+                        sizeof(llc_t)
+                );
+
+                parent->edges = new_parent_children;
+
+                double parent_weight = parent_edge->llc->weight;
+
+                size_t i = 0, j = 0, k;
+
+                llc_t child_i, child_j;
+
+                for (k = 0; i < parent_nchildren || j < nchildren;) {
+                    //TODO add null after all children in array
+                    // loop over that instead
+                    if (i >= parent_nchildren) {
+                        while (j < nchildren) {
+                            child_j = children[j];
+                            double prob = children[j].weight / vertex->rate;
+
+                            if (child_j.child == parent) {
+                                parent->rate -= parent_weight * prob;
+                                j++;
+                                continue;
+                            }
+
+                            add_edge_no_rate(parent, child_j.child, k, prob * parent_weight);
+                            j++;
+                            k++;
+                        }
+
+                        break;
+                    }
+
+                    if (j >= nchildren) {
+                        while (i < parent_nchildren) {
+                            child_i = parent_old_children[i];
+
+                            if (child_i.child == vertex) {
+                                i++;
+                                continue;
+                            }
+
+                            new_parent_children[k] = child_i;
+                            new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                            i++;
+                            k++;
+                        }
+
+                        break;
+                    }
+
+                    child_i = parent_old_children[i];
+                    child_j = children[j];
+
+                    if (child_j.child == parent) {
+                        double prob = children[j].weight / vertex->rate;
+                        parent->rate -= parent_weight * prob;
+                        j++;
+                        continue;
+                    }
+
+                    if (child_i.child == vertex) {
+                        i++;
+                        continue;
+                    }
+
+                    if (j >= nchildren ||
+                        child_i.child < child_j.child) {
+                        new_parent_children[k] = child_i;
+                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                        i++;
+                    } else if (child_i.child > child_j.child) {
+                        double prob = child_j.weight / vertex->rate;
+                        add_edge(parent, child_j.child, k, prob * parent_weight);
+                        parent->rate -= prob * parent_weight;
+                        j++;
+                    } else {
+                        // ==
+                        double prob = child_j.weight / vertex->rate;
+                        new_parent_children[k] = child_i;
+                        new_parent_children[k].weight += prob * parent_weight;
+                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                        i++;
+                        j++;
+                    }
+
+                    k++;
+                }
+
+
+                parent->nedges = k;
+                free(parent_old_children);
+                parent_edge = parent_edge->next;
+            }
+
+            vertex_destroy_parents(vertex);
+            vertex_destroy(vertex);
+
+        } else {
+            for (size_t i = 0; i < vertex->nedges; ++i) {
+                vertex->edges[i].weight /= reward;
+            }
+
+            vertex->rate /= reward;
+        }
+    }
 
     return 0;
 }

@@ -1,5 +1,6 @@
 #include <Rcpp.h>
 #include "phase.h"
+#include "io.h"
 #include "generation.h"
 
 using namespace Rcpp;
@@ -43,8 +44,12 @@ List gen_mat(unsigned int seed, int n_states, int n_edges, int n_zero_rewards) {
     
     for (size_t j = 2; j < size; ++j) {
       SIM(i - 2, j - 2) = mat[i][j];
-      
-      RW(i - 2, 0) = vertices[i]->rewards[0];
+    }
+
+    if (i < n_zero_rewards) {
+        RW(i - 2, 0) = 0;
+    } else {
+        RW(i - 2, 0) = 2;
     }
   }
   
