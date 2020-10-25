@@ -5,61 +5,85 @@
 
 using namespace Rcpp;
 
-// kingman_gen_mat
-List kingman_gen_mat(int n, int m);
-RcppExport SEXP _ptdalgorithms_kingman_gen_mat(SEXP nSEXP, SEXP mSEXP) {
+// graph_as_matrix
+List graph_as_matrix(SEXP phase_type_graph);
+RcppExport SEXP _ptdalgorithms_graph_as_matrix(SEXP phase_type_graphSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
+    rcpp_result_gen = Rcpp::wrap(graph_as_matrix(phase_type_graph));
+    return rcpp_result_gen;
+END_RCPP
+}
+// matrix_as_graph
+SEXP matrix_as_graph(NumericVector initial_probability_vector, NumericMatrix subintensity_matrix, NumericMatrix rewards);
+RcppExport SEXP _ptdalgorithms_matrix_as_graph(SEXP initial_probability_vectorSEXP, SEXP subintensity_matrixSEXP, SEXP rewardsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type initial_probability_vector(initial_probability_vectorSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type subintensity_matrix(subintensity_matrixSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type rewards(rewardsSEXP);
+    rcpp_result_gen = Rcpp::wrap(matrix_as_graph(initial_probability_vector, subintensity_matrix, rewards));
+    return rcpp_result_gen;
+END_RCPP
+}
+// kingman_gen_graph
+SEXP kingman_gen_graph(int n, int m);
+RcppExport SEXP _ptdalgorithms_kingman_gen_graph(SEXP nSEXP, SEXP mSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< int >::type n(nSEXP);
     Rcpp::traits::input_parameter< int >::type m(mSEXP);
-    rcpp_result_gen = Rcpp::wrap(kingman_gen_mat(n, m));
+    rcpp_result_gen = Rcpp::wrap(kingman_gen_graph(n, m));
     return rcpp_result_gen;
 END_RCPP
 }
-// kingman_gen_reward
-List kingman_gen_reward(int n, int r);
-RcppExport SEXP _ptdalgorithms_kingman_gen_reward(SEXP nSEXP, SEXP rSEXP) {
+// reward_transform
+SEXP reward_transform(SEXP phase_type_graph, Rcpp::Function reward_function);
+RcppExport SEXP _ptdalgorithms_reward_transform(SEXP phase_type_graphSEXP, SEXP reward_functionSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< int >::type n(nSEXP);
-    Rcpp::traits::input_parameter< int >::type r(rSEXP);
-    rcpp_result_gen = Rcpp::wrap(kingman_gen_reward(n, r));
-    return rcpp_result_gen;
-END_RCPP
-}
-// kingman_gen_reward_by
-List kingman_gen_reward_by(int n, int m, Rcpp::Function reward_function);
-RcppExport SEXP _ptdalgorithms_kingman_gen_reward_by(SEXP nSEXP, SEXP mSEXP, SEXP reward_functionSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< int >::type n(nSEXP);
-    Rcpp::traits::input_parameter< int >::type m(mSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
     Rcpp::traits::input_parameter< Rcpp::Function >::type reward_function(reward_functionSEXP);
-    rcpp_result_gen = Rcpp::wrap(kingman_gen_reward_by(n, m, reward_function));
+    rcpp_result_gen = Rcpp::wrap(reward_transform(phase_type_graph, reward_function));
     return rcpp_result_gen;
 END_RCPP
 }
-// kingman_exp_cov
-List kingman_exp_cov(int n, int m);
-RcppExport SEXP _ptdalgorithms_kingman_exp_cov(SEXP nSEXP, SEXP mSEXP) {
+// reward_transform_by_reward
+SEXP reward_transform_by_reward(SEXP phase_type_graph, int reward);
+RcppExport SEXP _ptdalgorithms_reward_transform_by_reward(SEXP phase_type_graphSEXP, SEXP rewardSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< int >::type n(nSEXP);
-    Rcpp::traits::input_parameter< int >::type m(mSEXP);
-    rcpp_result_gen = Rcpp::wrap(kingman_exp_cov(n, m));
+    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
+    Rcpp::traits::input_parameter< int >::type reward(rewardSEXP);
+    rcpp_result_gen = Rcpp::wrap(reward_transform_by_reward(phase_type_graph, reward));
+    return rcpp_result_gen;
+END_RCPP
+}
+// graph_exp_cov
+List graph_exp_cov(SEXP phase_type_graph);
+RcppExport SEXP _ptdalgorithms_graph_exp_cov(SEXP phase_type_graphSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
+    rcpp_result_gen = Rcpp::wrap(graph_exp_cov(phase_type_graph));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_ptdalgorithms_kingman_gen_mat", (DL_FUNC) &_ptdalgorithms_kingman_gen_mat, 2},
-    {"_ptdalgorithms_kingman_gen_reward", (DL_FUNC) &_ptdalgorithms_kingman_gen_reward, 2},
-    {"_ptdalgorithms_kingman_gen_reward_by", (DL_FUNC) &_ptdalgorithms_kingman_gen_reward_by, 3},
-    {"_ptdalgorithms_kingman_exp_cov", (DL_FUNC) &_ptdalgorithms_kingman_exp_cov, 2},
+    {"_ptdalgorithms_graph_as_matrix", (DL_FUNC) &_ptdalgorithms_graph_as_matrix, 1},
+    {"_ptdalgorithms_matrix_as_graph", (DL_FUNC) &_ptdalgorithms_matrix_as_graph, 3},
+    {"_ptdalgorithms_kingman_gen_graph", (DL_FUNC) &_ptdalgorithms_kingman_gen_graph, 2},
+    {"_ptdalgorithms_reward_transform", (DL_FUNC) &_ptdalgorithms_reward_transform, 2},
+    {"_ptdalgorithms_reward_transform_by_reward", (DL_FUNC) &_ptdalgorithms_reward_transform_by_reward, 2},
+    {"_ptdalgorithms_graph_exp_cov", (DL_FUNC) &_ptdalgorithms_graph_exp_cov, 1},
     {NULL, NULL, 0}
 };
 

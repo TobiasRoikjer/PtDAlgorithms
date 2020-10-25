@@ -5,4 +5,7 @@ cmake-build-debug/
 .Rproj.user/
 .Rhistory
 .idea
+src/*.o
+src/*.so
+src/*.dll
 
