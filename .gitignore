@@ -1,0 +1,8 @@
+.RData
+src-i386
+src-x64
+cmake-build-debug/
+.Rproj.user/
+.Rhistory
+.idea
+
