@@ -91,16 +91,20 @@ typedef struct llp {
 vertex_t *vertex_init(vec_entry_t *state, vector<double> rewards, size_t state_length);
 void vertex_destroy(vertex_t *vertex);
 void vertex_add_edge(vertex_t *from, vertex_t *to, double weight);
+void graph_free(vertex_t *graph);
 
 queue<vertex_t *> enqueue_vertices(vertex_t *graph);
 int label_vertex_index(size_t *largest_index, vertex_t *graph);
 
-cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
+struct graph_info {
+    size_t vertices;
+    size_t edges;
+};
 
-void graph_free(vertex_t *graph);
+struct graph_info get_graph_info(vertex_t *graph);
+cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
+int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *));
 
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m);
-
-int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *));
 
 #endif //PTDALGORITHMS_PHASE_H

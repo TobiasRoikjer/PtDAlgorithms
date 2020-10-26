@@ -1304,4 +1304,23 @@ int label_vertex_index(size_t *largest_index, vertex_t *graph) {
     return 0;
 }
 
+struct graph_info get_graph_info(vertex_t *graph) {
+    size_t vertices, edges;
 
+    queue<vertex_t*> queue = enqueue_vertices(graph);
+    vertices = (size_t)queue.size();
+    edges = 0;
+
+    while (!queue.empty()) {
+        vertex_t *vertex = queue.front();
+        queue.pop();
+        edges += vertex->nedges;
+    }
+
+    struct graph_info graph_info;
+
+    graph_info.vertices = vertices;
+    graph_info.edges = edges;
+
+    return graph_info;
+}

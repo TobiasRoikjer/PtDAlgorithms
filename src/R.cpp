@@ -197,6 +197,15 @@ List graph_exp_cov(SEXP phase_type_graph) {
     return List::create(Named("exp") = out_exp , _["cov"] = out_cov);
 }
 
+// [[Rcpp::export]]
+List graph_info(SEXP phase_type_graph) {
+  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+  struct graph_info graph_info = get_graph_info(graph->start);
+  
+  
+  return List::create(Named("vertices") = graph_info.vertices , _["edges"] = graph_info.edges);
+}
+
+
 // TODO:
 // Clone graph when e.g. reward transforming
-// add matrix_as_graph function
