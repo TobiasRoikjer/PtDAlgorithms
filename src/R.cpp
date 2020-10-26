@@ -79,8 +79,10 @@ SEXP matrix_as_graph(NumericVector initial_probability_vector,NumericMatrix subi
     reward_size = (size_t)rewards.cols();
   }
   
-  vertex_t *absorbing = vertex_init(NULL, vector<double>(), 0);
-  vertex_t *start = vertex_init(NULL, vector<double>(), 0);
+  vector<double> zero_reward(reward_size);
+  
+  vertex_t *absorbing = vertex_init(NULL, zero_reward, reward_size);
+  vertex_t *start = vertex_init(NULL, zero_reward, reward_size);
   vertex_t **vertices = (vertex_t**)calloc(entries, sizeof(vertex_t*));
   
   for (size_t i = 0; i < entries; ++i) {
