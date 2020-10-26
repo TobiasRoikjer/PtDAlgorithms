@@ -76,6 +76,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// graph_info
+List graph_info(SEXP phase_type_graph);
+RcppExport SEXP _ptdalgorithms_graph_info(SEXP phase_type_graphSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
+    rcpp_result_gen = Rcpp::wrap(graph_info(phase_type_graph));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_ptdalgorithms_graph_as_matrix", (DL_FUNC) &_ptdalgorithms_graph_as_matrix, 1},
@@ -84,6 +95,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ptdalgorithms_reward_transform", (DL_FUNC) &_ptdalgorithms_reward_transform, 2},
     {"_ptdalgorithms_reward_transform_by_reward", (DL_FUNC) &_ptdalgorithms_reward_transform_by_reward, 2},
     {"_ptdalgorithms_graph_exp_cov", (DL_FUNC) &_ptdalgorithms_graph_exp_cov, 1},
+    {"_ptdalgorithms_graph_info", (DL_FUNC) &_ptdalgorithms_graph_info, 1},
     {NULL, NULL, 0}
 };
 

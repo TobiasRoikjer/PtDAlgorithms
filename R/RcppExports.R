@@ -25,3 +25,7 @@ graph_exp_cov <- function(phase_type_graph) {
     .Call('_ptdalgorithms_graph_exp_cov', PACKAGE = 'ptdalgorithms', phase_type_graph)
 }
 
+graph_info <- function(phase_type_graph) {
+    .Call('_ptdalgorithms_graph_info', PACKAGE = 'ptdalgorithms', phase_type_graph)
+}
+
