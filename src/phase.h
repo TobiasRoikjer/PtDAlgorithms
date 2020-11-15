@@ -104,6 +104,7 @@ struct graph_info {
 struct graph_info get_graph_info(vertex_t *graph);
 cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *));
+void set_graph_rewards(vertex_t *graph, vector<double> (*set_rewards_func)(vector<double>));
 
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m);
 

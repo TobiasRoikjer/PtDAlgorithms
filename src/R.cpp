@@ -43,6 +43,14 @@ List graph_as_matrix(SEXP phase_type_graph) {
         }
     }
 
+    for (size_t i = 2; i < size; ++i) {
+        vertex_t *vertex = vertices[i];
+      
+        for (size_t j = 0; j < graph->rewards_length; j++) {
+            RW(i - 2, j) = vertex->rewards[j];
+        }
+    }
+    
     for (size_t i = 0; i < size; ++i) {
         free(mat[i]);
     }
@@ -206,6 +214,29 @@ List graph_info(SEXP phase_type_graph) {
   return List::create(Named("vertices") = graph_info.vertices , _["edges"] = graph_info.edges);
 }
 
+Rcpp::Function *custom_set_reward_function;
+
+vector<double> custom_set_reward(vector<double> rewards) {
+  NumericVector numeric_rewards = wrap(rewards);
+    
+  NumericVector new_rewards = Rcpp::as<NumericVector >((*custom_set_reward_function)(numeric_rewards));
+  
+  vector<double> vec_double = Rcpp::as<vector<double> >(new_rewards);
+  
+  return vec_double;
+}
+
+// [[Rcpp::export]]
+SEXP set_rewards(SEXP phase_type_graph, Rcpp::Function set_reward_function) {
+  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+
+  custom_set_reward_function = &set_reward_function;
+  set_graph_rewards(graph->start, custom_set_reward);
+  
+  graph->rewards_length = graph->start->rewards.size();
+  
+  return Rcpp::XPtr<PhaseTypeGraph>(graph);
+}
 
 // TODO:
 // Clone graph when e.g. reward transforming
