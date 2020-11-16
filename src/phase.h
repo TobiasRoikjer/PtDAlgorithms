@@ -72,6 +72,7 @@ typedef struct vertex {
     vector<double> desc;
 
     size_t vertex_index;
+    size_t integer;
     size_t reset_int;
 } vertex_t;
 
@@ -105,7 +106,14 @@ struct graph_info get_graph_info(vertex_t *graph);
 cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *));
 void set_graph_rewards(vertex_t *graph, vector<double> (*set_rewards_func)(vector<double>));
+void reduce_graph(vertex_t *graph);
 
+vertex_t *generate_state_space(
+        size_t state_length,
+        vector<pair<double, vector<size_t> > >(*visit_function)(vector<size_t>),
+        vector<pair<double, vector<size_t> > >(*initial_states)(void),
+        vector<double>(*rewards)(vector<size_t>)
+);
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m);
 
 #endif //PTDALGORITHMS_PHASE_H

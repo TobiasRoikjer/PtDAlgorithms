@@ -238,5 +238,75 @@ SEXP set_rewards(SEXP phase_type_graph, Rcpp::Function set_reward_function) {
   return Rcpp::XPtr<PhaseTypeGraph>(graph);
 }
 
+Rcpp::Function *custom_initial_function_R;
+
+vector<pair<double, vector<size_t> > > custom_initial_function() {
+  List children = Rcpp::as<Rcpp::List>((*custom_initial_function_R)());
+  
+  vector<pair<double, vector<size_t> > > res;
+  
+  for (size_t i = 0; i < children.size(); i++) {
+    Rcpp::List child = Rcpp::as<Rcpp::List>(children[i]);
+    double weight = child[0];
+    vector<size_t> child_state = Rcpp::as<vector<size_t> >(Rcpp::as<Rcpp::IntegerVector>(child[1]));
+    res.push_back(pair<double, vector<size_t> >(weight, child_state));
+  }
+  
+  return res;
+}
+
+Rcpp::Function *custom_children_function_R;
+
+vector<pair<double, vector<size_t> > > custom_children_function(vector<size_t> state) {
+  List children = Rcpp::as<Rcpp::List>((*custom_children_function_R)(state));
+  
+  vector<pair<double, vector<size_t> > > res;
+  
+  for (size_t i = 0; i < children.size(); i++) {
+    Rcpp::List child = Rcpp::as<Rcpp::List>(children[i]);
+    double weight = child[0];
+    vector<size_t> child_state = Rcpp::as<vector<size_t> >(Rcpp::as<Rcpp::IntegerVector>(child[1]));
+    res.push_back(pair<double, vector<size_t> >(weight, child_state));
+  }
+  
+  return res;
+}
+
+Rcpp::Function *custom_rewards_from_state_function_R;
+
+vector<double> custom_rewards_from_state_function(vector<size_t> state) {
+  NumericVector rewards = Rcpp::as<Rcpp::NumericVector>((*custom_rewards_from_state_function_R)(state));
+  
+  vector<double> res = Rcpp::as<vector<double> >(rewards);
+  
+  return res;
+}
+
+// [[Rcpp::export]]
+SEXP generate_graph(int state_length, Rcpp::Function initial, Rcpp::Function children, Rcpp::Function rewards_from_state) {
+  custom_initial_function_R = &initial;
+  custom_children_function_R = &children;
+  custom_rewards_from_state_function_R = &rewards_from_state;
+  
+  vertex_t *graph = generate_state_space(
+    (size_t)state_length,
+    custom_children_function,
+    custom_initial_function,
+    custom_rewards_from_state_function
+  );
+  
+  return Rcpp::XPtr<PhaseTypeGraph>(new PhaseTypeGraph(graph, graph->rewards.size()));
+}
+
+
+// [[Rcpp::export]]
+SEXP graph_reduce(SEXP phase_type_graph) {
+  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+  
+  reduce_graph(graph->start);
+  
+  return Rcpp::XPtr<PhaseTypeGraph>(graph);
+}
+
 // TODO:
 // Clone graph when e.g. reward transforming

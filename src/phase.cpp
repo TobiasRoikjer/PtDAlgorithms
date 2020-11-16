@@ -601,6 +601,184 @@ int edgecmp(const void *a, const void *b) {
     return (int) diff;
 }
 
+vertex_t *generate_state_space(
+        size_t state_length,
+        vector<pair<double, vector<size_t> > >(*visit_function)(vector<size_t>),
+        vector<pair<double, vector<size_t> > >(*initial_states)(void),
+        vector<double>(*rewards)(vector<size_t>)
+) {
+    avl_vec_vertex_t *bst = NULL;
+    queue<pair<vertex_t *, vector<pair<double, vector<size_t> > > > > vertices_to_visit;
+
+    vertex_t *start_vertex = vertex_init(
+            NULL,
+            rewards(vector<size_t>(state_length, 0)),
+            0
+    );
+
+    vertex_t *absorbing_vertex = vertex_init(
+            NULL,
+            rewards(vector<size_t>(state_length, 0)),
+            0
+    );
+
+    vector<edge> initial_edges;
+    vector<pair<double, vector<size_t> > > initial =
+            initial_states();
+
+    for (vector<pair<double, vector<size_t> > >::iterator it =
+            initial.begin(); it != initial.end(); ++it) {
+        double weight = it->first;
+        vector<size_t> state(it->second);
+
+        if (state.size() != state_length) {
+            fprintf(stderr, "States must have given length '%zu', output state had length '%zu'",
+                    state_length, state.size());
+            goto error;
+        }
+
+        vertex_t *child;
+        avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, &state[0], state_length);
+
+        if (bst_entry != NULL) {
+            fprintf(stderr, "Two edges with the same state have already been added to the initial state\n");
+            goto error;
+        }
+
+        vector<pair<double, vector<size_t> > > child_children = visit_function(state);
+
+        if (child_children.empty()) {
+            child = absorbing_vertex;
+        } else {
+            size_t *vec_entry = (size_t *) calloc(
+                    state.size(),
+                    sizeof(size_t)
+            );
+
+            memcpy(vec_entry, &state[0], state.size() * sizeof(size_t));
+
+            child = vertex_init(
+                    vec_entry,
+                    rewards(state),
+                    state_length
+            );
+
+            avl_vec_insert(&bst, vec_entry, child, state_length);
+
+            pair<vertex_t *, vector<pair<double, vector<size_t> > > > pair(child, child_children);
+            vertices_to_visit.push(pair);
+        }
+
+        struct edge edge;
+        edge.weight = weight;
+        edge.vertex = child;
+
+        initial_edges.push_back(edge);
+    }
+
+    if (initial_edges.size() != 0) {
+        start_vertex->edges = (llc_t *) calloc(
+                initial_edges.size(), sizeof(llc_t)
+        );
+
+        struct edge *e = &initial_edges[0];
+        qsort(e, initial_edges.size(), sizeof(struct edge), edgecmp);
+
+        for (size_t i = 0; i < initial_edges.size(); ++i) {
+            add_edge(start_vertex, e[i].vertex, i, e[i].weight);
+        }
+
+        for (size_t i = 0; i < initial_edges.size(); ++i) {
+            start_vertex->edges[i].llp->llc = &(start_vertex->edges[i]);
+        }
+    } else {
+        fprintf(stderr, "Start vertex must have one edge");
+        goto error;
+    }
+
+    while (!vertices_to_visit.empty()) {
+        pair<vertex_t *, vector<pair<double, vector<size_t> > > > p = vertices_to_visit.front();
+        vertices_to_visit.pop();
+
+        vector<edge> edges;
+        vertex_t *visiting_vertex = p.first;
+        vector<pair<double, vector<size_t> > > visiting_children = p.second;
+
+        for (vector<pair<double, vector<size_t> > >::iterator it =
+                visiting_children.begin(); it != visiting_children.end(); ++it) {
+            double child_weight = it->first;
+            vector<size_t> child_state = it->second;
+
+            if (child_state.size() != state_length) {
+                fprintf(stderr, "States must have given length '%zu', output state had length '%zu'",
+                        state_length, child_state.size());
+                goto error;
+            }
+
+            vertex_t *child;
+            avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, &child_state[0], state_length);
+
+            if (bst_entry == NULL) {
+                vector<pair<double, vector<size_t> > > children = visit_function(child_state);
+
+                if (children.empty()) {
+                    child = absorbing_vertex;
+                } else {
+                    size_t *vec_entry = (size_t *) calloc(
+                            child_state.size(),
+                            sizeof(size_t)
+                    );
+
+                    memcpy(vec_entry, &child_state[0], child_state.size() * sizeof(size_t));
+
+                    child = vertex_init(
+                            vec_entry,
+                            rewards(child_state),
+                            state_length
+                    );
+
+                    avl_vec_insert(&bst, vec_entry, child, state_length);
+
+                    pair<vertex_t *, vector<pair<double, vector<size_t> > > > pair(child, children);
+                    vertices_to_visit.push(pair);
+                }
+            } else {
+                child = bst_entry->entry;
+            }
+
+            struct edge edge;
+            edge.weight = child_weight;
+            edge.vertex = child;
+
+            edges.push_back(edge);
+        }
+
+        if (edges.size() != 0) {
+            visiting_vertex->edges = (llc_t *) calloc(
+                    edges.size(), sizeof(llc_t)
+            );
+
+            struct edge *e = &edges[0];
+            qsort(e, edges.size(), sizeof(struct edge), edgecmp);
+
+            for (size_t i = 0; i < edges.size(); ++i) {
+                add_edge(visiting_vertex, e[i].vertex, i, e[i].weight);
+            }
+
+            for (size_t i = 0; i < edges.size(); ++i) {
+                visiting_vertex->edges[i].llp->llc = &(visiting_vertex->edges[i]);
+            }
+        }
+    }
+
+    avl_free(bst);
+
+    return start_vertex;
+
+    error:
+    avl_free(bst);
+    return NULL;
+}
 
 static int kingman_visit_vertex(vertex_t **out_initial_vertex,
                                 vec_entry_t *initial_state,
@@ -1159,8 +1337,8 @@ int label_vertex_index(size_t *largest_index, vertex_t *graph) {
 struct graph_info get_graph_info(vertex_t *graph) {
     size_t vertices, edges;
 
-    queue<vertex_t*> queue = enqueue_vertices(graph);
-    vertices = (size_t)queue.size();
+    queue<vertex_t *> queue = enqueue_vertices(graph);
+    vertices = (size_t) queue.size();
     edges = 0;
 
     while (!queue.empty()) {
@@ -1178,11 +1356,192 @@ struct graph_info get_graph_info(vertex_t *graph) {
 }
 
 void set_graph_rewards(vertex_t *graph, vector<double> (*set_rewards_func)(vector<double>)) {
-  queue<vertex_t*> queue = enqueue_vertices(graph);
+    queue<vertex_t *> queue = enqueue_vertices(graph);
 
-  while (!queue.empty()) {
-    vertex_t *vertex = queue.front();
-    queue.pop();
-    vertex->rewards = set_rewards_func(vertex->rewards);
-  }
+    while (!queue.empty()) {
+        vertex_t *vertex = queue.front();
+        queue.pop();
+        vertex->rewards = set_rewards_func(vertex->rewards);
+    }
+}
+
+
+void assign_vertex_dist(vertex_t *vertex) {
+    if (vertex->visited) {
+        return;
+    }
+
+    vertex->visited = true;
+
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        vertex_t *child = vertex->edges[i].child;
+        assign_vertex_dist(child);
+    }
+
+    size_t max = 0;
+
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        vertex_t *child = vertex->edges[i].child;
+
+        if (child->integer > max) {
+            max = child->integer;
+        }
+    }
+
+    vertex->integer = max + 1;
+}
+
+int same_vertex_cmp(const void *a, const void *b) {
+    vertex_t *va = *((vertex_t **) (a));
+    vertex_t *vb = *((vertex_t **) (b));
+
+    if (va->integer != vb->integer) {
+        return (int) va->integer - (int) vb->integer;
+    }
+
+    if (va->nedges != vb->nedges) {
+        return (int) va->nedges - (int) vb->nedges;
+    }
+
+    if (va->rate != vb->rate) {
+        return (int) va->rate - (int) vb->rate;
+    }
+
+    return 0;
+}
+
+
+void reduce_graph(vertex_t *graph) {
+    reset_graph_visited(graph);
+    assign_vertex_dist(graph);
+
+    size_t largest_index;
+    label_vertex_index(&largest_index, graph);
+
+    queue<vertex_t *> queue = enqueue_vertices(graph);
+    vertex_t **vertices = (vertex_t **) calloc(largest_index + 1, sizeof(vertex_t *));
+
+    size_t k = 0;
+
+    while (!queue.empty()) {
+        vertex_t *vertex = queue.front();
+        queue.pop();
+
+        vertices[k] = vertex;
+        k++;
+    }
+
+    qsort(vertices, largest_index + 1, sizeof(vertex_t *), same_vertex_cmp);
+
+    for (size_t i = 0; i < largest_index + 1; ++i) {
+        for (size_t j = i + 1; j < largest_index + 1; ++j) {
+            vertex_t *vertex_i = vertices[i];
+            vertex_t *vertex_j = vertices[j];
+
+            if (vertex_i->integer != vertex_j->integer ||
+                vertex_i->nedges != vertex_j->nedges) {
+                continue;
+            }
+
+            bool equal = true;
+
+            for (size_t l = 0; l < vertex_i->nedges; ++l) {
+                if ((vertex_i->edges[l].weight - vertex_j->edges[l].weight) > 0.001 ||
+                    vertex_i->edges[l].child != vertex_j->edges[l].child) {
+                    equal = false;
+                    break;
+                }
+            }
+
+            if (equal) {
+                vertex_t **parents = (vertex_t **) calloc(
+                        vertex_j->nparents,
+                        sizeof(vertex_t *)
+                );
+
+                double *weights = (double *) calloc(
+                        vertex_j->nparents,
+                        sizeof(double)
+                );
+
+                llp_t *parent_edge = vertex_j->parents->next;
+                size_t p = 0;
+
+                while (parent_edge != NULL) {
+                    vertex_t *parent = parent_edge->parent;
+                    parents[p] = parent;
+                    weights[p] = parent_edge->llc->weight;
+                    parent_edge = parent_edge->next;
+                    p++;
+                }
+
+                for (size_t l = 0; l < p; ++l) {
+                    vertex_t *parent = parents[l];
+                    double weight_j = weights[l];
+                    llc_t *parent_children = parent->edges;
+                    size_t parent_nchildren = parent->nedges;
+
+                    // Remove all children's parent link
+                    for (size_t m = 0; m < parent_nchildren; ++m) {
+                        llc_t llc = parent_children[m];
+                        llc.child->nparents--;
+
+                        ll_remove(llc.llp);
+                    }
+
+                    llc_t *new_parent_children = (llc_t *) calloc(
+                            parent_nchildren + 1,
+                            sizeof(llc_t)
+                    );
+
+                    parent->edges = new_parent_children;
+                    bool has_vertex_i = false;
+                    size_t index = 0;
+                    parent->rate = 0;
+                    parent->nedges = 0;
+
+                    for (size_t m = 0; m < parent_nchildren; ++m) {
+                        llc_t edge = parent_children[m];
+
+                        if (edge.child == vertex_j) {
+                            continue;
+                        }
+
+                        if (!has_vertex_i && parent_children[m].child > vertex_i) {
+                            add_edge(parent, vertex_i, index, weight_j);
+                            index++;
+                            has_vertex_i = true;
+                            m--;
+                            continue;
+                        }
+
+                        if (edge.child == vertex_i) {
+                            add_edge(parent, edge.child, index, edge.weight + weight_j);
+                            index++;
+                            has_vertex_i = true;
+                            continue;
+                        }
+
+                        add_edge(parent, edge.child, index, edge.weight);
+                        index++;
+                    }
+
+                    //TODO: How come we cannot free this?
+                    // Perhaps test any llc->llp->llc, no one should reference it!
+//                    free(parent->edges);
+                }
+
+
+                // Remove all my parents link
+                for (size_t m = 0; m < vertex_j->nedges; ++m) {
+                    llc_t llc = vertex_j->edges[m];
+                    llc.child->nparents--;
+
+                    ll_remove(llc.llp);
+                }
+            }
+        }
+    }
+
+    free(vertices);
 }
