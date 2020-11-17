@@ -87,6 +87,43 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// set_rewards
+SEXP set_rewards(SEXP phase_type_graph, Rcpp::Function set_reward_function);
+RcppExport SEXP _ptdalgorithms_set_rewards(SEXP phase_type_graphSEXP, SEXP set_reward_functionSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Function >::type set_reward_function(set_reward_functionSEXP);
+    rcpp_result_gen = Rcpp::wrap(set_rewards(phase_type_graph, set_reward_function));
+    return rcpp_result_gen;
+END_RCPP
+}
+// generate_graph
+SEXP generate_graph(int state_length, Rcpp::Function initial, Rcpp::Function children, Rcpp::Function rewards_from_state);
+RcppExport SEXP _ptdalgorithms_generate_graph(SEXP state_lengthSEXP, SEXP initialSEXP, SEXP childrenSEXP, SEXP rewards_from_stateSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type state_length(state_lengthSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Function >::type initial(initialSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Function >::type children(childrenSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Function >::type rewards_from_state(rewards_from_stateSEXP);
+    rcpp_result_gen = Rcpp::wrap(generate_graph(state_length, initial, children, rewards_from_state));
+    return rcpp_result_gen;
+END_RCPP
+}
+// graph_reduce
+SEXP graph_reduce(SEXP phase_type_graph);
+RcppExport SEXP _ptdalgorithms_graph_reduce(SEXP phase_type_graphSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
+    rcpp_result_gen = Rcpp::wrap(graph_reduce(phase_type_graph));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_ptdalgorithms_graph_as_matrix", (DL_FUNC) &_ptdalgorithms_graph_as_matrix, 1},
@@ -96,6 +133,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ptdalgorithms_reward_transform_by_reward", (DL_FUNC) &_ptdalgorithms_reward_transform_by_reward, 2},
     {"_ptdalgorithms_graph_exp_cov", (DL_FUNC) &_ptdalgorithms_graph_exp_cov, 1},
     {"_ptdalgorithms_graph_info", (DL_FUNC) &_ptdalgorithms_graph_info, 1},
+    {"_ptdalgorithms_set_rewards", (DL_FUNC) &_ptdalgorithms_set_rewards, 2},
+    {"_ptdalgorithms_generate_graph", (DL_FUNC) &_ptdalgorithms_generate_graph, 4},
+    {"_ptdalgorithms_graph_reduce", (DL_FUNC) &_ptdalgorithms_graph_reduce, 1},
     {NULL, NULL, 0}
 };
 

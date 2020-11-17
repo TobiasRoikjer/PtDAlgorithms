@@ -29,3 +29,15 @@ graph_info <- function(phase_type_graph) {
     .Call('_ptdalgorithms_graph_info', PACKAGE = 'ptdalgorithms', phase_type_graph)
 }
 
+set_rewards <- function(phase_type_graph, set_reward_function) {
+    .Call('_ptdalgorithms_set_rewards', PACKAGE = 'ptdalgorithms', phase_type_graph, set_reward_function)
+}
+
+generate_graph <- function(state_length, initial, children, rewards_from_state) {
+    .Call('_ptdalgorithms_generate_graph', PACKAGE = 'ptdalgorithms', state_length, initial, children, rewards_from_state)
+}
+
+graph_reduce <- function(phase_type_graph) {
+    .Call('_ptdalgorithms_graph_reduce', PACKAGE = 'ptdalgorithms', phase_type_graph)
+}
+

@@ -238,18 +238,111 @@ SEXP set_rewards(SEXP phase_type_graph, Rcpp::Function set_reward_function) {
   return Rcpp::XPtr<PhaseTypeGraph>(graph);
 }
 
+size_t custom_state_length;
+
+inline pair<double, vector<size_t> > parse_child(SEXP childS) {
+  if (!Rf_isList(childS) && !Rf_isNewList(childS)) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: child entries in children list must be a list, the datatype was '%i' (R internal type description)",
+      (int)TYPEOF(childS)
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  Rcpp::List child = Rcpp::as<Rcpp::List>(childS);
+  
+  if (!child.containsElementNamed("weight")) {
+    throw std::runtime_error(
+        "Failed: the list of children must have 2 named entries (weight, state), 'weight' not found"
+    );
+  }
+  
+  if (!child.containsElementNamed("state")) {
+    throw std::runtime_error(
+        "Failed: the list of children must have 2 named entries (weight, state), 'state' not found"
+    );
+  }
+  
+  double weight = Rcpp::as<double>(child["weight"]);
+  
+  if (weight <= 0) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: weight is not a strictly positive real (was %f)",
+      weight
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  SEXP stateS = child["state"];
+  
+  if (!Rf_isNumber(stateS)) {
+    throw std::runtime_error(
+        "Failed: given state is not a number (vector)"
+    );
+  }
+  
+  IntegerVector state = Rcpp::as<Rcpp::IntegerVector>(stateS);
+  
+  if ((int)state.size() != (int)custom_state_length) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: state must have length '%i', state had length '%i'",
+      (int)custom_state_length,
+      (int)state.size()
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  vector<size_t> child_state = Rcpp::as<vector<size_t> >(state);
+  
+  return pair<double, vector<size_t> >(weight, child_state);
+}
+
 Rcpp::Function *custom_initial_function_R;
 
 vector<pair<double, vector<size_t> > > custom_initial_function() {
-  List children = Rcpp::as<Rcpp::List>((*custom_initial_function_R)());
+  SEXP childrenS = (*custom_initial_function_R)();
   
+  if (!Rf_isList(childrenS) && !Rf_isNewList(childrenS)) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: children must be returned as a list, the datatype was '%i' (R internal type description)",
+      (int)TYPEOF(childrenS)
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  List children = Rcpp::as<Rcpp::List>(childrenS);
   vector<pair<double, vector<size_t> > > res;
   
-  for (size_t i = 0; i < children.size(); i++) {
-    Rcpp::List child = Rcpp::as<Rcpp::List>(children[i]);
-    double weight = child[0];
-    vector<size_t> child_state = Rcpp::as<vector<size_t> >(Rcpp::as<Rcpp::IntegerVector>(child[1]));
-    res.push_back(pair<double, vector<size_t> >(weight, child_state));
+  for (size_t i = 0; i < (size_t)children.size(); i++) {
+    res.push_back(parse_child(children[i]));
   }
   
   return res;
@@ -258,15 +351,28 @@ vector<pair<double, vector<size_t> > > custom_initial_function() {
 Rcpp::Function *custom_children_function_R;
 
 vector<pair<double, vector<size_t> > > custom_children_function(vector<size_t> state) {
-  List children = Rcpp::as<Rcpp::List>((*custom_children_function_R)(state));
+  SEXP childrenS = ((*custom_children_function_R)(state));
+
+  if (!Rf_isList(childrenS) && !Rf_isNewList(childrenS)) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: children must be returned as a list, the datatype was '%i' (R internal type description)",
+      (int)TYPEOF(childrenS)
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
   
+  List children = Rcpp::as<Rcpp::List>(childrenS);
   vector<pair<double, vector<size_t> > > res;
   
-  for (size_t i = 0; i < children.size(); i++) {
-    Rcpp::List child = Rcpp::as<Rcpp::List>(children[i]);
-    double weight = child[0];
-    vector<size_t> child_state = Rcpp::as<vector<size_t> >(Rcpp::as<Rcpp::IntegerVector>(child[1]));
-    res.push_back(pair<double, vector<size_t> >(weight, child_state));
+  for (size_t i = 0; i < (size_t)children.size(); i++) {
+    res.push_back(parse_child(children[i]));
   }
   
   return res;
@@ -284,6 +390,7 @@ vector<double> custom_rewards_from_state_function(vector<size_t> state) {
 
 // [[Rcpp::export]]
 SEXP generate_graph(int state_length, Rcpp::Function initial, Rcpp::Function children, Rcpp::Function rewards_from_state) {
+  custom_state_length = state_length;
   custom_initial_function_R = &initial;
   custom_children_function_R = &children;
   custom_rewards_from_state_function_R = &rewards_from_state;
