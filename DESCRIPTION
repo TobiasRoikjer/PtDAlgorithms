@@ -8,7 +8,6 @@ BugReports: https://github.com/r-pkg-examples/rcpp-cpp11-usage
 License: GPL (3)
 Depends: R (>= 2.0.0)
 LinkingTo: Rcpp
-Imports:
-    Rcpp
+Imports: Rcpp
 Encoding: UTF-8
 LazyData: true
