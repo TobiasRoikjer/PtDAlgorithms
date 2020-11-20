@@ -6,6 +6,7 @@
 #include <queue>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdexcept>
 
 typedef struct {
     double ***cov;
@@ -26,9 +27,18 @@ snprintf(error_formatted_line,                     \
          __FILE__, __LINE__);                      \
                                                    \
 fprintf(stderr, "%s\n", error_formatted_line);     \
-exit(error_code);                                  \
+/*exit(error_code);*/throw std::runtime_error(error_formatted_line); \
 } while(0)
 
+#define DEBUG_PRINT(message, ...) do {             \
+char formatted[2048];                              \
+                                                   \
+snprintf(formatted,                                \
+         sizeof(formatted),                        \
+         message, ##__VA_ARGS__);                  \
+                                                   \
+fprintf(stderr, "%s", formatted);                  \
+} while(0)
 
 using namespace std;
 

@@ -4,6 +4,7 @@
 #include <stack>
 #include <queue>
 #include <stdint.h>
+#include <math.h>
 #include "phase.h"
 
 void print_graph_list(FILE *stream, vertex_t *graph,
@@ -64,22 +65,37 @@ void vertex_destroy_parents(vertex_t *vertex) {
     }
 }
 
-ssize_t total_add_edge_time = 0;
+
+inline void ensure_valid_children(vertex_t *from) {
+    if (from->nedges == 0) {
+        return;
+    }
+
+    for (size_t i = 0; i < from->nedges - 1; ++i) {
+        if (from->edges[i].child >= from->edges[i + 1].child) {
+            DIE_ERROR(1, "Child %p  at index %zu is larger than (or eq) to next child %p at index %zu\n",
+                      (void *) from->edges[i].child,
+                      i,
+                      (void *) from->edges[i + 1].child,
+                      i + 1);
+        }
+    }
+}
 
 inline void add_edge_no_rate(vertex_t *from, vertex_t *to, size_t index, double weight) {
     if (to == NULL) {
         DIE_ERROR(1, "to is NULL\n");
     }
 
-
     llc_t *entry = &(from->edges[index]);
-    /*fprintf(stderr, "Adding edge from %p to %p\n", (void*)from, (void*)to);
+    DEBUG_PRINT("Adding edge from %p to %p at index %zu with weight %f\n",
+                (void *) from, (void *) to, index, weight);
     for (size_t i = 0; i < index; ++i) {
         if (from->edges[i].child >= to) {
             DIE_ERROR(1, "Child %p to be inserted at index %zu is smaller than (or eq) to prev child %p at index %zu\n",
                       (void *) to, index, (void *) from->edges[i].child, i);
         }
-    }*/
+    }
 
     entry->weight = weight;
     entry->child = to;
@@ -576,7 +592,8 @@ static vertex_t *get_abs_vertex(vertex_t *graph) {
             if (abs_vertex == NULL) {
                 abs_vertex = vertex;
             } else {
-                DIE_ERROR(1, "Found multiple absorbing vertices\n");
+                DIE_ERROR(1, "Found multiple absorbing vertices (both %zu and %zu)\n",
+                          abs_vertex->vertex_index, vertex->vertex_index);
             }
         }
     }
@@ -607,9 +624,11 @@ vertex_t *generate_state_space(
         vector<pair<double, vector<size_t> > >(*initial_states)(void),
         vector<double>(*rewards)(vector<size_t>)
 ) {
+    DEBUG_PRINT("Start generate state space\n");
+
     avl_vec_vertex_t *bst = NULL;
     queue<pair<vertex_t *, vector<pair<double, vector<size_t> > > > > vertices_to_visit;
-
+    queue<vertex_t *> q;
     vertex_t *start_vertex = vertex_init(
             NULL,
             rewards(vector<size_t>(state_length, 0)),
@@ -754,28 +773,66 @@ vertex_t *generate_state_space(
         }
 
         if (edges.size() != 0) {
-            visiting_vertex->edges = (llc_t *) calloc(
-                    edges.size(), sizeof(llc_t)
-            );
+            // The list of edges may contain the same vertex twice
+            size_t n_edges = 0;
 
             struct edge *e = &edges[0];
             qsort(e, edges.size(), sizeof(struct edge), edgecmp);
+            vertex_t *prev_vertex = NULL;
 
             for (size_t i = 0; i < edges.size(); ++i) {
-                add_edge(visiting_vertex, e[i].vertex, i, e[i].weight);
+                vertex_t *child = edges[i].vertex;
+
+                if (prev_vertex != child) {
+                    n_edges++;
+                }
+
+                prev_vertex = child;
             }
 
+            visiting_vertex->edges = (llc_t *) calloc(
+                    n_edges, sizeof(llc_t)
+            );
+
+            prev_vertex = NULL;
+            size_t k = 0;
+
             for (size_t i = 0; i < edges.size(); ++i) {
+                vertex_t *child = e[i].vertex;
+
+                if (prev_vertex != child) {
+                    add_edge(visiting_vertex, child, k, e[i].weight);
+                    k++;
+                }
+
+                prev_vertex = child;
+            }
+
+            for (size_t i = 0; i < n_edges; ++i) {
+                // TODO: needed?
                 visiting_vertex->edges[i].llp->llc = &(visiting_vertex->edges[i]);
             }
         }
     }
 
+    DEBUG_PRINT("Freeing BST\n");
+
     avl_free(bst);
+
+    q = enqueue_vertices(start_vertex);
+    DEBUG_PRINT("Queue size: %zu\n", q.size());
+
+    while (!q.empty()) {
+        DEBUG_PRINT("Checking children of %p\n",
+                    (void *) q.front());
+        ensure_valid_children(q.front());
+        q.pop();
+    }
 
     return start_vertex;
 
     error:
+    DEBUG_PRINT("FAILURE\n");
     avl_free(bst);
     return NULL;
 }
@@ -1143,7 +1200,6 @@ double calculate_rate(vertex_t *vertex) {
     double rate = 0;
 
     for (size_t i = 0; i < vertex->nedges; ++i) {
-        vertex_t *child = vertex->edges[i].child;
         llc_t child_edge = vertex->edges[i];
         rate += child_edge.weight;
     }
@@ -1152,11 +1208,21 @@ double calculate_rate(vertex_t *vertex) {
 }
 
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
+    DEBUG_PRINT("Reward transforming\n");
     queue<vertex_t *> queue = enqueue_vertices(graph);
+
+    if (graph->nparents != 0) {
+        DIE_ERROR(1, "Expected start vertex to have 0 children\n");
+    }
 
     while (!queue.empty()) {
         vertex_t *vertex = queue.front();
         queue.pop();
+
+        DEBUG_PRINT("Visiting vertex %p\n",
+                    (void *) vertex);
+
+        ensure_valid_children(vertex);
 
         if (vertex->nedges == 0) {
             // Absorbing vertex
@@ -1171,6 +1237,8 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
         double reward = reward_func(vertex);
 
         if (reward == 0) {
+            DEBUG_PRINT("\t zero reward\n");
+            ensure_valid_children(vertex);
             llc_t *children = vertex->edges;
             size_t nchildren = vertex->nedges;
 
@@ -1182,11 +1250,31 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
                 vertex_t *parent = parent_edge->parent;
                 llc_t *parent_old_children = parent->edges;
                 size_t parent_nchildren = parent->nedges;
+                ensure_valid_children(parent);
 
                 llc_t *new_parent_children = (llc_t *) calloc(
                         parent_nchildren + nchildren,
                         sizeof(llc_t)
                 );
+
+                DEBUG_PRINT("Me (rw0) Vertex has %zu children\n",
+                            nchildren);
+
+                for (size_t n = 0; n < nchildren; ++n) {
+                    DEBUG_PRINT("\tChild %p with edge %.*f\n",
+                                (void *) children[n].child, 3,
+                                children[n].weight);
+                }
+
+
+                DEBUG_PRINT("Parent Vertex has %zu children\n",
+                            parent_nchildren);
+
+                for (size_t n = 0; n < parent_nchildren; ++n) {
+                    DEBUG_PRINT("\tChild %p with edge %.*f\n",
+                                (void *) parent_old_children[n].child, 3,
+                                parent_old_children[n].weight);
+                }
 
                 parent->edges = new_parent_children;
 
@@ -1201,15 +1289,20 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
                     // loop over that instead
                     if (i >= parent_nchildren) {
                         while (j < nchildren) {
+                            // We have more children, but our parent does not have
+                            // any more.
                             child_j = children[j];
                             double prob = children[j].weight / vertex->rate;
 
                             if (child_j.child == parent) {
+                                // A 'self-loop' is removed
                                 parent->rate -= parent_weight * prob;
                                 j++;
                                 continue;
                             }
 
+                            DEBUG_PRINT("CASE i>=: (i %zu, parent_nchildren %zu, j %zu, nchildren %zu)\n",
+                                        i, parent_nchildren, j, nchildren);
                             add_edge_no_rate(parent, child_j.child, k, prob * parent_weight);
                             j++;
                             k++;
@@ -1253,16 +1346,22 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
 
                     if (j >= nchildren ||
                         child_i.child < child_j.child) {
+                        DEBUG_PRINT("Case A (i %zu, j %zu, k %zu, nchildren %zu, child_i %p, child_j %p)\n",
+                                    i, j, k, nchildren, (void *) child_i.child, (void *) child_j.child);
                         new_parent_children[k] = child_i;
                         new_parent_children[k].llp->llc = &(new_parent_children[k]);
                         i++;
                     } else if (child_i.child > child_j.child) {
+                        DEBUG_PRINT("Case B (i %zu, j %zu, k %zu, child_i %p, child_j %p)\n",
+                                    i, j, k, (void *) child_i.child, (void *) child_j.child);
                         double prob = child_j.weight / vertex->rate;
                         add_edge(parent, child_j.child, k, prob * parent_weight);
                         parent->rate -= prob * parent_weight;
                         j++;
                     } else {
                         // ==
+                        DEBUG_PRINT("Case C (i %zu, j %zu, k %zu, child_i %p, child_j %p)\n",
+                                    i, j, k, (void *) child_i.child, (void *) child_j.child);
                         double prob = child_j.weight / vertex->rate;
                         new_parent_children[k] = child_i;
                         new_parent_children[k].weight += prob * parent_weight;
@@ -1284,6 +1383,8 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
             vertex_destroy(vertex);
 
         } else {
+            DEBUG_PRINT("\t non-zero reward\n");
+
             for (size_t i = 0; i < vertex->nedges; ++i) {
                 vertex->edges[i].weight /= reward;
             }
@@ -1415,11 +1516,12 @@ void reduce_graph(vertex_t *graph) {
     reset_graph_visited(graph);
     assign_vertex_dist(graph);
 
-    size_t largest_index;
-    label_vertex_index(&largest_index, graph);
+    struct graph_info info = get_graph_info(graph);
+    size_t graph_size = info.vertices;
 
+    queue<vertex_t *> queue2;
     queue<vertex_t *> queue = enqueue_vertices(graph);
-    vertex_t **vertices = (vertex_t **) calloc(largest_index + 1, sizeof(vertex_t *));
+    vertex_t **vertices = (vertex_t **) calloc(graph_size, sizeof(vertex_t *));
 
     size_t k = 0;
 
@@ -1431,29 +1533,64 @@ void reduce_graph(vertex_t *graph) {
         k++;
     }
 
-    qsort(vertices, largest_index + 1, sizeof(vertex_t *), same_vertex_cmp);
+    qsort(vertices, graph_size, sizeof(vertex_t *), same_vertex_cmp);
+    bool *removed = (bool *) calloc(graph_size, sizeof(bool));
 
-    for (size_t i = 0; i < largest_index + 1; ++i) {
-        for (size_t j = i + 1; j < largest_index + 1; ++j) {
+    for (size_t i = 0; i < graph_size; ++i) {
+        for (size_t j = i + 1; j < graph_size; ++j) {
+            DEBUG_PRINT("comparing %zu and %zu (%i %i)\n",
+                        vertices[i]->vertex_index,
+                        vertices[j]->vertex_index,
+                        removed[i], removed[j]);
+            if (removed[i] || removed[j]) {
+                continue;
+            }
+
+            //TODO: Do not loop over all twice, replace with linear loop
             vertex_t *vertex_i = vertices[i];
             vertex_t *vertex_j = vertices[j];
 
-            if (vertex_i->integer != vertex_j->integer ||
-                vertex_i->nedges != vertex_j->nedges) {
+            if (//vertex_i->integer != vertex_j->integer ||
+                    vertex_i->nedges != vertex_j->nedges) {
                 continue;
             }
+
+            DEBUG_PRINT("Vertices %zu and %zu are the same group with depth %zu and nedges %zu\n",
+                        vertex_i->vertex_index, vertex_j->vertex_index,
+                        vertex_i->integer, vertex_i->nedges);
 
             bool equal = true;
 
             for (size_t l = 0; l < vertex_i->nedges; ++l) {
-                if ((vertex_i->edges[l].weight - vertex_j->edges[l].weight) > 0.001 ||
+                if (fabs(vertex_i->edges[l].weight - vertex_j->edges[l].weight) > 0.001 ||
                     vertex_i->edges[l].child != vertex_j->edges[l].child) {
                     equal = false;
                     break;
                 }
             }
 
+            if (!equal) {
+                DEBUG_PRINT("But NOT equal:\n");
+            }
+            DEBUG_PRINT("Vertex %zu has %zu children\n", vertex_i->vertex_index,
+                        vertex_i->nedges);
+
+            for (size_t n = 0; n < vertex_i->nedges; ++n) {
+                DEBUG_PRINT("\tChild %zu with edge %.*f\n",
+                            vertex_i->edges[n].child->vertex_index,
+                            3, vertex_i->edges[n].weight);
+            }
+            DEBUG_PRINT("Vertex %zu has %zu children\n", vertex_j->vertex_index,
+                        vertex_j->nedges);
+
+            for (size_t n = 0; n < vertex_j->nedges; ++n) {
+                DEBUG_PRINT("\tChild %zu with edge %.*f\n",
+                            vertex_j->edges[n].child->vertex_index,
+                            3, vertex_j->edges[n].weight);
+            }
+
             if (equal) {
+                DEBUG_PRINT("And they are equal\n");
                 vertex_t **parents = (vertex_t **) calloc(
                         vertex_j->nparents,
                         sizeof(vertex_t *)
@@ -1481,6 +1618,18 @@ void reduce_graph(vertex_t *graph) {
                     llc_t *parent_children = parent->edges;
                     size_t parent_nchildren = parent->nedges;
 
+                    DEBUG_PRINT("Redirecting the parent %zu with an edge to vertex j (%zu) to vertex i (%zu)\n",
+                                parent->vertex_index,
+                                vertex_j->vertex_index, vertex_i->vertex_index);
+
+                    DEBUG_PRINT("Parent had old %zu children:\n", parent_nchildren);
+
+                    for (size_t n = 0; n < parent_nchildren; ++n) {
+                        DEBUG_PRINT("\tChild %zu with edge %.*f\n",
+                                    parent_children[n].child->vertex_index,
+                                    3, parent_children[n].weight);
+                    }
+
                     // Remove all children's parent link
                     for (size_t m = 0; m < parent_nchildren; ++m) {
                         llc_t llc = parent_children[m];
@@ -1504,6 +1653,14 @@ void reduce_graph(vertex_t *graph) {
                         llc_t edge = parent_children[m];
 
                         if (edge.child == vertex_j) {
+                            // If vertex_j was the last child, we must add vertex_i
+                            // Unless it has been seen/added already
+                            if (m + 1 == parent_nchildren && !has_vertex_i) {
+                                add_edge(parent, vertex_i, index, weight_j);
+                                index++;
+                                has_vertex_i = true;
+                            }
+
                             continue;
                         }
 
@@ -1526,11 +1683,20 @@ void reduce_graph(vertex_t *graph) {
                         index++;
                     }
 
-                    //TODO: How come we cannot free this?
-                    // Perhaps test any llc->llp->llc, no one should reference it!
-//                    free(parent->edges);
+                    DEBUG_PRINT("Parent NEW %zu children:\n",
+                                parent->nedges);
+
+                    for (size_t n = 0; n < parent->nedges; ++n) {
+                        DEBUG_PRINT("\tChild %zu with edge %.*f\n",
+                                    parent->edges[n].child->vertex_index,
+                                    3, parent->edges[n].weight);
+                    }
+
+                    free(parent_children);
                 }
 
+                free(weights);
+                free(parents);
 
                 // Remove all my parents link
                 for (size_t m = 0; m < vertex_j->nedges; ++m) {
@@ -1539,9 +1705,26 @@ void reduce_graph(vertex_t *graph) {
 
                     ll_remove(llc.llp);
                 }
+
+                vertex_destroy(vertex_j);
+                removed[j] = true;
+
+                queue2 = enqueue_vertices(graph);
+
+                while (!queue2.empty()) {
+                    vertex_t *vertex = queue2.front();
+                    queue2.pop();
+
+                    if (vertex == vertex_j ||
+                        vertex->vertex_index == vertex_j->vertex_index) {
+                        //TODO: Remove this check
+                        DIE_ERROR(1, "Should have removed vertex, it still exists\n");
+                    }
+                }
             }
         }
     }
 
+    free(removed);
     free(vertices);
 }
