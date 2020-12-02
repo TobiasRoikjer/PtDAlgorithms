@@ -615,7 +615,13 @@ int edgecmp(const void *a, const void *b) {
     uintptr_t vertex_position_b = (uintptr_t) ((struct edge *) b)->vertex;
     ptrdiff_t diff = vertex_position_a - vertex_position_b;
 
-    return (int) diff;
+    if (diff < 0) {
+        return -1;
+    } else if (diff > 0) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 vertex_t *generate_state_space(
