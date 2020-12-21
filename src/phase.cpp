@@ -67,6 +67,7 @@ void vertex_destroy_parents(vertex_t *vertex) {
 
 
 inline void ensure_valid_children(vertex_t *from) {
+    return;
     if (from->nedges == 0) {
         return;
     }
@@ -90,12 +91,12 @@ inline void add_edge_no_rate(vertex_t *from, vertex_t *to, size_t index, double 
     llc_t *entry = &(from->edges[index]);
     DEBUG_PRINT("Adding edge from %p to %p at index %zu with weight %f\n",
                 (void *) from, (void *) to, index, weight);
-    for (size_t i = 0; i < index; ++i) {
+    /*for (size_t i = 0; i < index; ++i) {
         if (from->edges[i].child >= to) {
             DIE_ERROR(1, "Child %p to be inserted at index %zu is smaller than (or eq) to prev child %p at index %zu\n",
                       (void *) to, index, (void *) from->edges[i].child, i);
         }
-    }
+    }*/
 
     entry->weight = weight;
     entry->child = to;
@@ -1544,9 +1545,9 @@ void reduce_graph(vertex_t *graph) {
 
     for (size_t i = 0; i < graph_size; ++i) {
         for (size_t j = i + 1; j < graph_size; ++j) {
-            DEBUG_PRINT("comparing %zu and %zu (%i %i)\n",
-                        vertices[i]->vertex_index,
-                        vertices[j]->vertex_index,
+            DEBUG_PRINT("comparing %i and %i (%i %i)\n",
+                        removed[i] ? -1 : (int)(vertices[i]->vertex_index),
+                        removed[j] ? -1 : (int)(vertices[j]->vertex_index),
                         removed[i], removed[j]);
             if (removed[i] || removed[j]) {
                 continue;
@@ -1556,7 +1557,7 @@ void reduce_graph(vertex_t *graph) {
             vertex_t *vertex_i = vertices[i];
             vertex_t *vertex_j = vertices[j];
 
-            if (//vertex_i->integer != vertex_j->integer ||
+            if (vertex_i->integer != vertex_j->integer ||
                     vertex_i->nedges != vertex_j->nedges) {
                 continue;
             }
@@ -1715,18 +1716,17 @@ void reduce_graph(vertex_t *graph) {
                 vertex_destroy(vertex_j);
                 removed[j] = true;
 
-                queue2 = enqueue_vertices(graph);
+                /*queue2 = enqueue_vertices(graph);
 
                 while (!queue2.empty()) {
                     vertex_t *vertex = queue2.front();
                     queue2.pop();
 
-                    if (vertex == vertex_j ||
-                        vertex->vertex_index == vertex_j->vertex_index) {
+                    if (vertex == vertex_j) {
                         //TODO: Remove this check
                         DIE_ERROR(1, "Should have removed vertex, it still exists\n");
                     }
-                }
+                }*/
             }
         }
     }

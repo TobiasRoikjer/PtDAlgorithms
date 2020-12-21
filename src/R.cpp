@@ -417,3 +417,149 @@ SEXP graph_reduce(SEXP phase_type_graph) {
 
 // TODO:
 // Clone graph when e.g. reward transforming
+
+
+size_t n1, n2, nrow, ncol, t1, t2, matrix_size, state_size;
+double m;
+
+void mig_set_state_properties(size_t num_pop1, size_t num_pop2,
+                              size_t types_pop1, size_t types_pop2, double mig) {
+  n1 = num_pop1;
+  n2 = num_pop2;
+  nrow = types_pop1 + 1;
+  ncol = types_pop2 + 1;
+  matrix_size = nrow * ncol;
+  state_size = matrix_size * 2;
+  t1 = types_pop1;
+  t2 = types_pop2;
+  m = mig;
+}
+
+size_t mig_state_index(size_t p1, size_t p2, size_t population) {
+  if (p1 > t1) {
+    p1 = t1;
+  }
+  
+  if (p2 > t2) {
+    p2 = t2;
+  }
+  
+  return nrow * (p2) + p1 + (population == 1 ? 0 : matrix_size);
+}
+
+vector<pair<double, vector<size_t> > > mig_visit_function(vector<size_t> state) {
+  vector<pair<double, vector<size_t> > > children;
+  
+  if (accumulate(state.begin(), state.end(), 0) == 1) {
+    return children;
+  }
+  
+  for (size_t p = 1; p <= 2; p++) {
+    for (size_t i1 = 0; i1 <= t1; i1++) {
+      for (size_t j1 = 0; j1 <= t2; j1++) {
+        size_t idx1 = mig_state_index(i1, j1, p);
+        
+        {
+          size_t idx2 = mig_state_index(i1, j1, 2 - p + 1);
+          // Migration from the islands
+          if (state[idx1] >= 1) {
+            double rate = m * state[idx1];
+            
+            vector<size_t> child_state(state);
+            
+            child_state[idx1]--;
+            child_state[idx2]++;
+            
+            children.push_back(
+              pair<double, vector<size_t> >(rate, child_state)
+            );
+          }
+        }
+        
+        if (state[idx1] != 0) {
+          // Coalescence
+          for (size_t i2 = 0; i2 <= t1; i2++) {
+            for (size_t j2 = 0; j2 <= t2; j2++) {
+              double rate;
+              size_t idx2 = mig_state_index(i2, j2, p);
+              
+              if (i1 == i2 && j1 == j2) {
+                if (state[idx1] <= 1) {
+                  continue;
+                }
+                
+                rate = (double) (state[idx1] * (state[idx1] - 1)) / 2;
+              } else {
+                if (state[idx1] == 0 || state[idx2] == 0) {
+                  continue;
+                }
+                
+                rate = (double) state[idx1] * state[idx2];
+              }
+              
+              vector<size_t> child_state(state);
+              size_t idx3 = mig_state_index(i1 + i2, j1 + j2, p);
+              
+              child_state[idx1]--;
+              child_state[idx2]--;
+              child_state[idx3]++;
+              
+              children.push_back(
+                pair<double, vector<size_t> >(rate, child_state)
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return (children);
+}
+
+vector<pair<double, vector<size_t> > > mig_initial_states(void) {
+  vector<pair<double, vector<size_t> > > children;
+  vector<size_t> state = vector<size_t>(state_size, 0);
+  
+  state[mig_state_index(1, 0, 1)] = n1;
+  state[mig_state_index(0, 1, 2)] = n2;
+  
+  children.push_back(pair<double, vector<size_t> >(1.0f, state));
+  
+  return children;
+}
+
+vector<double> mig_rewards(vector<size_t> input) {
+  vector<double> rew(input.begin(), input.end());
+  
+  return rew;
+}
+
+// [[Rcpp::export]]
+SEXP generate_graphM() {
+  mig_set_state_properties(3, 3, 3, 1, 0.1);
+  
+  vertex_t *graph = generate_state_space(
+    state_size,
+    mig_visit_function,
+    mig_initial_states,
+    mig_rewards
+  );
+  
+  return Rcpp::XPtr<PhaseTypeGraph>(new PhaseTypeGraph(graph, graph->rewards.size()));
+}
+
+
+// [[Rcpp::export]]
+SEXP generate_graphM2(int n1, int n2, int t1, int t2, double m) {
+  mig_set_state_properties((size_t)n1, (size_t)n2, (size_t)t1, size_t(t2), m);
+  
+  vertex_t *graph = generate_state_space(
+    state_size,
+    mig_visit_function,
+    mig_initial_states,
+    mig_rewards
+  );
+  
+  return Rcpp::XPtr<PhaseTypeGraph>(new PhaseTypeGraph(graph, graph->rewards.size()));
+}
