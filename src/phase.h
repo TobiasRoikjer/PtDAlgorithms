@@ -11,6 +11,7 @@
 typedef struct {
     double ***cov;
     double **exp;
+    double **defect;
 } cov_exp_return;
 
 
@@ -80,6 +81,7 @@ typedef struct vertex {
 
     vector<double> exp;
     vector<double> desc;
+    vector<double> no_defect;
 
     size_t vertex_index;
     size_t integer;

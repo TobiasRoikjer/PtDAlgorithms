@@ -1118,11 +1118,21 @@ void mph_cov_assign_desc_all(vertex_t *vertex, size_t m) {
         mph_cov_assign_desc_all(child, m);
     }
 
+    vertex->no_defect = vector<double>(m, 0);
+
     for (size_t i = 0; i < vertex->nedges; ++i) {
         llc_t child_edge = vertex->edges[i];
 
         for (size_t j = 0; j < m; ++j) {
-            vertex->desc[j] += child_edge.weight / vertex->rate * child_edge.child->desc[j];
+            double probability = child_edge.weight / vertex->rate;
+            vertex->desc[j] += probability * child_edge.child->desc[j];
+            vertex->no_defect[j] += probability * child_edge.child->no_defect[j];
+        }
+    }
+
+    for (size_t j = 0; j < m; ++j) {
+        if (vertex->rewards[j] != 0) {
+            vertex->no_defect[j] = 1;
         }
     }
 
@@ -1143,6 +1153,7 @@ void mph_cov_assign_desc_all(vertex_t *vertex, size_t m) {
 
 double **cov;
 double *expectation;
+double *defect;
 
 void _mph_cov_all(vertex_t *vertex, size_t m) {
     if (vertex->visited) {
@@ -1157,6 +1168,7 @@ void _mph_cov_all(vertex_t *vertex, size_t m) {
     }
 
     vertex->visited = true;
+
     for (size_t i = 0; i < vertex->nedges; ++i) {
         vertex_t *child = vertex->edges[i].child;
         _mph_cov_all(child, m);
@@ -1180,9 +1192,11 @@ cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m) {
     _mph_cov_all(graph, m);
 
     expectation = (double *) calloc(m, sizeof(double));
+    defect = (double *) calloc(m, sizeof(double));
 
     for (size_t i = 0; i < m; ++i) {
         expectation[i] = graph->desc[i];
+        defect[i] = 1 - graph->no_defect[i];
 
         for (size_t j = 0; j <= i; ++j) {
             cov[i][j] -= graph->desc[i] *
@@ -1190,7 +1204,7 @@ cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m) {
         }
     }
 
-    return (cov_exp_return) {.cov = &cov, .exp = &expectation};
+    return (cov_exp_return) {.cov = &cov, .exp = &expectation, .defect = &defect};
 }
 
 void graph_free(vertex_t *graph) {
@@ -1546,8 +1560,8 @@ void reduce_graph(vertex_t *graph) {
     for (size_t i = 0; i < graph_size; ++i) {
         for (size_t j = i + 1; j < graph_size; ++j) {
             DEBUG_PRINT("comparing %i and %i (%i %i)\n",
-                        removed[i] ? -1 : (int)(vertices[i]->vertex_index),
-                        removed[j] ? -1 : (int)(vertices[j]->vertex_index),
+                        removed[i] ? -1 : (int) (vertices[i]->vertex_index),
+                        removed[j] ? -1 : (int) (vertices[j]->vertex_index),
                         removed[i], removed[j]);
             if (removed[i] || removed[j]) {
                 continue;
@@ -1558,7 +1572,7 @@ void reduce_graph(vertex_t *graph) {
             vertex_t *vertex_j = vertices[j];
 
             if (vertex_i->integer != vertex_j->integer ||
-                    vertex_i->nedges != vertex_j->nedges) {
+                vertex_i->nedges != vertex_j->nedges) {
                 continue;
             }
 

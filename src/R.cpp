@@ -193,16 +193,18 @@ List graph_exp_cov(SEXP phase_type_graph) {
 
     NumericMatrix out_cov(graph->rewards_length, graph->rewards_length);
     NumericVector out_exp(graph->rewards_length);
+    NumericVector out_defect(graph->rewards_length);
 
     for (size_t i = 0; i < graph->rewards_length; ++i) {
         out_exp(i) = (*ret.exp)[i];
+        out_defect(i) = (*ret.defect)[i];
 
         for (size_t j = 0; j < graph->rewards_length; ++j) {
             out_cov(i,j) = (*ret.cov)[max(i,j)][min(i,j)];
         }
     }
 
-    return List::create(Named("exp") = out_exp , _["cov"] = out_cov);
+    return List::create(Named("exp") = out_exp , _["cov"] = out_cov, _["defect"] = out_defect);
 }
 
 // [[Rcpp::export]]
