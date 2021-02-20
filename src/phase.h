@@ -32,13 +32,13 @@ fprintf(stderr, "%s\n", error_formatted_line);     \
 } while(0)
 
 #define DEBUG_PRINT(message, ...) do {             \
-/*char formatted[2048];                              \
+char formatted[2048];                              \
                                                    \
 snprintf(formatted,                                \
          sizeof(formatted),                        \
          message, ##__VA_ARGS__);                  \
                                                    \
-fprintf(stderr, "%s", formatted);*/                  \
+fprintf(stderr, "%s", formatted);                  \
 } while(0)
 
 using namespace std;
@@ -61,7 +61,7 @@ typedef struct vertex {
         this->visited = false;
         this->rate = 0;
         this->prob = 0;
-        this->reset_int = 0;
+        this->reset = true;
     }
 
     ~vertex() {
@@ -86,7 +86,7 @@ typedef struct vertex {
     size_t vertex_index;
     size_t integer;
     bool boolean;
-    size_t reset_int;
+    bool reset;
 } vertex_t;
 
 typedef struct llc {
@@ -115,11 +115,27 @@ struct graph_info {
     size_t edges;
 };
 
+struct pdf_values {
+    double lambda;
+    double k;
+    size_t n;
+};
+
+struct vertex_pdf {
+    double defect_prob;
+    double c;
+    vector<struct pdf_values> *parts;
+};
+
 struct graph_info get_graph_info(vertex_t *graph);
 cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *));
+double fold(vertex_t *graph, double (*vertex_func)(vertex_t *));
 void set_graph_rewards(vertex_t *graph, vector<double> (*set_rewards_func)(vector<double>));
 void reduce_graph(vertex_t *graph);
+void calculate_prob(vertex_t *graph, size_t *size, double **probs);
+void calculate_var(vertex_t *graph, size_t *size, double **vars);
+void pdf(vertex_t *graph, struct vertex_pdf *out_vertex_pdfs);
 
 vertex_t *generate_state_space(
         size_t state_length,
@@ -128,5 +144,6 @@ vertex_t *generate_state_space(
         vector<double>(*rewards)(vector<size_t>)
 );
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m);
+int gen_kingman_graph_rw(vertex_t **graph, size_t n, size_t rw);
 
 #endif //PTDALGORITHMS_PHASE_H

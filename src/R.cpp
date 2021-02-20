@@ -20,39 +20,80 @@ public:
 };
 
 // [[Rcpp::export]]
-List graph_as_matrix(SEXP phase_type_graph) {
+void label_graph(SEXP phase_type_graph) {
+  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+  label_vertex_index(NULL, graph->start);
+}
+
+// [[Rcpp::export]]
+NumericVector probs(SEXP phase_type_graph) {
+  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+  
+  double *probs;
+  size_t size;
+  
+  calculate_prob(graph->start, &size, &probs);
+  NumericVector res(size - 2);
+  
+  for (size_t i = 2; i < size; ++i) {
+    res[i - 2] = probs[i];
+  }
+  
+  free(probs);
+  
+  return res;
+}
+
+// [[Rcpp::export]]
+double graph_var(SEXP phase_type_graph) {
+  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+  
+  double *vars;
+  size_t size;
+  
+  calculate_var(graph->start, &size, &vars);
+  
+  double var = vars[1];
+  
+  free(vars);
+  
+  return var;
+}
+
+List _graph_as_matrix(SEXP phase_type_graph, bool transition_probs) {
     Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
     double **mat;
     size_t size;
     vertex_t **vertices;
-    graph_as_mat(&mat, &size, &vertices, graph->start);
+    
+    if (!transition_probs) {
+      graph_as_mat(&mat, &size, &vertices, graph->start);
+    } else {
+      graph_as_t_mat(&mat, &size, &vertices, graph->start);
+    }
 
     NumericMatrix SIM(size - 2, size - 2);
     NumericVector IPV(size - 2);
     NumericMatrix RW(size - 2, graph->rewards_length);
 
     for (size_t i = 2; i < size; ++i) {
-        IPV(i - 2) = mat[1][i];
+      IPV(i - 2) = mat[1][i];
 
-        for (size_t j = 2; j < size; ++j) {
-            SIM(i - 2, j - 2) = mat[i][j];
-
-            if (j - 2 < graph->rewards_length) {
-                RW(i - 2, j - 2) = vertices[i]->rewards[j - 2];
-            }
-        }
+      for (size_t j = 2; j < size; ++j) {
+        SIM(i - 2, j - 2) = mat[i][j];
+      }
     }
 
     for (size_t i = 2; i < size; ++i) {
-        vertex_t *vertex = vertices[i];
-      
-        for (size_t j = 0; j < graph->rewards_length; j++) {
-            RW(i - 2, j) = vertex->rewards[j];
-        }
+      vertex_t *vertex = vertices[i];
+
+      for (size_t j = 0; j < graph->rewards_length; j++) {
+        RW(i - 2, j) = vertex->rewards[j];
+      }
     }
     
     for (size_t i = 0; i < size; ++i) {
-        free(mat[i]);
+      free(mat[i]);
     }
 
     free(mat);
@@ -60,6 +101,17 @@ List graph_as_matrix(SEXP phase_type_graph) {
 
     return List::create(Named("IPV") = IPV , _["SIM"] = SIM, _["RW"] = RW);
 }
+
+// [[Rcpp::export]]
+List graph_as_matrix(SEXP phase_type_graph) {
+  return(_graph_as_matrix(phase_type_graph, false));
+}
+
+// [[Rcpp::export]]
+List graph_as_t_matrix(SEXP phase_type_graph) {
+  return(_graph_as_matrix(phase_type_graph, true));
+}
+
 
 // [[Rcpp::export]]
 SEXP matrix_as_graph(NumericVector initial_probability_vector,NumericMatrix subintensity_matrix,NumericMatrix rewards) {
@@ -148,6 +200,18 @@ SEXP kingman_gen_graph(int n, int m) {
     gen_kingman_graph(&graph, n, m);
 
     return Rcpp::XPtr<PhaseTypeGraph>(new PhaseTypeGraph(graph, m));
+}
+
+// [[Rcpp::export]]
+SEXP kingman_gen_graph_rw(int n, int rw) {
+  if (n <= 0) {
+    throw std::invalid_argument("'n' must be strictly positive");
+  }
+  
+  vertex_t *graph;
+  gen_kingman_graph_rw(&graph, n, rw - 1);
+  
+  return Rcpp::XPtr<PhaseTypeGraph>(new PhaseTypeGraph(graph, rw - 1 + 2));
 }
 
 size_t reward_index;
@@ -409,12 +473,34 @@ SEXP generate_graph(int state_length, Rcpp::Function initial, Rcpp::Function chi
 
 
 // [[Rcpp::export]]
-SEXP graph_reduce(SEXP phase_type_graph) {
+List graph_apply(SEXP phase_type_graph, Rcpp::Function func) {
   Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+  queue<vertex_t *> q = enqueue_vertices(graph->start);
+
+  List list(q.size() - 2);
   
-  reduce_graph(graph->start);
+  while (!q.empty()) {
+    vertex_t *vertex = q.front();
+    q.pop();
+    
+    if (vertex->vertex_index <= 1) {
+      continue;
+    }
+    
+    NumericVector rewards(vertex->rewards.size());
+    
+    for (ssize_t i = 0; i < rewards.size(); ++i) {
+      rewards(i) = vertex->rewards[i];
+    }
+    
+    list[vertex->vertex_index - 2] = func(
+      vertex->vertex_index - 1,
+      vertex->rate,
+      rewards
+    );
+  }
   
-  return Rcpp::XPtr<PhaseTypeGraph>(graph);
+  return list;
 }
 
 // TODO:

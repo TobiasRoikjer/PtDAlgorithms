@@ -7,6 +7,8 @@
 #include <math.h>
 #include "phase.h"
 
+static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
+
 void print_graph_list(FILE *stream, vertex_t *graph,
                       bool indexed,
                       size_t vec_length, size_t vec_spacing);
@@ -167,23 +169,38 @@ static void print_vector_spacing(FILE *stream, vec_entry_t *v, size_t nmemb, siz
     fprintf(stream, ")");
 }
 
-void _reset_graph_visited(vertex_t *vertex, size_t reset_int) {
-    if (vertex->reset_int == reset_int) {
-        return;
+static void reset_graph_visited(vertex_t *graph) {
+    queue<vertex_t *> to_reset;
+    queue<vertex_t *> to_visit;
+
+    to_visit.push(graph);
+
+    while (!to_visit.empty()) {
+        vertex_t *vertex = to_visit.front();
+        to_visit.pop();
+
+        if (!vertex->reset) {
+            continue;
+        }
+
+        vertex->reset = false;
+        to_reset.push(vertex);
+
+        vertex->visited = false;
+
+        for (size_t i = 0; i < vertex->nedges; ++i) {
+            vertex_t *child = vertex->edges[i].child;
+            to_visit.push(child);
+        }
     }
 
-    vertex->reset_int = reset_int;
 
-    for (size_t i = 0; i < vertex->nedges; ++i) {
-        vertex_t *child = vertex->edges[i].child;
-        _reset_graph_visited(child, reset_int);
+    while (!to_reset.empty()) {
+        vertex_t *vertex = to_reset.front();
+        to_reset.pop();
+
+        vertex->reset = true;
     }
-
-    vertex->visited = false;
-}
-
-static void reset_graph_visited(vertex_t *vertex) {
-    _reset_graph_visited(vertex, vertex->reset_int + 1);
 }
 
 typedef struct avl_vec_vertex {
@@ -570,6 +587,7 @@ queue<vertex_t *> enqueue_vertices(vertex_t *graph) {
         }
 
         vertex->visited = true;
+        DEBUG_PRINT("Adding %p to queue\n", (void *) vertex);
         ret.push(vertex);
 
         for (size_t i = 0; i < vertex->nedges; ++i) {
@@ -642,11 +660,17 @@ vertex_t *generate_state_space(
             0
     );
 
+    start_vertex->vertex_index = 1;
+
     vertex_t *absorbing_vertex = vertex_init(
             NULL,
             rewards(vector<size_t>(state_length, 0)),
             0
     );
+
+    absorbing_vertex->vertex_index = 0;
+
+    size_t index = 2;
 
     vector<edge> initial_edges;
     vector<pair<double, vector<size_t> > > initial =
@@ -688,6 +712,8 @@ vertex_t *generate_state_space(
                     rewards(state),
                     state_length
             );
+
+            child->vertex_index = index++;
 
             avl_vec_insert(&bst, vec_entry, child, state_length);
 
@@ -860,6 +886,9 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
 
     size_t end = 0;
 
+    initial_vertex->vertex_index = 2;
+    size_t index = 3;
+
     while (!vertices_to_visit.empty()) {
         vertex_t *vertex = vertices_to_visit.front();
         vertices_to_visit.pop();
@@ -880,6 +909,190 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
                 }
             }
         }
+
+        for (vec_entry_t i = start; i <= end; i++) {
+            if (v[i] == 0) {
+                continue;
+            }
+
+            for (vec_entry_t j = i; j <= end; j++) {
+                if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
+                    double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
+
+                    const size_t inc_pos = min((i + j + 2) - 1, m - 1);
+                    v[i]--;
+                    v[j]--;
+                    v[inc_pos]++;
+
+                    vertex_t *new_vertex;
+                    const bool only_tail = (v[m - 1] == n_remaining - 1);
+
+                    if (only_tail) {
+                        new_vertex = abs_vertex;
+                    } else {
+                        bst_vertex = (avl_vec_vertex_t *) avl_vec_find(bst, v, m);
+
+                        if (bst_vertex == NULL) {
+                            vec_entry_t *new_state = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
+                            memcpy(new_state, v, sizeof(vec_entry_t) * m);
+                            vertex_t *to = vertex_init(
+                                    new_state,
+                                    vector<double>(new_state, new_state + m),
+                                    m
+                            );
+
+                            to->vertex_index = index++;
+
+                            avl_vec_insert(&bst, new_state, to, m);
+                            vertices_to_visit.push(to);
+                            new_vertex = to;
+                        } else {
+                            new_vertex = bst_vertex->entry;
+                        }
+                    }
+
+                    v[i]++;
+                    v[j]++;
+                    v[inc_pos]--;
+
+                    struct edge edge;
+                    edge.weight = t;
+                    edge.vertex = new_vertex;
+
+                    edges.push_back(edge);
+                }
+            }
+        }
+
+        if (edges.size() != 0) {
+            vertex->edges = (llc_t *) calloc(edges.size(), sizeof(llc_t));
+            struct edge *e = &edges[0];
+            qsort(e, edges.size(), sizeof(struct edge), edgecmp);
+
+            for (size_t i = 0; i < edges.size(); ++i) {
+                add_edge(vertex, e[i].vertex, i, e[i].weight);
+            }
+
+            for (size_t i = 0; i < edges.size(); ++i) {
+                vertex->edges[i].llp->llc = &(vertex->edges[i]);
+            }
+        }
+    }
+
+    free(v);
+    *out_initial_vertex = initial_vertex;
+    avl_free(bst);
+    return 0;
+}
+
+int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
+    if (m < n) {
+        m += 1;
+    }
+
+    vec_entry_t *initial = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
+    initial[0] = n;
+
+    vec_entry_t *mrca = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
+    mrca[m - 1] = 1;
+
+    vertex_t *absorbing_vertex = vertex_init(
+            mrca,
+            vector<double>(mrca, mrca + m),
+            m
+    );
+
+    absorbing_vertex->vertex_index = 0;
+
+    vertex_t *state_graph;
+
+    kingman_visit_vertex(
+            &state_graph,
+            initial, absorbing_vertex,
+            m
+    );
+
+    vec_entry_t *start_state = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
+
+    vertex_t *start = vertex_init(start_state, vector<double>(start_state, start_state + m), m);
+
+    start->edges = (llc_t *) calloc(1, sizeof(llc_t));
+    add_edge(start, state_graph, 0, 1);
+
+    start->vertex_index = 1;
+
+    // TODO: remove this. Replace entire function with generic one
+    get_abs_vertex(start)->vertex_index = 0;
+
+    *graph = start;
+
+    return 0;
+}
+
+size_t reward_state = 0;
+
+static double reward_by_state(vertex_t *vertex) {
+    return vertex->rewards[reward_state];
+}
+
+static int kingman_visit_vertex_rw(vertex_t **out_initial_vertex,
+                                   vec_entry_t *initial_state,
+                                   vertex_t *abs_vertex,
+                                   const size_t rw) {
+    reward_state = rw;
+    size_t m = rw + 2;
+    avl_vec_vertex_t *bst = NULL;
+
+    queue<vertex_t *> vertices_to_visit;
+
+    vertex_t *initial_vertex = vertex_init(initial_state,
+                                           vector<double>(initial_state, initial_state + m),
+                                           m);
+    vertices_to_visit.push(initial_vertex);
+    vec_entry_t *v = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
+    avl_vec_vertex_t *bst_vertex;
+
+    size_t end = 0;
+    size_t previous_layer = 0;
+    vector<vertex_t *> unrewarded_vertices;
+    vector<vertex_t *> current_layer_vertices;
+
+    while (!vertices_to_visit.empty()) {
+        vertex_t *vertex = vertices_to_visit.front();
+        vertices_to_visit.pop();
+
+
+        memcpy(v, vertex->state, sizeof(vec_entry_t) * m);
+        size_t n_remaining = 0;
+        size_t start = -1;
+
+        vector<edge> edges;
+
+        for (vec_entry_t i = 0; i < m; i++) {
+            n_remaining += v[i];
+
+            if (v[i] > 0) {
+                end = i;
+
+                if (start == (size_t) -1) {
+                    start = i;
+                }
+            }
+        }
+
+        if (n_remaining != previous_layer) {
+            previous_layer = n_remaining;
+
+            for (vector<vertex_t *>::iterator it =
+                    unrewarded_vertices.begin(); it != unrewarded_vertices.end(); ++it) {
+                reward_transform_vertex(*it, &reward_by_state);
+            }
+
+            unrewarded_vertices = current_layer_vertices;
+            current_layer_vertices.clear();
+        }
+
+        current_layer_vertices.push_back(vertex);
 
         for (vec_entry_t i = start; i <= end; i++) {
             if (v[i] == 0) {
@@ -946,16 +1159,27 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
         }
     }
 
+    for (vector<vertex_t *>::iterator it =
+            unrewarded_vertices.begin(); it != unrewarded_vertices.end(); ++it) {
+        reward_transform_vertex(*it, &reward_by_state);
+    }
+
+    for (vector<vertex_t *>::iterator it =
+            current_layer_vertices.begin(); it != current_layer_vertices.end(); ++it) {
+        reward_transform_vertex(*it, &reward_by_state);
+    }
+
+    unrewarded_vertices.clear();
+    current_layer_vertices.clear();
+
     free(v);
     *out_initial_vertex = initial_vertex;
     avl_free(bst);
     return 0;
 }
 
-int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
-    if (m < n) {
-        m += 1;
-    }
+int gen_kingman_graph_rw(vertex_t **graph, size_t n, size_t rw) {
+    size_t m = rw + 2;
 
     vec_entry_t *initial = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
     initial[0] = n;
@@ -969,9 +1193,9 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
 
     vertex_t *state_graph;
 
-    kingman_visit_vertex(&state_graph,
-                         initial, absorbing_vertex,
-                         m);
+    kingman_visit_vertex_rw(&state_graph,
+                            initial, absorbing_vertex,
+                            rw);
 
     vec_entry_t *start_state = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
 
@@ -979,6 +1203,8 @@ int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
 
     start->edges = (llc_t *) calloc(1, sizeof(llc_t));
     add_edge(start, state_graph, 0, 1);
+
+    reward_transform_vertex(state_graph, &reward_by_state);
 
     *graph = start;
 
@@ -1068,6 +1294,35 @@ void print_graph_list(FILE *stream, vertex_t *graph,
     _print_graph_list(stream, graph, indexed, vec_length, vec_spacing);
     fflush(stream);
 }
+
+void assign_probability(vertex_t *graph) {
+    queue<vertex_t *> q = enqueue_vertices(graph);
+
+    while (!q.empty()) {
+        vertex_t *vertex = q.front();
+        q.pop();
+
+        vertex->prob = 0;
+    }
+
+    // Start has probability 1
+    graph->prob = 1;
+
+    q = enqueue_vertices(graph);
+
+    while (!q.empty()) {
+        vertex_t *vertex = q.front();
+        q.pop();
+
+        for (size_t i = 0; i < vertex->nedges; ++i) {
+            llc_t edge = vertex->edges[i];
+            vertex_t *child = edge.child;
+
+            child->prob += vertex->prob * edge.weight / vertex->rate;
+        }
+    }
+}
+
 
 void mph_cov_assign_vertex_all(vertex_t *vertex, size_t m) {
     if (vertex->visited) {
@@ -1240,178 +1495,190 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
         vertex_t *vertex = queue.front();
         queue.pop();
 
-        DEBUG_PRINT("Visiting vertex %p\n",
+        reward_transform_vertex(vertex, reward_func);
+    }
+
+    label_vertex_index(NULL, graph);
+
+    return 0;
+}
+
+int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
+    DEBUG_PRINT("Visiting vertex %p\n",
+                (void *) vertex);
+
+    ensure_valid_children(vertex);
+
+    if (vertex->nedges == 0) {
+        // Absorbing vertex
+        DEBUG_PRINT("Vertex %p is absorbing\n",
                     (void *) vertex);
+        return 0;
+    }
 
+    if (vertex->nparents == 0) {
+        // Starting vertex
+        DEBUG_PRINT("Vertex %p is start\n",
+                    (void *) vertex);
+        return 0;
+    }
+
+    double reward = reward_func(vertex);
+
+    if (reward == 0) {
+        DEBUG_PRINT("\t zero reward\n");
         ensure_valid_children(vertex);
-
-        if (vertex->nedges == 0) {
-            // Absorbing vertex
-            continue;
-        }
-
-        if (vertex->nparents == 0) {
-            // Starting vertex
-            continue;
-        }
-
-        double reward = reward_func(vertex);
-
-        if (reward == 0) {
-            DEBUG_PRINT("\t zero reward\n");
-            ensure_valid_children(vertex);
-            llc_t *children = vertex->edges;
-            size_t nchildren = vertex->nedges;
+        llc_t *children = vertex->edges;
+        size_t nchildren = vertex->nedges;
 
 
-            // Take all my edges and add to my parent instead.
-            llp_t *parent_edge = vertex->parents->next;
+        // Take all my edges and add to my parent instead.
+        llp_t *parent_edge = vertex->parents->next;
 
-            while (parent_edge != NULL) {
-                vertex_t *parent = parent_edge->parent;
-                llc_t *parent_old_children = parent->edges;
-                size_t parent_nchildren = parent->nedges;
-                ensure_valid_children(parent);
+        while (parent_edge != NULL) {
+            vertex_t *parent = parent_edge->parent;
+            llc_t *parent_old_children = parent->edges;
+            size_t parent_nchildren = parent->nedges;
+            ensure_valid_children(parent);
 
-                llc_t *new_parent_children = (llc_t *) calloc(
-                        parent_nchildren + nchildren,
-                        sizeof(llc_t)
-                );
+            llc_t *new_parent_children = (llc_t *) calloc(
+                    parent_nchildren + nchildren,
+                    sizeof(llc_t)
+            );
 
-                DEBUG_PRINT("Me (rw0) Vertex has %zu children\n",
-                            nchildren);
+            DEBUG_PRINT("Me (rw0) Vertex has %zu children\n",
+                        nchildren);
 
-                for (size_t n = 0; n < nchildren; ++n) {
-                    DEBUG_PRINT("\tChild %p with edge %.*f\n",
-                                (void *) children[n].child, 3,
-                                children[n].weight);
-                }
+            for (size_t n = 0; n < nchildren; ++n) {
+                DEBUG_PRINT("\tChild %p with edge %.*f\n",
+                            (void *) children[n].child, 3,
+                            children[n].weight);
+            }
 
 
-                DEBUG_PRINT("Parent Vertex has %zu children\n",
-                            parent_nchildren);
+            DEBUG_PRINT("Parent Vertex has %zu children\n",
+                        parent_nchildren);
 
-                for (size_t n = 0; n < parent_nchildren; ++n) {
-                    DEBUG_PRINT("\tChild %p with edge %.*f\n",
-                                (void *) parent_old_children[n].child, 3,
-                                parent_old_children[n].weight);
-                }
+            for (size_t n = 0; n < parent_nchildren; ++n) {
+                DEBUG_PRINT("\tChild %p with edge %.*f\n",
+                            (void *) parent_old_children[n].child, 3,
+                            parent_old_children[n].weight);
+            }
 
-                parent->edges = new_parent_children;
+            parent->edges = new_parent_children;
 
-                double parent_weight = parent_edge->llc->weight;
+            double parent_weight = parent_edge->llc->weight;
 
-                size_t i = 0, j = 0, k;
+            size_t i = 0, j = 0, k;
 
-                llc_t child_i, child_j;
+            llc_t child_i, child_j;
 
-                for (k = 0; i < parent_nchildren || j < nchildren;) {
-                    //TODO add null after all children in array
-                    // loop over that instead
-                    if (i >= parent_nchildren) {
-                        while (j < nchildren) {
-                            // We have more children, but our parent does not have
-                            // any more.
-                            child_j = children[j];
-                            double prob = children[j].weight / vertex->rate;
-
-                            if (child_j.child == parent) {
-                                // A 'self-loop' is removed
-                                parent->rate -= parent_weight * prob;
-                                j++;
-                                continue;
-                            }
-
-                            DEBUG_PRINT("CASE i>=: (i %zu, parent_nchildren %zu, j %zu, nchildren %zu)\n",
-                                        i, parent_nchildren, j, nchildren);
-                            add_edge_no_rate(parent, child_j.child, k, prob * parent_weight);
-                            j++;
-                            k++;
-                        }
-
-                        break;
-                    }
-
-                    if (j >= nchildren) {
-                        while (i < parent_nchildren) {
-                            child_i = parent_old_children[i];
-
-                            if (child_i.child == vertex) {
-                                i++;
-                                continue;
-                            }
-
-                            new_parent_children[k] = child_i;
-                            new_parent_children[k].llp->llc = &(new_parent_children[k]);
-                            i++;
-                            k++;
-                        }
-
-                        break;
-                    }
-
-                    child_i = parent_old_children[i];
-                    child_j = children[j];
-
-                    if (child_j.child == parent) {
+            for (k = 0; i < parent_nchildren || j < nchildren;) {
+                //TODO add null after all children in array
+                // loop over that instead
+                if (i >= parent_nchildren) {
+                    while (j < nchildren) {
+                        // We have more children, but our parent does not have
+                        // any more.
+                        child_j = children[j];
                         double prob = children[j].weight / vertex->rate;
-                        parent->rate -= parent_weight * prob;
+
+                        if (child_j.child == parent) {
+                            // A 'self-loop' is removed
+                            parent->rate -= parent_weight * prob;
+                            j++;
+                            continue;
+                        }
+
+                        DEBUG_PRINT("CASE i>=: (i %zu, parent_nchildren %zu, j %zu, nchildren %zu)\n",
+                                    i, parent_nchildren, j, nchildren);
+                        add_edge_no_rate(parent, child_j.child, k, prob * parent_weight);
                         j++;
-                        continue;
+                        k++;
                     }
 
-                    if (child_i.child == vertex) {
-                        i++;
-                        continue;
-                    }
-
-                    if (j >= nchildren ||
-                        child_i.child < child_j.child) {
-                        DEBUG_PRINT("Case A (i %zu, j %zu, k %zu, nchildren %zu, child_i %p, child_j %p)\n",
-                                    i, j, k, nchildren, (void *) child_i.child, (void *) child_j.child);
-                        new_parent_children[k] = child_i;
-                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
-                        i++;
-                    } else if (child_i.child > child_j.child) {
-                        DEBUG_PRINT("Case B (i %zu, j %zu, k %zu, child_i %p, child_j %p)\n",
-                                    i, j, k, (void *) child_i.child, (void *) child_j.child);
-                        double prob = child_j.weight / vertex->rate;
-                        add_edge(parent, child_j.child, k, prob * parent_weight);
-                        parent->rate -= prob * parent_weight;
-                        j++;
-                    } else {
-                        // ==
-                        DEBUG_PRINT("Case C (i %zu, j %zu, k %zu, child_i %p, child_j %p)\n",
-                                    i, j, k, (void *) child_i.child, (void *) child_j.child);
-                        double prob = child_j.weight / vertex->rate;
-                        new_parent_children[k] = child_i;
-                        new_parent_children[k].weight += prob * parent_weight;
-                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
-                        i++;
-                        j++;
-                    }
-
-                    k++;
+                    break;
                 }
 
+                if (j >= nchildren) {
+                    while (i < parent_nchildren) {
+                        child_i = parent_old_children[i];
 
-                parent->nedges = k;
-                free(parent_old_children);
-                parent_edge = parent_edge->next;
+                        if (child_i.child == vertex) {
+                            i++;
+                            continue;
+                        }
+
+                        new_parent_children[k] = child_i;
+                        new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                        i++;
+                        k++;
+                    }
+
+                    break;
+                }
+
+                child_i = parent_old_children[i];
+                child_j = children[j];
+
+                if (child_j.child == parent) {
+                    double prob = children[j].weight / vertex->rate;
+                    parent->rate -= parent_weight * prob;
+                    j++;
+                    continue;
+                }
+
+                if (child_i.child == vertex) {
+                    i++;
+                    continue;
+                }
+
+                if (j >= nchildren ||
+                    child_i.child < child_j.child) {
+                    DEBUG_PRINT("Case A (i %zu, j %zu, k %zu, nchildren %zu, child_i %p, child_j %p)\n",
+                                i, j, k, nchildren, (void *) child_i.child, (void *) child_j.child);
+                    new_parent_children[k] = child_i;
+                    new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                    i++;
+                } else if (child_i.child > child_j.child) {
+                    DEBUG_PRINT("Case B (i %zu, j %zu, k %zu, child_i %p, child_j %p)\n",
+                                i, j, k, (void *) child_i.child, (void *) child_j.child);
+                    double prob = child_j.weight / vertex->rate;
+                    add_edge(parent, child_j.child, k, prob * parent_weight);
+                    parent->rate -= prob * parent_weight;
+                    j++;
+                } else {
+                    // ==
+                    DEBUG_PRINT("Case C (i %zu, j %zu, k %zu, child_i %p, child_j %p)\n",
+                                i, j, k, (void *) child_i.child, (void *) child_j.child);
+                    double prob = child_j.weight / vertex->rate;
+                    new_parent_children[k] = child_i;
+                    new_parent_children[k].weight += prob * parent_weight;
+                    new_parent_children[k].llp->llc = &(new_parent_children[k]);
+                    i++;
+                    j++;
+                }
+
+                k++;
             }
 
-            vertex_destroy_parents(vertex);
-            vertex_destroy(vertex);
 
-        } else {
-            DEBUG_PRINT("\t non-zero reward\n");
-
-            for (size_t i = 0; i < vertex->nedges; ++i) {
-                vertex->edges[i].weight /= reward;
-            }
-
-            vertex->rate /= reward;
+            parent->nedges = k;
+            free(parent_old_children);
+            parent_edge = parent_edge->next;
         }
+
+        vertex_destroy_parents(vertex);
+        vertex_destroy(vertex);
+
+    } else {
+        DEBUG_PRINT("\t non-zero reward\n");
+
+        for (size_t i = 0; i < vertex->nedges; ++i) {
+            vertex->edges[i].weight /= reward;
+        }
+
+        vertex->rate /= reward;
     }
 
     return 0;
@@ -1421,32 +1688,23 @@ int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *)) {
  * Also ensures that the absorbing vertex has index 0
  */
 int label_vertex_index(size_t *largest_index, vertex_t *graph) {
-    vertex_t *abs_vertex;
-    abs_vertex = get_abs_vertex(graph);
-    reset_graph_visited(graph);
-    queue<vertex_t *> queue;
-    size_t index = 0;
+    vertex_t *abs_vertex = get_abs_vertex(graph);
+    queue<vertex_t *> q = enqueue_vertices(graph);
+    size_t index = 1;
 
-    // The absorbing vertex should have index 0
-    queue.push(abs_vertex);
-    queue.push(graph);
+    while (!q.empty()) {
+        vertex_t *vertex = q.front();
+        q.pop();
 
-    while (!queue.empty()) {
-        vertex_t *vertex = queue.front();
-        queue.pop();
+        if (vertex != abs_vertex) {
+            vertex->vertex_index = index++;
+        } else {
+            DEBUG_PRINT("%p is absorbing vertex\n", (void *) vertex);
 
-        if (vertex->visited) {
-            continue;
+            vertex->vertex_index = 0;
         }
 
-        vertex->visited = true;
-
-        vertex->vertex_index = index++;
-
-        for (size_t i = 0; i < vertex->nedges; ++i) {
-            llc_t child = vertex->edges[i];
-            queue.push(child.child);
-        }
+        DEBUG_PRINT("Labelled %p as %zu\n", (void *) vertex, vertex->vertex_index);
     }
 
     if (largest_index != NULL) {
@@ -1747,4 +2005,255 @@ void reduce_graph(vertex_t *graph) {
 
     free(removed);
     free(vertices);
+}
+
+double fold(vertex_t *graph, double (*vertex_func)(vertex_t *)) {
+    assign_probability(graph);
+
+    double fold = 0;
+
+    queue<vertex_t *> q = enqueue_vertices(graph);
+
+    // Remove start vertex
+    q.pop();
+
+    while (!q.empty()) {
+        vertex_t *vertex = q.front();
+        q.pop();
+
+        // Do not invoke absorbing vertex
+        if (vertex->nedges == 0) {
+            continue;
+        }
+
+        fprintf(stderr, "Vertex prob %f function res %f\n",
+                vertex->prob, vertex_func(vertex));
+
+        fold += vertex->prob * vertex_func(vertex);
+    }
+
+    return fold;
+}
+
+void _calculate_prob(vertex_t *vertex, double *probs) {
+    if (vertex->visited) {
+        return;
+    }
+
+    vertex->visited = true;
+
+    if (vertex->nparents == 0) {
+        // Start vertex
+        probs[vertex->vertex_index] = 1;
+
+        return;
+    }
+
+    llp_t *parent = vertex->parents->next;
+
+    while (parent != NULL) {
+        _calculate_prob(parent->parent, probs);
+
+        probs[vertex->vertex_index] +=
+                parent->llc->weight / parent->parent->rate *
+                probs[parent->parent->vertex_index];
+
+        parent = parent->next;
+    }
+}
+
+void calculate_prob(vertex_t *graph, size_t *size, double **probs) {
+    vertex_t *abs = get_abs_vertex(graph);
+    graph_info info = get_graph_info(graph);
+
+    (*probs) = (double *) calloc(info.vertices, sizeof(double));
+    *size = info.vertices;
+
+    reset_graph_visited(graph);
+    _calculate_prob(abs, *probs);
+}
+
+void _calculate_var(vertex_t *vertex, double *vars) {
+    if (vertex->visited) {
+        return;
+    }
+
+    vertex->visited = true;
+
+    if (vertex->nedges == 0) {
+        // abs vertex
+        vars[vertex->vertex_index] = 0;
+
+        return;
+    }
+
+    for (size_t i = 0; i < vertex->nedges; ++i) {
+        llc_t edge = vertex->edges[i];
+
+        _calculate_var(edge.child, vars);
+        double prob = edge.weight / vertex->rate;
+
+        vars[vertex->vertex_index] += prob * prob * (vars[edge.child->vertex_index]);
+    }
+
+    if (vertex->nparents != 0 && vertex->nedges != 0) {
+        vars[vertex->vertex_index] += 2 / (vertex->rate * vertex->rate);
+    }
+}
+
+void calculate_var(vertex_t *graph, size_t *size, double **vars) {
+    graph_info info = get_graph_info(graph);
+
+    (*vars) = (double *) calloc(info.vertices, sizeof(double));
+    *size = info.vertices;
+
+    reset_graph_visited(graph);
+    _calculate_var(graph, *vars);
+}
+
+struct vertex_pdf *vertex_pdfs;
+double *rewards;
+
+double fac(size_t n) {
+    if (n == 0) {
+        return 1;
+    }
+
+    return n * fac(n - 1);
+}
+
+void _pdf(vertex_t *vertex) {
+    if (vertex->visited) {
+        return;
+    }
+
+    vertex->visited = true;
+
+    for (size_t f = 0; f < vertex->nedges; ++f) {
+        llc_t edge = vertex->edges[f];
+
+        _pdf(edge.child);
+    }
+
+
+
+    if (vertex->nedges == 0) {
+        vertex_pdfs[vertex->vertex_index].c = 0;
+        vertex_pdfs[vertex->vertex_index].defect_prob = 1;
+        vertex_pdfs[vertex->vertex_index].parts = new vector<struct pdf_values>();
+
+        DEBUG_PRINT("I am vertex %zu I am the absorbing\n", vertex->vertex_index);
+        return;
+    }
+
+    DEBUG_PRINT("I am vertex %zu I have rewards %f %f %f %f\n", vertex->vertex_index,
+            vertex->rewards[0], vertex->rewards[1], vertex->rewards[2], vertex->rewards[3]);
+
+
+    if (rewards[vertex->vertex_index] == 0) {
+        vertex_pdfs[vertex->vertex_index].c = 0;
+        vertex_pdfs[vertex->vertex_index].parts =
+                new vector<struct pdf_values>();
+
+        vector<struct pdf_values> *parts =
+                vertex_pdfs[vertex->vertex_index].parts;
+
+        double c = 0;
+        double defect_prob = 0;
+
+        for (size_t f = 0; f < vertex->nedges; ++f) {
+            llc_t edge = vertex->edges[f];
+
+            vector<struct pdf_values> *partsz =
+                    vertex_pdfs[edge.child->vertex_index].parts;
+
+            double prob = vertex->rate / edge.weight;
+
+            for (size_t p = 0; p < partsz->size(); ++p) {
+                (*parts).push_back((struct pdf_values) {.lambda = (*partsz)[p].lambda, .k = prob *
+                                                                                            (*partsz)[p].k, .n = (*partsz)[p].n});
+            }
+
+            c += prob * vertex_pdfs[edge.child->vertex_index].c;
+            defect_prob += prob * vertex_pdfs[edge.child->vertex_index].defect_prob;
+        }
+
+
+        vertex_pdfs[vertex->vertex_index].c = c;
+        vertex_pdfs[vertex->vertex_index].defect_prob = defect_prob;
+    } else {
+        vertex_pdfs[vertex->vertex_index].c = 0;
+        vertex_pdfs[vertex->vertex_index].parts =
+                new vector<struct pdf_values>();
+
+        vector<struct pdf_values> *parts =
+                vertex_pdfs[vertex->vertex_index].parts;
+
+        double c = 0;
+
+        for (size_t f = 0; f < vertex->nedges; ++f) {
+            llc_t edge = vertex->edges[f];
+
+            double prob = vertex->rate / edge.weight;
+            double mu = vertex->rate;
+
+            vector<struct pdf_values> *partsz =
+                    vertex_pdfs[edge.child->vertex_index].parts;
+
+            double cz = vertex_pdfs[edge.child->vertex_index].c;
+            double defect_probz = vertex_pdfs[edge.child->vertex_index].defect_prob;
+            parts->push_back((struct pdf_values) {.lambda = -mu, .k = cz * prob, .n = 1});
+            c += cz * prob;
+
+            for (size_t i = 0; i < (*partsz).size(); ++i) {
+                double kzi = (*partsz)[i].k;
+                size_t nzi = (*partsz)[i].n;
+                double lambdazi = (*partsz)[i].lambda;
+
+                double a = mu * (kzi * fac(nzi - 1)) / pow(lambdazi - mu, nzi);
+
+                // Add the first part
+                parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * a, .n = 1});
+
+                for (size_t j = 0; j <= nzi - 1; ++j) {
+                    double newk = prob * a * (1 / fac(j)) * pow(lambdazi - mu, j);
+                    double newlambda = (lambdazi - 2 * mu);
+                    size_t newn = j + 1;
+
+                    parts->push_back((struct pdf_values) {.lambda = newlambda, .k = newk, .n = newn});
+                }
+            }
+
+            parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * defect_probz * mu, .n = 1});
+        }
+
+        vertex_pdfs[vertex->vertex_index].c = c;
+        vertex_pdfs[vertex->vertex_index].defect_prob = 0;
+    }
+}
+
+void pdf(vertex_t *graph, struct vertex_pdf *out_vertex_pdfs) {
+    graph_info info = get_graph_info(graph);
+
+    // TODO: Should always be indexed
+    label_vertex_index(NULL, graph);
+    reset_graph_visited(graph);
+
+    vertex_pdfs = (struct vertex_pdf *) calloc(info.vertices, sizeof(struct vertex_pdf));
+    rewards = (double *) calloc(info.vertices, sizeof(double));
+
+    for (size_t i = 0; i < info.vertices; ++i) {
+        rewards[i] = 1;
+        // TODO ^
+    }
+
+    rewards[0] = 0;
+    rewards[1] = 0;
+
+    _pdf(graph);
+
+    // TODO: Clone
+    out_vertex_pdfs->defect_prob = vertex_pdfs[1].defect_prob;
+    out_vertex_pdfs->c = vertex_pdfs[1].c;
+    out_vertex_pdfs->parts = vertex_pdfs[1].parts;
 }
