@@ -2112,7 +2112,6 @@ void calculate_var(vertex_t *graph, size_t *size, double **vars) {
 }
 
 struct vertex_pdf *vertex_pdfs;
-double *rewards;
 
 size_t fac(size_t n) {
     if (n == 0) {
@@ -2124,7 +2123,7 @@ size_t fac(size_t n) {
 
 #define EPSILON 0.0001
 
-void _pdf(vertex_t *vertex) {
+void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     if (vertex->visited) {
         return;
     }
@@ -2134,9 +2133,8 @@ void _pdf(vertex_t *vertex) {
     for (size_t f = 0; f < vertex->nedges; ++f) {
         llc_t edge = vertex->edges[f];
 
-        _pdf(edge.child);
+        _pdf(edge.child, reward_func);
     }
-
 
     if (vertex->nedges == 0) {
         vertex_pdfs[vertex->vertex_index].c = 0;
@@ -2147,11 +2145,19 @@ void _pdf(vertex_t *vertex) {
         return;
     }
 
+    double reward;
+
+    if (vertex->nparents == 0) {
+        reward = 0;
+    } else {
+        reward = reward_func(vertex);
+    }
+
     DEBUG_PRINT("I am vertex %zu I have rewards %f %f %f %f\n", vertex->vertex_index,
                 vertex->rewards[0], vertex->rewards[1], vertex->rewards[2], vertex->rewards[3]);
 
 
-    if (rewards[vertex->vertex_index] == 0) {
+    if (reward == 0) {
         DEBUG_PRINT("My reward is zero\n");
         vertex_pdfs[vertex->vertex_index].c = 0;
         vertex_pdfs[vertex->vertex_index].parts =
@@ -2201,7 +2207,7 @@ void _pdf(vertex_t *vertex) {
             DEBUG_PRINT("I have a child %zu\n", edge.child->vertex_index);
 
             double prob = edge.weight / vertex->rate;
-            double mu = vertex->rate;
+            double mu = vertex->rate / reward;
 
             vector<struct pdf_values> *partsz =
                     vertex_pdfs[edge.child->vertex_index].parts;
@@ -2225,30 +2231,44 @@ void _pdf(vertex_t *vertex) {
 
                 DEBUG_PRINT("Child part %zu has lambdazi %f kzi %f nzi %zu\n", i, lambdazi, kzi, nzi);
 
-                double a = mu * (kzi * fac(nzi - 1)) / pow(-lambdazi - mu, nzi);
+                if (abs(lambdazi - (-mu)) < EPSILON) {
+                    DEBUG_PRINT("The rates are the same (mu=%f)\n", mu);
+                    double newk = mu * kzi * 1 / (nzi);
 
-                DEBUG_PRINT("My a is constructed from   %f * (%f * %zu)/ (pow(-%f - %f, %zu)) = %f\n",
-                            mu, kzi, fac(nzi - 1), lambdazi, mu, nzi, a);
-                // Add the first part
-                if (abs(prob * a) > EPSILON) {
-                    DEBUG_PRINT("The prob is %f giving a*prob=%f\n", prob, prob * a);
-                    DEBUG_PRINT("PUSHING A lambda  %f k %f n %zu\n", -mu, prob * a, (size_t) 1);
+                    if (abs(prob * newk) > EPSILON) {
+                        DEBUG_PRINT("PUSHING F lambda  %f k %f n %zu\n", -mu, prob * newk, nzi + 1);
 
-                    parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * a, .n = 1});
-                }
+                        parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * newk, .n = nzi + 1});
+                    }
+                } else {
+                    DEBUG_PRINT("The rates are NOT the same\n");
 
-                for (size_t j = 0; j <= nzi - 1; ++j) {
-                    double newk = prob * -a * (1 / fac(j)) * pow(-lambdazi - mu, j);
-                    double newlambda = (lambdazi);
-                    size_t newn = j + 1;
+                    double a = mu * (kzi * fac(nzi - 1)) / pow(-lambdazi - mu, nzi);
 
-                    if (abs(newk) > EPSILON) {
-                        DEBUG_PRINT("PUSHING B lambda  %f k %f n %zu\n", newlambda, newk, newn);
-                        parts->push_back((struct pdf_values) {.lambda = newlambda, .k = newk, .n = newn});
+                    DEBUG_PRINT("My a is constructed from   %f * (%f * %zu)/ (pow(-%f - %f, %zu)) = %f\n",
+                                mu, kzi, fac(nzi - 1), lambdazi, mu, nzi, a);
+                    // Add the first part
+                    if (abs(prob * a) > EPSILON) {
+                        DEBUG_PRINT("The prob is %f giving a*prob=%f\n", prob, prob * a);
+                        DEBUG_PRINT("PUSHING A lambda  %f k %f n %zu\n", -mu, prob * a, (size_t) 1);
+
+                        parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * a, .n = 1});
+                    }
+
+                    for (size_t j = 0; j <= nzi - 1; ++j) {
+                        double newk = prob * -a * (1 / fac(j)) * pow(-lambdazi - mu, j);
+                        double newlambda = (lambdazi);
+                        size_t newn = j + 1;
+
+                        if (abs(newk) > EPSILON) {
+                            DEBUG_PRINT("PUSHING B lambda  %f k %f n %zu\n", newlambda, newk, newn);
+                            parts->push_back((struct pdf_values) {.lambda = newlambda, .k = newk, .n = newn});
+                        }
                     }
                 }
             }
 
+            // Defect addition
             if (abs(prob * defect_probz * mu) > EPSILON) {
                 DEBUG_PRINT("PUSHING E lambda  %f k %f n %zu\n", -mu, prob * defect_probz * mu, (size_t) 1);
                 parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * defect_probz * mu, .n = 1});
@@ -2260,7 +2280,7 @@ void _pdf(vertex_t *vertex) {
     }
 }
 
-void pdf(vertex_t *graph, struct vertex_pdf *out_vertex_pdfs) {
+void pdf(vertex_t *graph, double (*reward_func)(vertex_t *), struct vertex_pdf *out_vertex_pdfs) {
     graph_info info = get_graph_info(graph);
 
     // TODO: Should always be indexed
@@ -2268,17 +2288,8 @@ void pdf(vertex_t *graph, struct vertex_pdf *out_vertex_pdfs) {
     reset_graph_visited(graph);
 
     vertex_pdfs = (struct vertex_pdf *) calloc(info.vertices, sizeof(struct vertex_pdf));
-    rewards = (double *) calloc(info.vertices, sizeof(double));
 
-    for (size_t i = 0; i < info.vertices; ++i) {
-        rewards[i] = 1;
-        // TODO ^
-    }
-
-    rewards[0] = 0;
-    rewards[1] = 0;
-
-    _pdf(graph);
+    _pdf(graph, reward_func);
 
     // TODO: Clone
     out_vertex_pdfs->defect_prob = vertex_pdfs[1].defect_prob;

@@ -34,11 +34,11 @@ fprintf(stderr, "%s\n", error_formatted_line);     \
 #define DEBUG_PRINT(message, ...) do {             \
 char formatted[2048];                              \
                                                    \
-snprintf(formatted,                                \
+/*snprintf(formatted,                                \
          sizeof(formatted),                        \
          message, ##__VA_ARGS__);                  \
                                                    \
-fprintf(stderr, "%s", formatted);                  \
+fprintf(stderr, "%s", formatted);*/                  \
 } while(0)
 
 using namespace std;
@@ -135,7 +135,7 @@ void set_graph_rewards(vertex_t *graph, vector<double> (*set_rewards_func)(vecto
 void reduce_graph(vertex_t *graph);
 void calculate_prob(vertex_t *graph, size_t *size, double **probs);
 void calculate_var(vertex_t *graph, size_t *size, double **vars);
-void pdf(vertex_t *graph, struct vertex_pdf *out_vertex_pdfs);
+void pdf(vertex_t *graph, double (*reward_func)(vertex_t *), struct vertex_pdf *out_vertex_pdfs);
 
 vertex_t *generate_state_space(
         size_t state_length,
