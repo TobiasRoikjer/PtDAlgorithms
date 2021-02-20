@@ -34,11 +34,11 @@ fprintf(stderr, "%s\n", error_formatted_line);     \
 #define DEBUG_PRINT(message, ...) do {             \
 char formatted[2048];                              \
                                                    \
-/*snprintf(formatted,                                \
+snprintf(formatted,                                \
          sizeof(formatted),                        \
          message, ##__VA_ARGS__);                  \
                                                    \
-fprintf(stderr, "%s", formatted);*/                  \
+fprintf(stderr, "%s", formatted);                  \
 } while(0)
 
 using namespace std;
@@ -116,14 +116,13 @@ struct graph_info {
 };
 
 struct pdf_values {
-    double lambda;
-    double k;
+    long double lambda;
+    long double k;
     size_t n;
 };
 
 struct vertex_pdf {
-    double defect_prob;
-    double c;
+    long double defect_prob;
     vector<struct pdf_values> *parts;
 };
 

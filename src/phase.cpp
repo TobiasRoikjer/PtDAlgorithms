@@ -2123,6 +2123,24 @@ size_t fac(size_t n) {
 
 #define EPSILON 0.0001
 
+int cmp_pdf_part(const void *a, const void *b) {
+    struct pdf_values *aa = (struct pdf_values *) a;
+    struct pdf_values *bb = (struct pdf_values *) b;
+
+    if (aa->n != bb->n) {
+        return (int) (aa->n - bb->n);
+    }
+
+    if (abs(aa->lambda - bb->lambda) < EPSILON) {
+        return 0;
+    } else if (aa->lambda > bb->lambda) {
+        return 1;
+    } else {
+        return -1;
+    }
+}
+
+// TODO: Use fractions not decimal...
 void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     if (vertex->visited) {
         return;
@@ -2137,7 +2155,6 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     }
 
     if (vertex->nedges == 0) {
-        vertex_pdfs[vertex->vertex_index].c = 0;
         vertex_pdfs[vertex->vertex_index].defect_prob = 1;
         vertex_pdfs[vertex->vertex_index].parts = new vector<struct pdf_values>();
 
@@ -2145,7 +2162,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         return;
     }
 
-    double reward;
+    long double reward;
 
     if (vertex->nparents == 0) {
         reward = 0;
@@ -2159,15 +2176,13 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
     if (reward == 0) {
         DEBUG_PRINT("My reward is zero\n");
-        vertex_pdfs[vertex->vertex_index].c = 0;
         vertex_pdfs[vertex->vertex_index].parts =
                 new vector<struct pdf_values>();
 
         vector<struct pdf_values> *parts =
                 vertex_pdfs[vertex->vertex_index].parts;
 
-        double c = 0;
-        double defect_prob = 0;
+        long double defect_prob = 0;
 
         for (size_t f = 0; f < vertex->nedges; ++f) {
             llc_t edge = vertex->edges[f];
@@ -2175,7 +2190,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
             vector<struct pdf_values> *partsz =
                     vertex_pdfs[edge.child->vertex_index].parts;
 
-            double prob = edge.weight / vertex->rate;
+            long double prob = edge.weight / vertex->rate;
 
             for (size_t p = 0; p < partsz->size(); ++p) {
 
@@ -2184,16 +2199,13 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                                                                                             (*partsz)[p].k, .n = (*partsz)[p].n});
             }
 
-            c += prob * vertex_pdfs[edge.child->vertex_index].c;
             defect_prob += prob * vertex_pdfs[edge.child->vertex_index].defect_prob;
         }
 
 
-        vertex_pdfs[vertex->vertex_index].c = c;
         vertex_pdfs[vertex->vertex_index].defect_prob = defect_prob;
     } else {
         DEBUG_PRINT("My reward is not zero\n");
-        vertex_pdfs[vertex->vertex_index].c = 0;
         vertex_pdfs[vertex->vertex_index].parts =
                 new vector<struct pdf_values>();
 
@@ -2206,62 +2218,53 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
             llc_t edge = vertex->edges[f];
             DEBUG_PRINT("I have a child %zu\n", edge.child->vertex_index);
 
-            double prob = edge.weight / vertex->rate;
-            double mu = vertex->rate / reward;
+            long double prob = edge.weight / vertex->rate;
+            long double mu = vertex->rate / reward;
 
             vector<struct pdf_values> *partsz =
                     vertex_pdfs[edge.child->vertex_index].parts;
 
-            double cz = vertex_pdfs[edge.child->vertex_index].c;
-            double defect_probz = vertex_pdfs[edge.child->vertex_index].defect_prob;
+            long double defect_probz = vertex_pdfs[edge.child->vertex_index].defect_prob;
 
-            DEBUG_PRINT("Child has cz %f\n", cz);
-
-            if (abs(cz * prob) > EPSILON) {
-                DEBUG_PRINT("PUSHINGd with  lambda %f k %f n %zu\n", -mu, cz * prob, (size_t) 1);
-                parts->push_back((struct pdf_values) {.lambda = -mu, .k = cz * prob, .n = 1});
-            }
-
-            c += cz * prob;
 
             for (size_t i = 0; i < (*partsz).size(); ++i) {
-                double kzi = (*partsz)[i].k;
+                long double kzi = (*partsz)[i].k;
                 size_t nzi = (*partsz)[i].n;
-                double lambdazi = (*partsz)[i].lambda;
+                long double lambdazi = (*partsz)[i].lambda;
 
-                DEBUG_PRINT("Child part %zu has lambdazi %f kzi %f nzi %zu\n", i, lambdazi, kzi, nzi);
+                DEBUG_PRINT("Child part %zu has lambdazi %Lf kzi %Lf nzi %zu\n", i, lambdazi, kzi, nzi);
 
                 if (abs(lambdazi - (-mu)) < EPSILON) {
-                    DEBUG_PRINT("The rates are the same (mu=%f)\n", mu);
-                    double newk = mu * kzi * 1 / (nzi);
+                    DEBUG_PRINT("The rates are the same (mu=%Lf)\n", mu);
+                    long double newk = mu * kzi * 1 / (nzi);
 
                     if (abs(prob * newk) > EPSILON) {
-                        DEBUG_PRINT("PUSHING F lambda  %f k %f n %zu\n", -mu, prob * newk, nzi + 1);
+                        DEBUG_PRINT("PUSHING F lambda  %Lf k %Lf n %zu\n", -mu, prob * newk, nzi + 1);
 
                         parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * newk, .n = nzi + 1});
                     }
                 } else {
                     DEBUG_PRINT("The rates are NOT the same\n");
 
-                    double a = mu * (kzi * fac(nzi - 1)) / pow(-lambdazi - mu, nzi);
+                    long double a = mu * (kzi * fac(nzi - 1)) / pow(-lambdazi - mu, nzi);
 
-                    DEBUG_PRINT("My a is constructed from   %f * (%f * %zu)/ (pow(-%f - %f, %zu)) = %f\n",
+                    DEBUG_PRINT("My a is constructed from   %Lf * (%Lf * %zu)/ (pow(-%Lf - %Lf, %zu)) = %Lf\n",
                                 mu, kzi, fac(nzi - 1), lambdazi, mu, nzi, a);
                     // Add the first part
                     if (abs(prob * a) > EPSILON) {
-                        DEBUG_PRINT("The prob is %f giving a*prob=%f\n", prob, prob * a);
-                        DEBUG_PRINT("PUSHING A lambda  %f k %f n %zu\n", -mu, prob * a, (size_t) 1);
+                        DEBUG_PRINT("The prob is %Lf giving a*prob=%Lf\n", prob, prob * a);
+                        DEBUG_PRINT("PUSHING A lambda  %Lf k %Lf n %zu\n", -mu, prob * a, (size_t) 1);
 
                         parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * a, .n = 1});
                     }
 
                     for (size_t j = 0; j <= nzi - 1; ++j) {
-                        double newk = prob * -a * (1 / fac(j)) * pow(-lambdazi - mu, j);
-                        double newlambda = (lambdazi);
+                        long double newk = prob * -a * (1 / fac(j)) * pow(-lambdazi - mu, j);
+                        long double newlambda = (lambdazi);
                         size_t newn = j + 1;
 
                         if (abs(newk) > EPSILON) {
-                            DEBUG_PRINT("PUSHING B lambda  %f k %f n %zu\n", newlambda, newk, newn);
+                            DEBUG_PRINT("PUSHING B lambda  %Lf k %Lf n %zu\n", newlambda, newk, newn);
                             parts->push_back((struct pdf_values) {.lambda = newlambda, .k = newk, .n = newn});
                         }
                     }
@@ -2270,13 +2273,78 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
             // Defect addition
             if (abs(prob * defect_probz * mu) > EPSILON) {
-                DEBUG_PRINT("PUSHING E lambda  %f k %f n %zu\n", -mu, prob * defect_probz * mu, (size_t) 1);
+                DEBUG_PRINT("PUSHING E lambda  %Lf k %Lf n %zu\n", -mu, prob * defect_probz * mu, (size_t) 1);
                 parts->push_back((struct pdf_values) {.lambda = -mu, .k = prob * defect_probz * mu, .n = 1});
             }
         }
 
-        vertex_pdfs[vertex->vertex_index].c = c;
         vertex_pdfs[vertex->vertex_index].defect_prob = 0;
+    }
+
+    // Combine the same lambda/n
+    // TODO: Do this already before...
+
+    struct pdf_values *values = (struct pdf_values *) calloc(
+            vertex_pdfs[vertex->vertex_index].parts->size(),
+            sizeof(struct pdf_values)
+    );
+
+    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
+        values[i] = (*vertex_pdfs[vertex->vertex_index].parts)[i];
+    }
+
+    qsort(values, vertex_pdfs[vertex->vertex_index].parts->size(), sizeof(struct pdf_values), cmp_pdf_part);
+
+    DEBUG_PRINT("ORDER:\n");
+    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
+        DEBUG_PRINT("%Lf %Lf %zu\n", values[i].lambda, values[i].k, values[i].n);
+    }
+
+    size_t len = vertex_pdfs[vertex->vertex_index].parts->size();
+
+    delete (vertex_pdfs[vertex->vertex_index].parts);
+
+    vertex_pdfs[vertex->vertex_index].parts = new vector<struct pdf_values>();
+    long double k = 0;
+    size_t prev_n = 0;
+    long double prev_lambda = 0;
+
+    for (size_t i = 0; i < len; ++i) {
+        DEBUG_PRINT("(%zu) %Lf %Lf %zu\n", i, values[i].lambda, values[i].k, values[i].n);
+        if (prev_n == 0 || (prev_n == values[i].n && abs(prev_lambda - values[i].lambda) < EPSILON)) {
+            DEBUG_PRINT("Increasing k by %Lf to %Lf\n", values[i].k, values[i].k + k);
+            k += values[i].k;
+        } else {
+            DEBUG_PRINT("ADDING?  %Lf %Lf %zu\n", prev_lambda, k, prev_n);
+
+            if (abs(k) > EPSILON) {
+                vertex_pdfs[vertex->vertex_index].parts->push_back(
+                        (struct pdf_values) {.lambda = prev_lambda, .k = k, .n = prev_n});
+            }
+
+            k = 0;
+            k += values[i].k;
+        }
+
+        prev_lambda = values[i].lambda;
+        prev_n = values[i].n;
+    }
+
+    DEBUG_PRINT("ADDING?2  %Lf %Lf %zu\n", prev_lambda, k, prev_n);
+
+    if (prev_n != 0) {
+        if (abs(k) > EPSILON) {
+            vertex_pdfs[vertex->vertex_index].parts->push_back(
+                    (struct pdf_values) {.lambda = prev_lambda, .k = k, .n = prev_n});
+        }
+    }
+
+    DEBUG_PRINT("NEW ORDER:\n");
+    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
+        DEBUG_PRINT("%Lf %Lf %zu\n",
+                    (*vertex_pdfs[vertex->vertex_index].parts)[i].lambda,
+                    (*vertex_pdfs[vertex->vertex_index].parts)[i].k,
+                    (*vertex_pdfs[vertex->vertex_index].parts)[i].n);
     }
 }
 
@@ -2293,6 +2361,5 @@ void pdf(vertex_t *graph, double (*reward_func)(vertex_t *), struct vertex_pdf *
 
     // TODO: Clone
     out_vertex_pdfs->defect_prob = vertex_pdfs[1].defect_prob;
-    out_vertex_pdfs->c = vertex_pdfs[1].c;
     out_vertex_pdfs->parts = vertex_pdfs[1].parts;
 }
