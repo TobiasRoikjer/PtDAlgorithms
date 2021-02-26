@@ -119,6 +119,7 @@ struct pdf_values {
     long double lambda;
     long double k;
     size_t n;
+    int c;
 };
 
 struct vertex_pdf {
