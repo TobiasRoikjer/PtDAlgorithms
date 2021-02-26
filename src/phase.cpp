@@ -2417,11 +2417,13 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
                         if (powl(-lambdazi - mu, nzi) > 0) {
                             DEBUG_PRINT("PATH 1\n");
-                            a = log(mu) + kzi2 + log(fac(nzi - 1)) - log(powl(-lambdazi - mu, nzi));
+                            int s = sign(powl(-lambdazi - mu, nzi));
+                            a = log(mu) + kzi2 + log(fac(nzi - 1)) - log(abs(-lambdazi - mu)) * nzi * s;
                             c = czi;
                         } else {
                             DEBUG_PRINT("PATH 2\n");
-                            a = log(mu) + kzi2 + log(fac(nzi - 1)) - log(powl(lambdazi + mu, nzi));
+                            int s = sign(powl(lambdazi + mu, nzi));
+                            a = log(mu) + kzi2 + log(fac(nzi - 1)) - log(abs(lambdazi + mu))*nzi*s;
                             c = -czi;
                         }
 
@@ -2463,11 +2465,11 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                         });*/
 
                         if (abs(-mu - NEWlambda) > EPSILON) {
-                            DIE_ERROR(1, "??");
+                            //DIE_ERROR(1, "??");
                         }
 
                         if (prob * a - NEWk > EPSILON) {
-                            DIE_ERROR(1, "??");
+                            //DIE_ERROR(1, "??");
                         }
                     }
 
@@ -2485,7 +2487,8 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                                     -lambdazi, mu, j, snzi, -lambdazi - mu, j - snzi, powl(-lambdazi - mu, j - snzi));
 
                             if (powl(-lambdazi - mu, j - snzi) > 0) {
-                                b = log(mu) + kzi2 + log(fac(nzi - 1)) + log(powl(-lambdazi - mu, j - snzi)) -
+                                int s = sign(powl(-lambdazi - mu, j - snzi));
+                                b = log(mu) + kzi2 + log(fac(nzi - 1)) + s * log(abs(-lambdazi - mu))*(j - snzi) -
                                     log(fac((size_t) j));
                                 c2 = -czi;
                                 DEBUG_PRINT(
@@ -2493,7 +2496,8 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                                         mu, kzi2, nzi, lambdazi, mu, j, snzi, j, b, expl(b)
                                 );
                             } else {
-                                b = log(mu) + kzi2 + log(fac(nzi - 1)) + log(powl(lambdazi + mu, (j - snzi))) -
+                                int s = sign(powl(lambdazi + mu, j - snzi));
+                                b = log(mu) + kzi2 + log(fac(nzi - 1)) + s*log(lambdazi + mu) *(j - snzi) -
                                     log(fac((size_t) j));
                                 c2 = czi;
                                 DEBUG_PRINT(
@@ -2542,11 +2546,11 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
 
                             if (abs(newlambda - NEWlambda) > EPSILON) {
-                                DIE_ERROR(1, "??");
+                                //DIE_ERROR(1, "??");
                             }
 
                             if (newk - NEWk > EPSILON) {
-                                DIE_ERROR(1, "??");
+                                //DIE_ERROR(1, "??");
                             }
                         }
 
@@ -2581,7 +2585,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
     // Combine the same lambda/n
     // TODO: Do this already before...
-/*
+
     struct pdf_values *values = (struct pdf_values *) calloc(
             vertex_pdfs[vertex->vertex_index].parts->size(),
             sizeof(struct pdf_values)
@@ -2611,17 +2615,22 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         DEBUG_PRINT("(%zu) %Lf %Lf %zu\n", i, values[i].lambda, values[i].k, values[i].n);
         if (prev_n == 0 || (prev_n == values[i].n && abs(prev_lambda - values[i].lambda) < EPSILON)) {
             DEBUG_PRINT("Increasing k by %Lf to %Lf\n", values[i].k, values[i].k + k);
-            k += values[i].k;
+            k += values[i].c * expl(values[i].k);
         } else {
             DEBUG_PRINT("ADDING?  %Lf %Lf %zu\n", prev_lambda, k, prev_n);
 
             if (abs(k) > EPSILON) {
                 vertex_pdfs[vertex->vertex_index].parts->push_back(
-                        (struct pdf_values) {.lambda = prev_lambda, .k = k, .n = prev_n});
+                        (struct pdf_values) {
+                            .lambda = prev_lambda,
+                            .k = log(abs(k)),
+                            .n = prev_n,
+                            .c = sign(k)
+                        });
             }
 
             k = 0;
-            k += values[i].k;
+            k += values[i].c * expl(values[i].k);
         }
 
         prev_lambda = values[i].lambda;
@@ -2633,7 +2642,9 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     if (prev_n != 0) {
         if (abs(k) > EPSILON) {
             vertex_pdfs[vertex->vertex_index].parts->push_back(
-                    (struct pdf_values) {.lambda = prev_lambda, .k = k, .n = prev_n});
+                    (struct pdf_values) {
+                        .lambda = prev_lambda, .k = log(abs(k)), .n = prev_n, .c=sign(k)
+                    });
         }
     }
 
@@ -2643,7 +2654,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                     (*vertex_pdfs[vertex->vertex_index].parts)[i].lambda,
                     (*vertex_pdfs[vertex->vertex_index].parts)[i].k,
                     (*vertex_pdfs[vertex->vertex_index].parts)[i].n);
-    }*/
+    }
 
 
     long double tt = 0.5;
