@@ -2611,56 +2611,48 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     if (len > 0) {
         size_t prev_n = values[0].n;
         long double prev_lambda = values[0].lambda;
-        long double kp = 0;
-        long double kn = 0;
+        size_t g = 0;
+        vector<vector<size_t> > groups;
+        groups.push_back(vector<size_t>());
 
         for (size_t i = 0; i < len; ++i) {
-            DEBUG_PRINT("(%zu) %Lf %Lf %zu\n", i, values[i].lambda, values[i].k, values[i].n);
             if (prev_n == values[i].n && fabsl(prev_lambda - values[i].lambda) < EPSILON) {
-                DEBUG_PRINT("Increasing k by %Lf to %Lf\n", values[i].k, values[i].k + k);
-                if (values[i].c == -1) {
-                    kn += exp2l(values[i].k);
-                } else {
-                    kp += exp2l(values[i].k);
-                }
+                groups[g].push_back(i);
             } else {
-                long double k = log2l(fabsl(kp - kn));
-
-                if (fabsl(k) > EPSILON) {
-                    vertex_pdfs[vertex->vertex_index].parts->push_back(
-                            (struct pdf_values) {
-                                    .lambda = prev_lambda,
-                                    .k = k,
-                                    .n = prev_n,
-                                    .c = sign(kp - kn)
-                            });
-                }
-
-                kp = 0;
-                kn = 0;
-
-                if (values[i].c == -1) {
-                    kn += exp2l(values[i].k);
-                } else {
-                    kp += exp2l(values[i].k);
-                }
-
+                groups.push_back(vector<size_t>());
+                g++;
+                groups[g].push_back(i);
                 prev_n = values[i].n;
                 prev_lambda = values[i].lambda;
             }
         }
 
+        for (size_t g = 0; g < groups.size(); ++g) {
+            long double kp = 0;
+            long double kn = 0;
 
-        long double k = log2l(fabsl(kp - kn));
+            for (size_t j = 0; j < groups[g].size(); ++j) {
+                size_t i = groups[g][j];
 
-        if (fabsl(k) > EPSILON) {
-            vertex_pdfs[vertex->vertex_index].parts->push_back(
-                    (struct pdf_values) {
-                            .lambda = prev_lambda,
-                            .k = fabsl(k),
-                            .n = prev_n,
-                            .c = sign(kp - kn)
-                    });
+                if (values[i].c == -1) {
+                    kn += exp2l(values[i].k);
+                } else {
+                    kp += exp2l(values[i].k);
+                }
+            }
+
+            long double k = log2l(fabsl(kp - kn));
+
+            if (fabsl(k) > EPSILON) {
+                vertex_pdfs[vertex->vertex_index].parts->push_back(
+                        (struct pdf_values) {
+                                .lambda = values[groups[g][0]].lambda,
+                                .k = k,
+                                .n = values[groups[g][0]].n,
+                                .c = sign(kp - kn)
+                        });
+
+            }
         }
     }
 
