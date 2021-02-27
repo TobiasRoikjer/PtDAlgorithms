@@ -2243,118 +2243,8 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
             long double defect_probz = vertex_pdfs[edge.child->vertex_index].defect_prob;
 
-            /*for (size_t i = 0; i < (*partsz).size(); ++i) {
-                DEBUG_PRINT("\n== part %zu =\n", i);
-                int czi = (*partsz)[i].c;
-                long double kzi = (*partsz)[i].k;
-                size_t nzi = (*partsz)[i].n;
-                long double lambdazi = (*partsz)[i].lambda;
-
-                DEBUG_PRINT("Child part %zu has lambdazi %Lf kzi %Lf (%Lf) nzi %zu\n",
-                            i, lambdazi, kzi, expl(kzi), nzi);
-
-                if (fabsl(lambdazi - (-mu)) < EPSILON) {
-                    DEBUG_PRINT("The rates are the same (mu=%Lf)\n", mu);
-                    long double newk = logl(mu) + kzi - logl(nzi);
-                    long double k = logl(prob) + newk;
-
-                    if (fabsl(prob * newk) > EPSILON) {
-                        DEBUG_PRINT("PUSHING F c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n", czi, -mu, k, expl(k),
-                                    nzi + 1);
-
-                        parts->push_back((struct pdf_values) {
-                                .lambda = -mu,
-                                .k = k,
-                                .n = nzi + 1,
-                                .c = czi
-                        });
-                    }
-                } else {
-                    DEBUG_PRINT("The rates are NOT the same (%Lf != %Lf)\n", lambdazi, -mu);
-                    long double a;
-                    int c;
-
-                    DEBUG_PRINT("powl(-lambdazi - mu, nzi) > 0, powl(%Lf - %Lf, %zu) = %Lf\n",
-                                -lambdazi, mu, nzi, powl(-lambdazi - mu, nzi));
-
-                    if (powl(-lambdazi - mu, nzi) > 0) {
-                        a = logl(mu) + kzi + logl(fac(nzi - 1)) - logl(powl(-lambdazi - mu, nzi));
-                        c = czi;
-                    } else {
-                        a = logl(mu) + kzi + logl(fac(nzi - 1)) - logl(powl(lambdazi + mu, nzi));
-                        c = -czi;
-                    }
-
-                    //DEBUG_PRINT("My a is constructed from   %Lf * (%Lf * %zu)/ (pow(-%Lf - %Lf, %zu)) = %Lf\n",
-                    //           mu, kzi, fac(nzi - 1), lambdazi, mu, nzi, a);
-                    // Add the first part
-                    DEBUG_PRINT("fabsl(logl(prob) + a) = fabsl(logl(%Lf) + %Lf)=%Lf", prob, a, fabsl(logl(prob) + a));
-                    if (fabsl(logl(prob) + a) > EPSILON) {
-                        //DEBUG_PRINT("The prob is %Lf giving a*prob=%Lf\n", prob, prob * a);
-                        DEBUG_PRINT("PUSHING A c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n",
-                                    c,
-                                    -mu, logl(prob) + a, exp(logl(prob) + a), (size_t) 1);
-
-                        parts->push_back((struct pdf_values) {
-                                .lambda = -mu,
-                                .k = logl(prob) + a,
-                                .n = 1,
-                                .c = c
-                        });
-                    }
-
-                    for (int j = 0; j <= nzi - 1; ++j) {
-                        int snzi = (int) nzi;
-                        long double b;
-                        int c2;
-
-                        DEBUG_PRINT(
-                                "powl(-lambdazi - mu, j - nzi) > 0, powl(%Lf - %Lf, %i - %i) = powl(%Lf, %i)= %Lf\n",
-                                -lambdazi, mu, j, snzi, -lambdazi - mu, j - snzi, powl(-lambdazi - mu, j - snzi));
-
-                        if (powl(-lambdazi - mu, j - snzi) > 0) {
-                            b = logl(mu) + kzi + logl(fac(nzi - 1)) + logl(powl(-lambdazi - mu, j - snzi)) -
-                                logl(fac((size_t) j));
-                            c2 = -czi;
-                            DEBUG_PRINT(
-                                    "COMPUTING B by logl(mu) + kzi + logl(fac(nzi - 1)) + logl(-lambdazi - mu) * (j - snzi) - logl(fac((size_t)j)) = logl(%Lf) + %Lf + logl(fac(%zu - 1)) - logl(-%Lf - %Lf) * (%i - %i) - logl(fac((size_t)%i)) = %Lf (%Lf)\n",
-                                    mu, kzi, nzi, lambdazi, mu, j, snzi, j, b, expl(b)
-                            );
-                        } else {
-                            b = logl(mu) + kzi + logl(fac(nzi - 1)) + logl(powl(lambdazi + mu, (j - snzi))) -
-                                logl(fac((size_t) j));
-                            c2 = czi;
-                            DEBUG_PRINT(
-                                    "COMPUTING B by logl(mu) + kzi + logl(fac(nzi - 1)) + logl(lambdazi + mu) * (j - snzi) - logl(fac((size_t)j)) = logl(%Lf) + %Lf + logl(fac(%zu - 1)) - logl(%Lf + %Lf) * (%i - %i) - logl(fac((size_t)%i)) = %Lf (%Lf)\n",
-                                    mu, kzi, nzi, lambdazi, mu, j, snzi, j, b, expl(b)
-                            );
-                        }
-
-                        long double newk = logl(prob) + b;
-                        long double newlambda = (lambdazi);
-                        size_t newn = (size_t) j + 1;
-
-                        DEBUG_PRINT("logl(prob) + b = logl(%Lf) + %Lf = %Lf\n",
-                                    prob, b, logl(prob) + b);
-
-
-                        if (fabsl(newk) > EPSILON) {
-                            DEBUG_PRINT("PUSHING B c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n", c2, newlambda, newk,
-                                        exp(newk), newn);
-                            parts->push_back((struct pdf_values) {
-                                    .lambda = newlambda,
-                                    .k = newk,
-                                    .n = newn,
-                                    .c=c2
-                            });
-                        }
-                    }
-                }
-            }*/
-
             for (size_t i = 0; i < (*partsz).size(); ++i) {
                 long double kzi2 = ((*partsz)[i].k);
-                long double kzi = (*partsz)[i].c * expl((*partsz)[i].k);
                 size_t nzi = (*partsz)[i].n;
                 long double lambdazi = (*partsz)[i].lambda;
                 int czi = (*partsz)[i].c;
@@ -2363,23 +2253,6 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
                 if (fabsl(lambdazi - (-mu)) < EPSILON) {
                     DEBUG_PRINT("The rates are the same (mu=%Lf)\n", mu);
-                    /* OLD{
-                        long double newk = mu * kzi * 1 / (nzi);
-                        DEBUG_PRINT("long double newk = mu * kzi * 1 / (nzi)=%Lf * %Lf * 1 / (%zu)=%Lf\n",
-                                    mu, kzi, nzi, newk);
-                        DEBUG_PRINT("fabsl(prob * newk)=fabsl(%Lf * %Lf)= %Lf\n",
-                                    prob, newk, fabsl(prob * newk));
-                        DEBUG_PRINT("OKAY SO IF WE TAKE THE EXP:%i %Lf\n",
-                                    -sign(mu * kzi * 1 / (nzi)), expl(fabsl(logl(mu) + kzi2 - logl(nzi))));
-
-                        if (fabsl(prob * newk) > EPSILON) {
-                            DEBUG_PRINT("PUSHING F lambda OLD  %Lf k %Lf n %zu\n", -mu, prob * newk, nzi + 1);
-
-                            parts->push_back((struct pdf_values) {
-                                    .lambda = -mu, .k = logl(prob * fabsl(newk)), .n = nzi + 1, .c=sign(newk)
-                            });
-                        }
-                    }*/
                     if (prob > EPSILON) {
                         long double newk = logl(mu) + kzi2 - logl((long double) nzi);
                         long double k = logl(prob) + newk;
@@ -2402,174 +2275,66 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                         });
                     }
                 } else {
-                    DEBUG_PRINT("The rates are NOT the same\n");
-                    long double NEWlambda, NEWk;
-                    size_t NEWn;
-                    long double aa;
-                    int cc;
-                    {
-                        DEBUG_PRINT("The rates are NOT the same (%Lf != %Lf)\n", lambdazi, -mu);
-                        long double a;
-                        int c;
+                    DEBUG_PRINT("The rates are NOT the same (%Lf != %Lf)\n", lambdazi, -mu);
+                    long double a;
+                    int c;
 
-                        DEBUG_PRINT("powl(-lambdazi - mu, nzi) > 0, powl(%Lf - %Lf, %zu) = %Lf\n",
-                                    -lambdazi, mu, nzi, powl(-lambdazi - mu, nzi));
 
-                        if (powl(-lambdazi - mu, nzi) > 0) {
-                            DEBUG_PRINT("PATH 1\n");
-                            int s = sign(powl(-lambdazi - mu, nzi));
-                            a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(-lambdazi - mu)) * nzi * s;
-                            c = czi;
-                        } else {
-                            DEBUG_PRINT("PATH 2\n");
-                            int s = sign(powl(lambdazi + mu, nzi));
-                            a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(lambdazi + mu)) * nzi * s;
-                            c = -czi;
-                        }
-
-                        //DEBUG_PRINT("My a is constructed from   %Lf * (%Lf * %zu)/ (pow(-%Lf - %Lf, %zu)) = %Lf\n",
-                        //           mu, kzi, fac(nzi - 1), lambdazi, mu, nzi, a);
-                        // Add the first part
-                        DEBUG_PRINT("fabsl(logl(prob) + a) = fabsl(logl(%Lf) + %Lf)=%Lf\n", prob, a,
-                                    fabsl(logl(prob) + a));
-                        {
-                            //DEBUG_PRINT("The prob is %Lf giving a*prob=%Lf\n", prob, prob * a);
-                            DEBUG_PRINT("PUSHING A c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n",
-                                        c,
-                                        -mu, logl(prob) + a, exp(logl(prob) + a), (size_t) 1);
-
-                            NEWlambda = -mu;
-                            NEWk = c * expl(logl(prob) + a);
-                            NEWn = 1;
-                            parts->push_back((struct pdf_values) {
-                                    .lambda = -mu,
-                                    .k = logl(prob) + a,
-                                    .n = 1,
-                                    .c = c
-                            });
-                            aa = a;
-                            cc = c;
-                        }
+                    if (powl(-lambdazi - mu, nzi) > 0) {
+                        int s = sign(powl(-lambdazi - mu, nzi));
+                        a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(-lambdazi - mu)) * nzi * s;
+                        c = czi;
+                    } else {
+                        int s = sign(powl(lambdazi + mu, nzi));
+                        a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(lambdazi + mu)) * nzi * s;
+                        c = -czi;
                     }
 
-                    long double a = mu * (kzi * fac(nzi - 1)) / pow(-lambdazi - mu, nzi);
-
-                    DEBUG_PRINT("My a is constructed from   %Lf * (%Lf * %zu)/ (pow(-%Lf - %Lf, %zu)) = %Lf\n",
-                                mu, kzi, fac(nzi - 1), lambdazi, mu, nzi, a);
                     // Add the first part
-                    if (fabsl(prob * a) > EPSILON) {
-                        DEBUG_PRINT("The prob is %Lf giving a*prob=%Lf\n", prob, prob * a);
-                        DEBUG_PRINT("PUSHING A OLD lambda  %Lf k %Lf n %zu\n", -mu, prob * a, (size_t) 1);
+                    DEBUG_PRINT("PUSHING A c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n",
+                                c,
+                                -mu, logl(prob) + a, exp(logl(prob) + a), (size_t) 1);
 
-                        /*parts->push_back((struct pdf_values) {
-                                .lambda = -mu, .k = logl(fabsl(prob * a)), .n = 1, .c=sign(prob * a)
-                        });*/
-
-                        if (fabsl(-mu - NEWlambda) > EPSILON) {
-                            //DIE_ERROR(1, "??");
-                        }
-
-                        if (prob * a - NEWk > EPSILON) {
-                            //DIE_ERROR(1, "??");
-                        }
-                    }
-
+                    parts->push_back((struct pdf_values) {
+                            .lambda = -mu,
+                            .k = logl(prob) + a,
+                            .n = 1,
+                            .c = c
+                    });
 
                     for (int j = 0; j < nzi; ++j) {
-                        {
-                            int snzi = (int) nzi;
-                            long double b;
-                            int c2;
-
-                            DEBUG_PRINT(
-                                    "powl(-lambdazi - mu, j - nzi) > 0, powl(%Lf - %Lf, %i - %i) = powl(%Lf, %i)= %Lf\n",
-                                    -lambdazi, mu, j, snzi, -lambdazi - mu, j - snzi, powl(-lambdazi - mu, j - snzi));
-
-                            if (powl(-lambdazi - mu, j - snzi) > 0) {
-                                int s = sign(powl(-lambdazi - mu, j - snzi));
-                                b = logl(mu) + kzi2 + logl(fac(nzi - 1)) +
-                                    s * logl(fabsl(-lambdazi - mu)) * (j - snzi) -
-                                    logl(fac((size_t) j));
-                                c2 = -czi;
-                                DEBUG_PRINT(
-                                        "COMPUTING B by logl(mu) + kzi + logl(fac(nzi - 1)) + logl(-lambdazi - mu) * (j - snzi) - logl(fac((size_t)j)) = logl(%Lf) + %Lf + logl(fac(%zu - 1)) - logl(-%Lf - %Lf) * (%i - %i) - logl(fac((size_t)%i)) = %Lf (%Lf)\n",
-                                        mu, kzi2, nzi, lambdazi, mu, j, snzi, j, b, expl(b)
-                                );
-                            } else {
-                                int s = sign(powl(lambdazi + mu, j - snzi));
-                                b = logl(mu) + kzi2 + logl(fac(nzi - 1)) + s * logl(lambdazi + mu) * (j - snzi) -
-                                    logl(fac((size_t) j));
-                                c2 = czi;
-                                DEBUG_PRINT(
-                                        "COMPUTING B by logl(mu) + kzi + logl(fac(nzi - 1)) + logl(lambdazi + mu) * (j - snzi) - logl(fac((size_t)j)) = logl(%Lf) + %Lf + logl(fac(%zu - 1)) - logl(%Lf + %Lf) * (%i - %i) - logl(fac((size_t)%i)) = %Lf (%Lf)\n",
-                                        mu, kzi2, nzi, lambdazi, mu, j, snzi, j, b, expl(b)
-                                );
-                            }
-
-                            long double newk = logl(prob) + b;
-                            long double newlambda = (lambdazi);
-                            size_t newn = (size_t) j + 1;
-
-                            DEBUG_PRINT("logl(prob) + b = logl(%Lf) + %Lf = %Lf\n",
-                                        prob, b, logl(prob) + b);
-
-                            NEWlambda = 9999;
-                            NEWk = 999;
-
-                            //if (fabsl(newk) > EPSILON) {
-                            {
-                                NEWlambda = newlambda;
-                                NEWk = c2 * expl(newk);
-
-                                DEBUG_PRINT("PUSHING B c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n", c2, newlambda, newk,
-                                            exp(newk), newn);
-                                parts->push_back((struct pdf_values) {
-                                        .lambda = newlambda,
-                                        .k = newk,
-                                        .n = newn,
-                                        .c=c2
-                                });
-                            }
+                        int snzi = (int) nzi;
+                        long double b;
+                        int c2;
+                        if (powl(-lambdazi - mu, j - snzi) > 0) {
+                            int s = sign(powl(-lambdazi - mu, j - snzi));
+                            b = logl(mu) + kzi2 + logl(fac(nzi - 1)) +
+                                s * logl(fabsl(-lambdazi - mu)) * (j - snzi) -
+                                logl(fac((size_t) j));
+                            c2 = -czi;
+                        } else {
+                            int s = sign(powl(lambdazi + mu, j - snzi));
+                            b = logl(mu) + kzi2 + logl(fac(nzi - 1)) + s * logl(lambdazi + mu) * (j - snzi) -
+                                logl(fac((size_t) j));
+                            c2 = czi;
                         }
-                        // OLD
-                        long double newk = prob * -a * (1 / fac((size_t) j)) * pow(-lambdazi - mu, j);
+
+                        long double newk = logl(prob) + b;
                         long double newlambda = (lambdazi);
                         size_t newn = (size_t) j + 1;
 
-                        if (fabsl(newk) > EPSILON) {
-                            DEBUG_PRINT("PUSHING B OLD lambda  %Lf k %Lf n %zu\n", newlambda, newk, newn);
-                            /*parts->push_back(
-                                    (struct pdf_values) {
-                                        .lambda = newlambda, .k = logl(fabsl(newk)), .n = newn, .c=sign(
-                                            newk)});*/
-
-
-
-                            if (fabsl(newlambda - NEWlambda) > EPSILON) {
-                                //DIE_ERROR(1, "??");
-                            }
-
-                            if (newk - NEWk > EPSILON) {
-                                //DIE_ERROR(1, "??");
-                            }
-                        }
-
+                        DEBUG_PRINT("PUSHING B c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n", c2, newlambda, newk,
+                                    exp(newk), newn);
+                        parts->push_back((struct pdf_values) {
+                                .lambda = newlambda,
+                                .k = newk,
+                                .n = newn,
+                                .c=c2
+                        });
                     }
                 }
-
             }
-            /* OLD
-            // Defect addition
-            if (fabsl(prob * defect_probz * mu) > EPSILON) {
-                long double k = logl(prob) + logl(defect_probz) + logl(mu);
-                DEBUG_PRINT("PUSHING E c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n", 1, -mu, k, expl(k), (size_t) 1);
-                parts->push_back((struct pdf_values) {
-                        .lambda = -mu,
-                        .k = k,
-                        .n = 1,
-                        .c = 1
-                });
-            }*/
+
             // Defect addition
             if (fabsl(prob * defect_probz) > EPSILON) {
                 DEBUG_PRINT("PUSHING E lambda  %Lf k %Lf n %zu\n", -mu, prob * defect_probz * mu, (size_t) 1);
