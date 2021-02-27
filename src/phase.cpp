@@ -2205,27 +2205,25 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         }
     }
 
+
+    vertex_pdfs[vertex->vertex_index].parts =
+            new vector<struct pdf_values>();
+
+    vector<struct pdf_values> *vertex_parts =
+            vertex_pdfs[vertex->vertex_index].parts;
+
     if (reward == 0) {
         DEBUG_PRINT("My reward is zero\n");
-        vertex_pdfs[vertex->vertex_index].parts =
-                new vector<struct pdf_values>();
-
-        vector<struct pdf_values> *parts =
-                vertex_pdfs[vertex->vertex_index].parts;
 
 
         for (size_t p = 0; p < allchildparts.size(); ++p) {
-
-            DEBUG_PRINT("PUSHING RC\n");
-            (*parts).push_back((struct pdf_values) {
+            vertex_parts->push_back((struct pdf_values) {
                     .lambda = allchildparts[p].lambda,
                     .k = allchildparts[p].k,
                     .n = allchildparts[p].n,
                     .c = allchildparts[p].c
             });
-
         }
-
 
         long double defect_prob = 0;
 
@@ -2238,12 +2236,6 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         vertex_pdfs[vertex->vertex_index].defect_prob = defect_prob;
     } else {
         DEBUG_PRINT("My reward is not zero\n");
-        vertex_pdfs[vertex->vertex_index].parts =
-                new vector<struct pdf_values>();
-
-        vector<struct pdf_values> *parts =
-                vertex_pdfs[vertex->vertex_index].parts;
-
         for (size_t f = 0; f < vertex->nedges; ++f) {
             llc_t edge = vertex->edges[f];
             DEBUG_PRINT("\n====\n");
@@ -2273,18 +2265,8 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                     if (prob > EPSILON) {
                         long double newk = logl(mu) + kzi2 - logl((long double) nzi);
                         long double k = logl(prob) + newk;
-                        DEBUG_PRINT("long double newk = logl(mu) + kzi2 - logl(nzi)="
-                                    "logl(%Lf) + %Lf - logl(%zu)=(%Lf) + %Lf - %Lf=%Lf\n",
-                                    mu, kzi2, nzi, logl(mu), kzi2, logl((long double) nzi), newk);
 
-                        DEBUG_PRINT("logl(prob) + newk=logl(%Lf)+ %Lf= %Lf\n",
-                                    prob, newk, logl(prob) + newk);
-
-                        DEBUG_PRINT("PUSHING F c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n",
-                                    czi, -mu, k, expl(k),
-                                    nzi + 1);
-
-                        parts->push_back((struct pdf_values) {
+                        vertex_parts->push_back((struct pdf_values) {
                                 .lambda = -mu,
                                 .k = k,
                                 .n = nzi + 1,
@@ -2312,7 +2294,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                                 c,
                                 -mu, logl(prob) + a, exp(logl(prob) + a), (size_t) 1);
 
-                    parts->push_back((struct pdf_values) {
+                    vertex_parts->push_back((struct pdf_values) {
                             .lambda = -mu,
                             .k = logl(prob) + a,
                             .n = 1,
@@ -2340,9 +2322,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                         long double newlambda = (lambdazi);
                         size_t newn = (size_t) j + 1;
 
-                        DEBUG_PRINT("PUSHING B c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n", c2, newlambda, newk,
-                                    exp(newk), newn);
-                        parts->push_back((struct pdf_values) {
+                        vertex_parts->push_back((struct pdf_values) {
                                 .lambda = newlambda,
                                 .k = newk,
                                 .n = newn,
@@ -2354,8 +2334,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
             // Defect addition
             if (fabsl(prob * defect_probz) > EPSILON) {
-                DEBUG_PRINT("PUSHING E lambda  %Lf k %Lf n %zu\n", -mu, prob * defect_probz * mu, (size_t) 1);
-                parts->push_back((struct pdf_values) {
+                vertex_parts->push_back((struct pdf_values) {
                         .lambda = -mu, .k = logl(prob) + logl(defect_probz) + logl(mu), .n = 1, .c =1
                 });
             }
