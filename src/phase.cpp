@@ -2236,6 +2236,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         vertex_pdfs[vertex->vertex_index].defect_prob = defect_prob;
     } else {
         DEBUG_PRINT("My reward is not zero\n");
+
         for (size_t f = 0; f < vertex->nedges; ++f) {
             llc_t edge = vertex->edges[f];
             DEBUG_PRINT("\n====\n");
@@ -2243,100 +2244,89 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
             long double prob = edge.weight / vertex->rate;
             long double mu = vertex->rate / reward;
 
-            vector<struct pdf_values> *partsz =
-                    vertex_pdfs[edge.child->vertex_index].parts;
-
-            DEBUG_PRINT("I have a child %zu with %zu parts and defect of %Lf\n", edge.child->vertex_index,
-                        (*partsz).size(), vertex_pdfs[edge.child->vertex_index].defect_prob);
-
-
             long double defect_probz = vertex_pdfs[edge.child->vertex_index].defect_prob;
-
-            for (size_t i = 0; i < (*partsz).size(); ++i) {
-                long double kzi2 = ((*partsz)[i].k);
-                size_t nzi = (*partsz)[i].n;
-                long double lambdazi = (*partsz)[i].lambda;
-                int czi = (*partsz)[i].c;
-
-                DEBUG_PRINT("Child part %zu has lambdazi %Lf kzi %Lf nzi %zu\n", i, lambdazi, kzi, nzi);
-
-                if (fabsl(lambdazi - (-mu)) < EPSILON) {
-                    DEBUG_PRINT("The rates are the same (mu=%Lf)\n", mu);
-                    if (prob > EPSILON) {
-                        long double newk = logl(mu) + kzi2 - logl((long double) nzi);
-                        long double k = logl(prob) + newk;
-
-                        vertex_parts->push_back((struct pdf_values) {
-                                .lambda = -mu,
-                                .k = k,
-                                .n = nzi + 1,
-                                .c = czi
-                        });
-                    }
-                } else {
-                    DEBUG_PRINT("The rates are NOT the same (%Lf != %Lf)\n", lambdazi, -mu);
-                    long double a;
-                    int c;
-
-
-                    if (powl(-lambdazi - mu, nzi) > 0) {
-                        int s = sign(powl(-lambdazi - mu, nzi));
-                        a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(-lambdazi - mu)) * nzi * s;
-                        c = czi;
-                    } else {
-                        int s = sign(powl(lambdazi + mu, nzi));
-                        a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(lambdazi + mu)) * nzi * s;
-                        c = -czi;
-                    }
-
-                    // Add the first part
-                    DEBUG_PRINT("PUSHING A c %i lambda  %Lf k %Lf (exp %Lf) n %zu\n",
-                                c,
-                                -mu, logl(prob) + a, exp(logl(prob) + a), (size_t) 1);
-
-                    vertex_parts->push_back((struct pdf_values) {
-                            .lambda = -mu,
-                            .k = logl(prob) + a,
-                            .n = 1,
-                            .c = c
-                    });
-
-                    for (int j = 0; j < nzi; ++j) {
-                        int snzi = (int) nzi;
-                        long double b;
-                        int c2;
-                        if (powl(-lambdazi - mu, j - snzi) > 0) {
-                            int s = sign(powl(-lambdazi - mu, j - snzi));
-                            b = logl(mu) + kzi2 + logl(fac(nzi - 1)) +
-                                s * logl(fabsl(-lambdazi - mu)) * (j - snzi) -
-                                logl(fac((size_t) j));
-                            c2 = -czi;
-                        } else {
-                            int s = sign(powl(lambdazi + mu, j - snzi));
-                            b = logl(mu) + kzi2 + logl(fac(nzi - 1)) + s * logl(lambdazi + mu) * (j - snzi) -
-                                logl(fac((size_t) j));
-                            c2 = czi;
-                        }
-
-                        long double newk = logl(prob) + b;
-                        long double newlambda = (lambdazi);
-                        size_t newn = (size_t) j + 1;
-
-                        vertex_parts->push_back((struct pdf_values) {
-                                .lambda = newlambda,
-                                .k = newk,
-                                .n = newn,
-                                .c=c2
-                        });
-                    }
-                }
-            }
 
             // Defect addition
             if (fabsl(prob * defect_probz) > EPSILON) {
                 vertex_parts->push_back((struct pdf_values) {
                         .lambda = -mu, .k = logl(prob) + logl(defect_probz) + logl(mu), .n = 1, .c =1
                 });
+            }
+        }
+
+
+        for (size_t i = 0; i < allchildparts.size(); ++i) {
+            DEBUG_PRINT("\n====\n");
+
+            long double mu = vertex->rate / reward;
+
+            long double kzi2 = allchildparts[i].k;
+            size_t nzi = allchildparts[i].n;
+            long double lambdazi = allchildparts[i].lambda;
+            int czi = allchildparts[i].c;
+
+            DEBUG_PRINT("Child part %zu has lambdazi %Lf kzi %Lf nzi %zu\n", i, lambdazi, kzi, nzi);
+
+            if (fabsl(lambdazi - (-mu)) < EPSILON) {
+                DEBUG_PRINT("The rates are the same (mu=%Lf)\n", mu);
+                long double newk = logl(mu) + kzi2 - logl((long double) nzi);
+                long double k = newk;
+
+                vertex_parts->push_back((struct pdf_values) {
+                        .lambda = -mu,
+                        .k = k,
+                        .n = nzi + 1,
+                        .c = czi
+                });
+            } else {
+                DEBUG_PRINT("The rates are NOT the same (%Lf != %Lf)\n", lambdazi, -mu);
+                long double a;
+                int c;
+
+                if (powl(-lambdazi - mu, nzi) > 0) {
+                    int s = sign(powl(-lambdazi - mu, nzi));
+                    a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(-lambdazi - mu)) * nzi * s;
+                    c = czi;
+                } else {
+                    int s = sign(powl(lambdazi + mu, nzi));
+                    a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(lambdazi + mu)) * nzi * s;
+                    c = -czi;
+                }
+                vertex_parts->push_back((struct pdf_values) {
+                        .lambda = -mu,
+                        .k = a,
+                        .n = 1,
+                        .c = c
+                });
+
+                for (int j = 0; j < nzi; ++j) {
+                    int snzi = (int) nzi;
+                    long double b;
+                    int c2;
+                    if (powl(-lambdazi - mu, j - snzi) > 0) {
+                        int s = sign(powl(-lambdazi - mu, j - snzi));
+                        b = logl(mu) + kzi2 + logl(fac(nzi - 1)) +
+                            s * logl(fabsl(-lambdazi - mu)) * (j - snzi) -
+                            logl(fac((size_t) j));
+                        c2 = -czi;
+                    } else {
+                        int s = sign(powl(lambdazi + mu, j - snzi));
+                        b = logl(mu) + kzi2 + logl(fac(nzi - 1)) + s * logl(lambdazi + mu) * (j - snzi) -
+                            logl(fac((size_t) j));
+                        c2 = czi;
+                    }
+
+                    long double newk =  b;
+                    long double newlambda = (lambdazi);
+                    size_t newn = (size_t) j + 1;
+
+                    vertex_parts->push_back((struct pdf_values) {
+                            .lambda = newlambda,
+                            .k = newk,
+                            .n = newn,
+                            .c=c2
+                    });
+                }
             }
         }
 
