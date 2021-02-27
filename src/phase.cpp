@@ -2151,18 +2151,18 @@ int cmp_pdf_part(const void *a, const void *b) {
     }
 }
 
-vector<struct pdf_values>* combine_densities(vertex_t* vertex) {
+vector<struct pdf_values>* combine_densities(vector<struct pdf_values>* parts) {
     struct pdf_values *new_values = (struct pdf_values *) calloc(
-            vertex_pdfs[vertex->vertex_index].parts->size(),
+            parts->size(),
             sizeof(struct pdf_values)
     );
 
-    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
-        new_values[i] = (*vertex_pdfs[vertex->vertex_index].parts)[i];
+    for (size_t i = 0; i < parts->size(); ++i) {
+        new_values[i] = (*parts)[i];
     }
 
-    qsort(new_values, vertex_pdfs[vertex->vertex_index].parts->size(), sizeof(struct pdf_values), cmp_pdf_part);
-    size_t len = vertex_pdfs[vertex->vertex_index].parts->size();
+    qsort(new_values, parts->size(), sizeof(struct pdf_values), cmp_pdf_part);
+    size_t len = parts->size();
 
     vector<struct pdf_values> *new_parts = new vector<struct pdf_values>();
 
@@ -2391,10 +2391,9 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         }
     }
 
-    vector<struct pdf_values> *new_parts = combine_densities(vertex);
+    vector<struct pdf_values> *new_parts = combine_densities(vertex_pdfs[vertex->vertex_index].parts);
     delete(vertex_pdfs[vertex->vertex_index].parts);
     vertex_pdfs[vertex->vertex_index].parts = new_parts;
-
 
     long double tt = 0.5;
     long double prob = 0;
