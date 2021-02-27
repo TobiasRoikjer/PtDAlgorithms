@@ -2151,6 +2151,72 @@ int cmp_pdf_part(const void *a, const void *b) {
     }
 }
 
+vector<struct pdf_values>* combine_densities(vertex_t* vertex) {
+    struct pdf_values *new_values = (struct pdf_values *) calloc(
+            vertex_pdfs[vertex->vertex_index].parts->size(),
+            sizeof(struct pdf_values)
+    );
+
+    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
+        new_values[i] = (*vertex_pdfs[vertex->vertex_index].parts)[i];
+    }
+
+    qsort(new_values, vertex_pdfs[vertex->vertex_index].parts->size(), sizeof(struct pdf_values), cmp_pdf_part);
+    size_t len = vertex_pdfs[vertex->vertex_index].parts->size();
+
+    vector<struct pdf_values> *new_parts = new vector<struct pdf_values>();
+
+    if (len > 0) {
+        size_t prev_n = new_values[0].n;
+        long double prev_lambda = new_values[0].lambda;
+        size_t g = 0;
+        vector<vector<size_t> > groups;
+        groups.push_back(vector<size_t>());
+
+        for (size_t i = 0; i < len; ++i) {
+            if (prev_n == new_values[i].n && fabsl(prev_lambda - new_values[i].lambda) < EPSILON) {
+                groups[g].push_back(i);
+            } else {
+                groups.push_back(vector<size_t>());
+                g++;
+                groups[g].push_back(i);
+                prev_n = new_values[i].n;
+                prev_lambda = new_values[i].lambda;
+            }
+        }
+
+        for (size_t g = 0; g < groups.size(); ++g) {
+            long double kp = 0;
+            long double kn = 0;
+
+            for (size_t j = 0; j < groups[g].size(); ++j) {
+                size_t i = groups[g][j];
+
+                if (new_values[i].c == -1) {
+                    kn += expl(new_values[i].k);
+                } else {
+                    kp += expl(new_values[i].k);
+                }
+            }
+
+            long double k = logl(fabsl(kp - kn));
+
+            {
+                new_parts->push_back(
+                        (struct pdf_values) {
+                                .lambda = new_values[groups[g][0]].lambda,
+                                .k = k,
+                                .n = new_values[groups[g][0]].n,
+                                .c = sign(kp - kn)
+                        });
+
+            }
+        }
+    }
+
+    return new_parts;
+}
+
 // TODO: Use fractions not decimal...
 void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     if (vertex->visited) {
@@ -2249,32 +2315,30 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
             // Defect addition
             if (fabsl(prob * defect_probz) > EPSILON) {
                 vertex_parts->push_back((struct pdf_values) {
-                        .lambda = -mu, .k = logl(prob) + logl(defect_probz) + logl(mu), .n = 1, .c =1
+                        .lambda = -mu,
+                        .k = logl(prob) + logl(defect_probz) + logl(mu),
+                        .n = 1,
+                        .c =1
                 });
             }
         }
 
+        vertex_pdfs[vertex->vertex_index].defect_prob = 0;
 
         for (size_t i = 0; i < allchildparts.size(); ++i) {
-            DEBUG_PRINT("\n====\n");
-
             long double mu = vertex->rate / reward;
-
-            long double kzi2 = allchildparts[i].k;
+            long double kzi = allchildparts[i].k;
             size_t nzi = allchildparts[i].n;
             long double lambdazi = allchildparts[i].lambda;
             int czi = allchildparts[i].c;
 
-            DEBUG_PRINT("Child part %zu has lambdazi %Lf kzi %Lf nzi %zu\n", i, lambdazi, kzi, nzi);
-
             if (fabsl(lambdazi - (-mu)) < EPSILON) {
                 DEBUG_PRINT("The rates are the same (mu=%Lf)\n", mu);
-                long double newk = logl(mu) + kzi2 - logl((long double) nzi);
-                long double k = newk;
+                long double newk = logl(mu) + kzi - logl((long double) nzi);
 
                 vertex_parts->push_back((struct pdf_values) {
                         .lambda = -mu,
-                        .k = k,
+                        .k = newk,
                         .n = nzi + 1,
                         .c = czi
                 });
@@ -2285,11 +2349,11 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
                 if (powl(-lambdazi - mu, nzi) > 0) {
                     int s = sign(powl(-lambdazi - mu, nzi));
-                    a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(-lambdazi - mu)) * nzi * s;
+                    a = logl(mu) + kzi + logl(fac(nzi - 1)) - logl(fabsl(-lambdazi - mu)) * nzi * s;
                     c = czi;
                 } else {
                     int s = sign(powl(lambdazi + mu, nzi));
-                    a = logl(mu) + kzi2 + logl(fac(nzi - 1)) - logl(fabsl(lambdazi + mu)) * nzi * s;
+                    a = logl(mu) + kzi + logl(fac(nzi - 1)) - logl(fabsl(lambdazi + mu)) * nzi * s;
                     c = -czi;
                 }
                 vertex_parts->push_back((struct pdf_values) {
@@ -2305,115 +2369,31 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                     int c2;
                     if (powl(-lambdazi - mu, j - snzi) > 0) {
                         int s = sign(powl(-lambdazi - mu, j - snzi));
-                        b = logl(mu) + kzi2 + logl(fac(nzi - 1)) +
+                        b = logl(mu) + kzi + logl(fac(nzi - 1)) +
                             s * logl(fabsl(-lambdazi - mu)) * (j - snzi) -
                             logl(fac((size_t) j));
                         c2 = -czi;
                     } else {
                         int s = sign(powl(lambdazi + mu, j - snzi));
-                        b = logl(mu) + kzi2 + logl(fac(nzi - 1)) + s * logl(lambdazi + mu) * (j - snzi) -
+                        b = logl(mu) + kzi + logl(fac(nzi - 1)) + s * logl(lambdazi + mu) * (j - snzi) -
                             logl(fac((size_t) j));
                         c2 = czi;
                     }
 
-                    long double newk =  b;
-                    long double newlambda = (lambdazi);
-                    size_t newn = (size_t) j + 1;
-
                     vertex_parts->push_back((struct pdf_values) {
-                            .lambda = newlambda,
-                            .k = newk,
-                            .n = newn,
-                            .c=c2
+                            .lambda = lambdazi,
+                            .k = b,
+                            .n = (size_t) j + 1,
+                            .c = c2
                     });
                 }
             }
         }
-
-        vertex_pdfs[vertex->vertex_index].defect_prob = 0;
     }
 
-
-    // Combine the same lambda/n
-    // TODO: Do this already before...
-
-    struct pdf_values *values = (struct pdf_values *) calloc(
-            vertex_pdfs[vertex->vertex_index].parts->size(),
-            sizeof(struct pdf_values)
-    );
-
-    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
-        values[i] = (*vertex_pdfs[vertex->vertex_index].parts)[i];
-    }
-
-    qsort(values, vertex_pdfs[vertex->vertex_index].parts->size(), sizeof(struct pdf_values), cmp_pdf_part);
-
-    DEBUG_PRINT("ORDER:\n");
-    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
-        DEBUG_PRINT("%Lf %Lf %zu\n", values[i].lambda, values[i].k, values[i].n);
-    }
-
-    size_t len = vertex_pdfs[vertex->vertex_index].parts->size();
-
-    delete (vertex_pdfs[vertex->vertex_index].parts);
-
-    vertex_pdfs[vertex->vertex_index].parts = new vector<struct pdf_values>();
-
-    if (len > 0) {
-        size_t prev_n = values[0].n;
-        long double prev_lambda = values[0].lambda;
-        size_t g = 0;
-        vector<vector<size_t> > groups;
-        groups.push_back(vector<size_t>());
-
-        for (size_t i = 0; i < len; ++i) {
-            if (prev_n == values[i].n && fabsl(prev_lambda - values[i].lambda) < EPSILON) {
-                groups[g].push_back(i);
-            } else {
-                groups.push_back(vector<size_t>());
-                g++;
-                groups[g].push_back(i);
-                prev_n = values[i].n;
-                prev_lambda = values[i].lambda;
-            }
-        }
-
-        for (size_t g = 0; g < groups.size(); ++g) {
-            long double kp = 0;
-            long double kn = 0;
-
-            for (size_t j = 0; j < groups[g].size(); ++j) {
-                size_t i = groups[g][j];
-
-                if (values[i].c == -1) {
-                    kn += expl(values[i].k);
-                } else {
-                    kp += expl(values[i].k);
-                }
-            }
-
-            long double k = logl(fabsl(kp - kn));
-
-            {
-                vertex_pdfs[vertex->vertex_index].parts->push_back(
-                        (struct pdf_values) {
-                                .lambda = values[groups[g][0]].lambda,
-                                .k = k,
-                                .n = values[groups[g][0]].n,
-                                .c = sign(kp - kn)
-                        });
-
-            }
-        }
-    }
-
-    DEBUG_PRINT("NEW ORDER:\n");
-    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
-        DEBUG_PRINT("%Lf %Lf %zu\n",
-                    (*vertex_pdfs[vertex->vertex_index].parts)[i].lambda,
-                    (*vertex_pdfs[vertex->vertex_index].parts)[i].k,
-                    (*vertex_pdfs[vertex->vertex_index].parts)[i].n);
-    }
+    vector<struct pdf_values> *new_parts = combine_densities(vertex);
+    delete(vertex_pdfs[vertex->vertex_index].parts);
+    vertex_pdfs[vertex->vertex_index].parts = new_parts;
 
 
     long double tt = 0.5;
