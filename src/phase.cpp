@@ -2184,6 +2184,26 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     DEBUG_PRINT("I am vertex %zu I have rewards %f %f %f %f\n", vertex->vertex_index,
                 vertex->rewards[0], vertex->rewards[1], vertex->rewards[2], vertex->rewards[3]);
 
+    vector<struct pdf_values> allchildparts;
+    vector<struct pdf_values> allchildparts2;
+
+    for (size_t f = 0; f < vertex->nedges; ++f) {
+        llc_t edge = vertex->edges[f];
+
+        vector<struct pdf_values> *partsz =
+                vertex_pdfs[edge.child->vertex_index].parts;
+
+        long double prob = edge.weight / vertex->rate;
+
+        for (size_t p = 0; p < partsz->size(); ++p) {
+            allchildparts.push_back((struct pdf_values) {
+                    .lambda = (*partsz)[p].lambda,
+                    .k = logl(prob) + (*partsz)[p].k,
+                    .n = (*partsz)[p].n,
+                    .c = (*partsz)[p].c
+            });
+        }
+    }
 
     if (reward == 0) {
         DEBUG_PRINT("My reward is zero\n");
@@ -2193,30 +2213,27 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         vector<struct pdf_values> *parts =
                 vertex_pdfs[vertex->vertex_index].parts;
 
+
+        for (size_t p = 0; p < allchildparts.size(); ++p) {
+
+            DEBUG_PRINT("PUSHING RC\n");
+            (*parts).push_back((struct pdf_values) {
+                    .lambda = allchildparts[p].lambda,
+                    .k = allchildparts[p].k,
+                    .n = allchildparts[p].n,
+                    .c = allchildparts[p].c
+            });
+
+        }
+
+
         long double defect_prob = 0;
 
         for (size_t f = 0; f < vertex->nedges; ++f) {
             llc_t edge = vertex->edges[f];
-
-            vector<struct pdf_values> *partsz =
-                    vertex_pdfs[edge.child->vertex_index].parts;
-
             long double prob = edge.weight / vertex->rate;
-
-            for (size_t p = 0; p < partsz->size(); ++p) {
-
-                DEBUG_PRINT("PUSHING RC\n");
-                (*parts).push_back((struct pdf_values) {
-                        .lambda = (*partsz)[p].lambda,
-                        .k = logl(prob) + (*partsz)[p].k,
-                        .n = (*partsz)[p].n,
-                        .c = (*partsz)[p].c
-                });
-            }
-
             defect_prob += prob * vertex_pdfs[edge.child->vertex_index].defect_prob;
         }
-
 
         vertex_pdfs[vertex->vertex_index].defect_prob = defect_prob;
     } else {
