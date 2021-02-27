@@ -2151,7 +2151,7 @@ int cmp_pdf_part(const void *a, const void *b) {
     }
 }
 
-vector<struct pdf_values>* combine_densities(vector<struct pdf_values>* parts) {
+vector<struct pdf_values> *combine_densities(vector<struct pdf_values> *parts) {
     struct pdf_values *new_values = (struct pdf_values *) calloc(
             parts->size(),
             sizeof(struct pdf_values)
@@ -2201,16 +2201,13 @@ vector<struct pdf_values>* combine_densities(vector<struct pdf_values>* parts) {
 
             long double k = logl(fabsl(kp - kn));
 
-            {
-                new_parts->push_back(
-                        (struct pdf_values) {
-                                .lambda = new_values[groups[g][0]].lambda,
-                                .k = k,
-                                .n = new_values[groups[g][0]].n,
-                                .c = sign(kp - kn)
-                        });
-
-            }
+            new_parts->push_back(
+                    (struct pdf_values) {
+                            .lambda = new_values[groups[g][0]].lambda,
+                            .k = k,
+                            .n = new_values[groups[g][0]].n,
+                            .c = sign(kp - kn)
+                    });
         }
     }
 
@@ -2251,7 +2248,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                 vertex->rewards[0], vertex->rewards[1], vertex->rewards[2], vertex->rewards[3]);
 
     vector<struct pdf_values> allchildparts;
-    vector<struct pdf_values> allchildparts2;
+    vector<struct pdf_values> *allchildparts2;
 
     for (size_t f = 0; f < vertex->nedges; ++f) {
         llc_t edge = vertex->edges[f];
@@ -2271,10 +2268,11 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         }
     }
 
+    allchildparts2 = combine_densities(&allchildparts);
+    allchildparts = *allchildparts2;
 
     vertex_pdfs[vertex->vertex_index].parts =
             new vector<struct pdf_values>();
-
     vector<struct pdf_values> *vertex_parts =
             vertex_pdfs[vertex->vertex_index].parts;
 
@@ -2392,7 +2390,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     }
 
     vector<struct pdf_values> *new_parts = combine_densities(vertex_pdfs[vertex->vertex_index].parts);
-    delete(vertex_pdfs[vertex->vertex_index].parts);
+    delete (vertex_pdfs[vertex->vertex_index].parts);
     vertex_pdfs[vertex->vertex_index].parts = new_parts;
 
     long double tt = 0.5;
