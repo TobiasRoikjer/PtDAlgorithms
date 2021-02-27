@@ -2193,13 +2193,13 @@ vector<struct pdf_values> *combine_densities(vector<struct pdf_values> *parts) {
                 size_t i = groups[g][j];
 
                 if (new_values[i].c == -1) {
-                    kn += expl(new_values[i].k);
+                    kn += exp2l(new_values[i].k);
                 } else {
-                    kp += expl(new_values[i].k);
+                    kp += exp2l(new_values[i].k);
                 }
             }
 
-            long double k = logl(fabsl(kp - kn));
+            long double k = log2l(fabsl(kp - kn));
 
             new_parts->push_back(
                     (struct pdf_values) {
@@ -2258,7 +2258,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         for (size_t p = 0; p < partsz->size(); ++p) {
             allchildparts.push_back((struct pdf_values) {
                     .lambda = (*partsz)[p].lambda,
-                    .k = logl(prob) + (*partsz)[p].k,
+                    .k = log2l(prob) + (*partsz)[p].k,
                     .n = (*partsz)[p].n,
                     .c = (*partsz)[p].c
             });
@@ -2306,7 +2306,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
             if (fabsl(prob * defect_probz) > EPSILON) {
                 vertex_parts->push_back((struct pdf_values) {
                         .lambda = -mu,
-                        .k = logl(prob) + logl(defect_probz) + logl(mu),
+                        .k = log2l(prob) + log2l(defect_probz) + log2l(mu),
                         .n = 1,
                         .c =1
                 });
@@ -2324,7 +2324,7 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
             if (fabsl(lambdazi - (-mu)) < EPSILON) {
                 DEBUG_PRINT("The rates are the same (mu=%Lf)\n", mu);
-                long double newk = logl(mu) + kzi - logl((long double) nzi);
+                long double newk = log2l(mu) + kzi - log2l((long double) nzi);
 
                 vertex_parts->push_back((struct pdf_values) {
                         .lambda = -mu,
@@ -2339,11 +2339,11 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
                 if (powl(-lambdazi - mu, nzi) > 0) {
                     int s = sign(powl(-lambdazi - mu, nzi));
-                    a = logl(mu) + kzi + logl(fac(nzi - 1)) - logl(fabsl(-lambdazi - mu)) * nzi * s;
+                    a = log2l(mu) + kzi + log2l(fac(nzi - 1)) - log2l(fabsl(-lambdazi - mu)) * nzi * s;
                     c = czi;
                 } else {
                     int s = sign(powl(lambdazi + mu, nzi));
-                    a = logl(mu) + kzi + logl(fac(nzi - 1)) - logl(fabsl(lambdazi + mu)) * nzi * s;
+                    a = log2l(mu) + kzi + log2l(fac(nzi - 1)) - log2l(fabsl(lambdazi + mu)) * nzi * s;
                     c = -czi;
                 }
                 vertex_parts->push_back((struct pdf_values) {
@@ -2359,14 +2359,14 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
                     int c2;
                     if (powl(-lambdazi - mu, j - snzi) > 0) {
                         int s = sign(powl(-lambdazi - mu, j - snzi));
-                        b = logl(mu) + kzi + logl(fac(nzi - 1)) +
-                            s * logl(fabsl(-lambdazi - mu)) * (j - snzi) -
-                            logl(fac((size_t) j));
+                        b = log2l(mu) + kzi + log2l(fac(nzi - 1)) +
+                            s * log2l(fabsl(-lambdazi - mu)) * (j - snzi) -
+                            log2l(fac((size_t) j));
                         c2 = -czi;
                     } else {
                         int s = sign(powl(lambdazi + mu, j - snzi));
-                        b = logl(mu) + kzi + logl(fac(nzi - 1)) + s * logl(lambdazi + mu) * (j - snzi) -
-                            logl(fac((size_t) j));
+                        b = log2l(mu) + kzi + log2l(fac(nzi - 1)) + s * log2l(lambdazi + mu) * (j - snzi) -
+                            log2l(fac((size_t) j));
                         c2 = czi;
                     }
 
