@@ -2244,9 +2244,6 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
         reward = reward_func(vertex);
     }
 
-    DEBUG_PRINT("I am vertex %zu I have rewards %f %f %f %f\n", vertex->vertex_index,
-                vertex->rewards[0], vertex->rewards[1], vertex->rewards[2], vertex->rewards[3]);
-
     vector<struct pdf_values> allchildparts;
     vector<struct pdf_values> *allchildparts2;
 
@@ -2279,7 +2276,6 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     if (reward == 0) {
         DEBUG_PRINT("My reward is zero\n");
 
-
         for (size_t p = 0; p < allchildparts.size(); ++p) {
             vertex_parts->push_back((struct pdf_values) {
                     .lambda = allchildparts[p].lambda,
@@ -2303,14 +2299,10 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
 
         for (size_t f = 0; f < vertex->nedges; ++f) {
             llc_t edge = vertex->edges[f];
-            DEBUG_PRINT("\n====\n");
-
             long double prob = edge.weight / vertex->rate;
             long double mu = vertex->rate / reward;
-
             long double defect_probz = vertex_pdfs[edge.child->vertex_index].defect_prob;
 
-            // Defect addition
             if (fabsl(prob * defect_probz) > EPSILON) {
                 vertex_parts->push_back((struct pdf_values) {
                         .lambda = -mu,
@@ -2392,29 +2384,6 @@ void _pdf(vertex_t *vertex, double (*reward_func)(vertex_t *)) {
     vector<struct pdf_values> *new_parts = combine_densities(vertex_pdfs[vertex->vertex_index].parts);
     delete (vertex_pdfs[vertex->vertex_index].parts);
     vertex_pdfs[vertex->vertex_index].parts = new_parts;
-
-    long double tt = 0.5;
-    long double prob = 0;
-
-    for (size_t i = 0; i < vertex_pdfs[vertex->vertex_index].parts->size(); ++i) {
-        DEBUG_PRINT("MY PARTS c %i k %Lf (%Lf) lambda %Lf n %zu\n",
-                    (*vertex_pdfs[vertex->vertex_index].parts)[i].c,
-                    (*vertex_pdfs[vertex->vertex_index].parts)[i].k,
-                    expl((*vertex_pdfs[vertex->vertex_index].parts)[i].k),
-                    ((*vertex_pdfs[vertex->vertex_index].parts)[i].lambda),
-                    (*vertex_pdfs[vertex->vertex_index].parts)[i].n);
-        prob += (*vertex_pdfs[vertex->vertex_index].parts)[i].c *
-                expl((*vertex_pdfs[vertex->vertex_index].parts)[i].k) *
-                pow(tt, (*vertex_pdfs[vertex->vertex_index].parts)[i].n - 1) *
-                expl((*vertex_pdfs[vertex->vertex_index].parts)[i].lambda * tt);
-    }
-
-    DEBUG_PRINT("RESULT %Lf\t %Lf\n", tt, prob);
-    //fprintf(stderr, "I am vertex %zu I have rewards %f %f %f %f %f\n", vertex->vertex_index,
-    //        vertex->rewards[0], vertex->rewards[1], vertex->rewards[2], vertex->rewards[3], vertex->rewards[4]);
-
-    //fprintf(stderr, "My prob %Lf\n", prob);
-    DEBUG_PRINT("\n============================\n\n");
 }
 
 void pdf(vertex_t *graph, double (*reward_func)(vertex_t *), struct vertex_pdf *out_vertex_pdfs) {
