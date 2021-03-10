@@ -106,6 +106,7 @@ vertex_t *vertex_init(vec_entry_t *state, vector<double> rewards, size_t state_l
 void vertex_destroy(vertex_t *vertex);
 void vertex_add_edge(vertex_t *from, vertex_t *to, double weight);
 void graph_free(vertex_t *graph);
+vertex_t *get_abs_vertex(vertex_t *graph);
 
 queue<vertex_t *> enqueue_vertices(vertex_t *graph);
 int label_vertex_index(size_t *largest_index, vertex_t *graph);

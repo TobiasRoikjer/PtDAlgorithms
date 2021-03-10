@@ -127,12 +127,21 @@ inline void add_edge(vertex_t *from, vertex_t *to, size_t index, double weight) 
 }
 
 void vertex_add_edge(vertex_t *from, vertex_t *to, double weight) {
+    for (size_t i = 0; i < from->nedges; ++i) {
+        if (from->edges[i].child == to) {
+            from->edges[i].weight += weight;
+            from->rate += weight;
+            return;
+        }
+    }
+
     //TODO super slow
     llc_t *edges = from->edges;
     from->edges = (llc_t *) calloc(from->nedges + 1, sizeof(llc_t));
 
     size_t inc = 0;
     size_t nedges = from->nedges + 1;
+
 
     for (size_t i = 0; i < nedges; ++i) {
         if (inc == 0 &&
@@ -599,7 +608,7 @@ queue<vertex_t *> enqueue_vertices(vertex_t *graph) {
     return ret;
 }
 
-static vertex_t *get_abs_vertex(vertex_t *graph) {
+vertex_t *get_abs_vertex(vertex_t *graph) {
     queue<vertex_t *> queue = enqueue_vertices(graph);
     vertex_t *abs_vertex = NULL;
 
