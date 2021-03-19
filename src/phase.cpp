@@ -5,6 +5,7 @@
 #include <queue>
 #include <stdint.h>
 #include <math.h>
+#include <set>
 #include "phase.h"
 
 static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
@@ -203,7 +204,6 @@ static void reset_graph_visited(vertex_t *graph) {
         }
     }
 
-
     while (!to_reset.empty()) {
         vertex_t *vertex = to_reset.front();
         to_reset.pop();
@@ -212,13 +212,15 @@ static void reset_graph_visited(vertex_t *graph) {
     }
 }
 
+
+//TODO AVL should use char* as key
 typedef struct avl_vec_vertex {
     struct avl_vec_vertex *left;
     struct avl_vec_vertex *right;
     struct avl_vec_vertex *parent;
     signed short balance;
     vec_entry_t *key;
-    vertex_t *entry;
+    void *entry;
 } avl_vec_vertex_t;
 
 static inline int radix_cmp(const vec_entry_t *a, const vec_entry_t *b,
@@ -385,7 +387,7 @@ avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child
     return child;
 }
 
-int avl_vec_vertex_create(avl_vec_vertex_t **vertex, vec_entry_t *key, vertex_t *entry, avl_vec_vertex_t *parent) {
+int avl_vec_vertex_create(avl_vec_vertex_t **vertex, vec_entry_t *key, void *entry, avl_vec_vertex_t *parent) {
     if ((*vertex = (avl_vec_vertex_t *) malloc(sizeof(avl_vec_vertex_t))) == NULL) {
         return 1;
     }
@@ -449,7 +451,7 @@ avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size
     }
 }
 
-int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_entry_t *key, vertex_t *entry,
+int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_entry_t *key, void *entry,
                        const size_t vec_length) {
     if (avl_vec_vertex_create(out, key, entry, NULL)) {
         return -1;
@@ -487,7 +489,7 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_en
     return 0;
 }
 
-int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, vertex_t *entry, const size_t vec_length) {
+int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, void *entry, const size_t vec_length) {
     avl_vec_vertex_t *child;
 
     if (*root == NULL) {
@@ -804,7 +806,7 @@ vertex_t *generate_state_space(
                     vertices_to_visit.push(pair);
                 }
             } else {
-                child = bst_entry->entry;
+                child = (vertex_t *) bst_entry->entry;
             }
 
             struct edge edge;
@@ -956,7 +958,7 @@ static int kingman_visit_vertex(vertex_t **out_initial_vertex,
                             vertices_to_visit.push(to);
                             new_vertex = to;
                         } else {
-                            new_vertex = bst_vertex->entry;
+                            new_vertex = (vertex_t *) bst_vertex->entry;
                         }
                     }
 
@@ -1136,7 +1138,7 @@ static int kingman_visit_vertex_rw(vertex_t **out_initial_vertex,
                             vertices_to_visit.push(to);
                             new_vertex = to;
                         } else {
-                            new_vertex = bst_vertex->entry;
+                            new_vertex = (vertex_t *) bst_vertex->entry;
                         }
                     }
 
@@ -2409,4 +2411,568 @@ void pdf(vertex_t *graph, double (*reward_func)(vertex_t *), struct vertex_pdf *
     // TODO: Clone
     out_vertex_pdfs->defect_prob = vertex_pdfs[1].defect_prob;
     out_vertex_pdfs->parts = vertex_pdfs[1].parts;
+}
+
+queue<vertex_t *> topological_queue(vertex_t *graph) {
+    queue<vertex_t *> topological_queue;
+    queue<vertex_t *> q;
+
+    q = enqueue_vertices(graph);
+
+    while (!q.empty()) {
+        vertex_t *vertex = q.front();
+        q.pop();
+
+        vertex->integer = (int) vertex->nparents;
+    }
+
+    reset_graph_visited(graph);
+    q.push(graph);
+
+    while (!q.empty()) {
+        vertex_t *vertex = q.front();
+        q.pop();
+
+        topological_queue.push(vertex);
+
+        for (size_t i = 0; i < vertex->nedges; ++i) {
+            vertex_t *child = vertex->edges[i].child;
+
+            child->integer -= 1;
+
+            if (child->integer == 0 && !child->visited) {
+                child->visited = true;
+                q.push(child);
+            }
+        }
+    }
+
+    return topological_queue;
+}
+
+static void ptd_reset_graph_visited(ptd_graph_t *graph) {
+    queue<ptd_vertex_t *> to_reset;
+    queue<ptd_vertex_t *> to_visit;
+
+    to_visit.push(graph->start_vertex);
+
+    while (!to_visit.empty()) {
+        ptd_vertex_t *vertex = to_visit.front();
+        to_visit.pop();
+
+        if (!vertex->reset) {
+            continue;
+        }
+
+        vertex->reset = false;
+        to_reset.push(vertex);
+
+        vertex->visited = false;
+
+        for (size_t i = 0; i < vertex->edges_length; ++i) {
+            ptd_vertex_t *child = vertex->edges[i].to;
+            to_visit.push(child);
+        }
+    }
+
+    while (!to_reset.empty()) {
+        ptd_vertex_t *vertex = to_reset.front();
+        to_reset.pop();
+
+        vertex->reset = true;
+    }
+}
+
+static queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
+    ptd_reset_graph_visited(graph);
+    // TODO: add failures to these
+    queue<ptd_vertex_t *> ret;
+    queue<ptd_vertex_t *> queue;
+
+    queue.push(graph->start_vertex);
+
+    while (!queue.empty()) {
+        ptd_vertex_t *vertex = queue.front();
+        queue.pop();
+
+        if (vertex->visited) {
+            continue;
+        }
+
+        vertex->visited = true;
+        ret.push(vertex);
+
+        for (size_t i = 0; i < vertex->edges_length; ++i) {
+            ptd_edge_t edge = vertex->edges[i];
+            queue.push(edge.to);
+        }
+    }
+
+    return ret;
+}
+
+ptd_graph_t *ptd_graph_create(size_t state_length, size_t reward_length) {
+    ptd_graph_t *graph;
+    ptd_vertex_t *start, *absorbing;
+
+    if ((graph = (ptd_graph_t *) malloc(sizeof(ptd_graph_t))) == NULL) {
+        return NULL;
+    }
+
+    graph->state_length = state_length;
+    graph->rewards_length = reward_length;
+
+    if ((start = ptd_vertex_create(graph)) == NULL) {
+        free(graph);
+        return NULL;
+    }
+
+    if ((absorbing = ptd_vertex_create(graph)) == NULL) {
+        free(graph);
+        return NULL;
+    }
+
+    graph->start_vertex = start;
+    graph->absorbing_vertex = absorbing;
+    graph->vertices_length = 2;
+
+    return graph;
+}
+
+void ptd_graph_destroy(ptd_graph_t *graph) {
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+
+    // TODO: Add failures
+
+    //if (q == NULL) {
+    // We have failed to allocate or push to a queue for all the vertices.
+    // This means that this freeing function cannot succeed. For now, we
+    // will just ignore this error.
+    //}
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        ptd_vertex_destroy(vertex);
+    }
+
+    memset(&graph, 0, sizeof(graph));
+    free(graph);
+}
+
+queue<ptd_vertex_t *> *vertices_to_visit;
+
+ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state) {
+    ptd_vertex_t *vertex;
+
+    vertex = (ptd_vertex_t *) malloc(sizeof(ptd_vertex_t));
+
+    if (vertex == NULL) {
+        return NULL;
+    }
+
+    vertex->edges_limit = 8;
+    vertex->edges = (ptd_edge_t *) calloc(8, sizeof(ptd_edge_t));
+
+    if (vertex->edges == NULL) {
+        return NULL;
+    }
+
+    vertex->edges_length = 0;
+
+    vertex->state = state;
+
+    vertex->rewards = (long double *) calloc(graph->rewards_length, sizeof(size_t));;
+
+    if (vertex->rewards == NULL) {
+        return NULL;
+    }
+
+    vertex->rate = 0;
+    vertex->visited = false;
+    vertex->reset = true;
+    vertex->graph = graph;
+
+    graph->vertices_length++;
+
+    if (vertices_to_visit != NULL) {
+        vertices_to_visit->push(vertex);
+    }
+
+    return vertex;
+}
+
+ptd_vertex_t *ptd_vertex_create(ptd_graph_t *graph) {
+    vec_entry_t *state = (vec_entry_t *) calloc(graph->state_length, sizeof(*state));
+
+    if (state == NULL) {
+        return NULL;
+    }
+
+    return ptd_vertex_create_state(graph, state);
+}
+
+void ptd_vertex_destroy(ptd_vertex_t *vertex) {
+    free(vertex->edges);
+    vertex->edges = NULL;
+    free(vertex->state);
+    vertex->state = NULL;
+    free(vertex->rewards);
+    vertex->rewards = NULL;
+
+    if (vertex->graph != NULL) {
+        vertex->graph->vertices_length--;
+    }
+
+    free(vertex);
+}
+
+ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length) {
+    ptd_avl_tree_t *avl_tree = (ptd_avl_tree_t *) malloc(sizeof(ptd_avl_tree_t));
+
+    if (avl_tree == NULL) {
+        return NULL;
+    }
+
+    avl_tree->root = NULL;
+    avl_tree->vec_length = vec_length;
+
+    return avl_tree;
+}
+
+void ptd_avl_tree_destroy(ptd_avl_tree_t *avl_tree) {
+    avl_vec_vertex_destroy((avl_vec_vertex_t *) avl_tree->root);
+    avl_tree->root = NULL;
+    free(avl_tree);
+}
+
+ptd_vertex_t *ptd_avl_tree_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
+    const avl_vec_vertex_t *avl_vertex = avl_vec_find(
+            (avl_vec_vertex_t *) avl_tree->root,
+            key,
+            avl_tree->vec_length
+    );
+
+    if (avl_vertex == NULL) {
+        return NULL;
+    }
+
+    return (ptd_vertex_t *) avl_vertex->entry;
+}
+
+int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex) {
+    int res;
+
+    avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
+    res = avl_vec_insert(&root, vertex->state, (void *) vertex, avl_tree->vec_length);
+
+    if (res != 0) {
+        return res;
+    }
+
+    avl_tree->root = root;
+
+    return 0;
+}
+
+
+int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *)) {
+    vertices_to_visit = new queue<ptd_vertex_t *>;
+    *vertices_to_visit = ptd_enqueue_vertices(graph);
+
+    while (!vertices_to_visit->empty()) {
+        ptd_vertex_t *vertex = vertices_to_visit->front();
+        vertices_to_visit->pop();
+
+        if (vertex == graph->start_vertex || vertex == graph->absorbing_vertex) {
+            continue;
+        }
+
+        int res = visit_func(vertex);
+
+        if (res != 0) {
+            return res;
+        }
+    }
+
+    delete vertices_to_visit;
+    vertices_to_visit = NULL;
+
+    return 0;
+}
+
+int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
+    if (from->edges_length + 1 >= from->edges_limit) {
+        from->edges_limit *= 2;
+        from->edges = (ptd_edge_t *) realloc(
+                from->edges,
+                from->edges_limit * sizeof(ptd_edge_t)
+        );
+
+        if (from->edges == NULL) {
+            return -1;
+        }
+    }
+
+    from->edges[from->edges_length] = (ptd_edge_t) {.to = to, .weight = weight};
+    from->edges_length++;
+
+    return 0;
+}
+
+stack<ptd_vertex_t *> *scc_stack;
+vector<ptd_strongly_connected_component_t *> *scc_components;
+size_t scc_index;
+size_t *scc_indices;
+size_t *low_links;
+bool *scc_on_stack;
+ptd_strongly_connected_components_t *sccs;
+
+int strongconnect(ptd_vertex_t *vertex, bool (*is_included_func)(ptd_vertex_t *)) {
+    scc_indices[vertex->index] = scc_index;
+    low_links[vertex->index] = scc_index;
+    vertex->visited = true;
+    scc_index++;
+    scc_stack->push(vertex);
+    scc_on_stack[vertex->index] = true;
+
+    if (is_included_func(vertex)) {
+        for (size_t i = 0; i < vertex->edges_length; ++i) {
+            ptd_edge_t edge = vertex->edges[i];
+
+            if (!edge.to->visited) {
+                int res = strongconnect(edge.to, is_included_func);
+
+                if (res != 0) {
+                    return res;
+                }
+
+                low_links[vertex->index] = min(
+                        low_links[vertex->index],
+                        low_links[edge.to->index]
+                );
+            } else if (scc_on_stack[edge.to->index]) {
+                low_links[vertex->index] = min(
+                        low_links[vertex->index],
+                        scc_indices[edge.to->index]
+                );
+            }
+        }
+    }
+
+    if (low_links[vertex->index] == scc_indices[vertex->index]) {
+        ptd_vertex_t *w;
+        vector<ptd_vertex_t *> list;
+
+        do {
+            w = scc_stack->top();
+            scc_stack->pop();
+            scc_on_stack[w->index] = false;
+
+            if (is_included_func(w)) {
+                list.push_back(w);
+            }
+        } while (w != vertex);
+
+        ptd_strongly_connected_component_t *scc = (ptd_strongly_connected_component_t *) malloc(sizeof(*scc));
+
+        if (scc == NULL) {
+            return -1;
+        }
+
+        scc->vertices_length = list.size();
+        scc->vertices = (ptd_vertex_t **) calloc(scc->vertices_length, sizeof(ptd_vertex_t *));
+
+        for (size_t i = 0; i < scc->vertices_length; ++i) {
+            scc->vertices[i] = list.at(i);
+        }
+
+        scc_components->push_back(scc);
+    }
+
+    return 0;
+}
+
+static int ptd_label_vertices(ptd_graph_t *graph) {
+    ptd_reset_graph_visited(graph);
+    graph->start_vertex->index = 0;
+    graph->absorbing_vertex->index = 1;
+
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+    size_t index = 2;
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        vertex->index = index;
+        index++;
+    }
+
+    return 0;
+}
+
+ptd_strongly_connected_components_t *
+ptd_find_strongly_connected_components(ptd_graph_t *graph, bool (*is_included_func)(ptd_vertex_t *)) {
+    ptd_strongly_connected_components_t *components =
+            (ptd_strongly_connected_components_t *) malloc(sizeof(ptd_strongly_connected_components_t));
+
+    if (components == NULL) {
+        return NULL;
+    }
+
+    ptd_label_vertices(graph);
+    scc_stack = new stack<ptd_vertex_t *>;
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+    ptd_reset_graph_visited(graph);
+    scc_index = 0;
+    scc_indices = (size_t *) calloc(q.size() + 2, sizeof(size_t));
+    low_links = (size_t *) calloc(q.size() + 2, sizeof(size_t));
+    scc_on_stack = (bool *) calloc(q.size() + 2, sizeof(bool));
+    scc_components = new vector<ptd_strongly_connected_component_t *>();
+
+    fprintf(stderr, "Variable sizes %zu\n", q.size() + 2);
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        if (!vertex->visited) {
+            if (strongconnect(vertex, is_included_func) != 0) {
+                return NULL;
+            }
+        }
+    }
+
+    components->components_length = scc_components->size();
+    components->components = (ptd_strongly_connected_component_t **)
+            calloc(
+                    components->components_length,
+                    sizeof(ptd_strongly_connected_component_t *)
+            );
+
+    for (size_t i = 0; i < scc_components->size(); ++i) {
+        components->components[i] = (scc_components->at(i));
+    }
+
+    delete scc_components;
+    free(scc_on_stack);
+    scc_on_stack = NULL;
+    delete scc_stack;
+    free(low_links);
+    low_links = NULL;
+    free(scc_indices);
+    scc_indices = NULL;
+
+    return components;
+}
+
+void ptd_strongly_connected_components_destroy(ptd_strongly_connected_components_t *sccs) {
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        free(sccs->components[i]->vertices);
+        sccs->components[i]->vertices = NULL;
+
+        free(sccs->components[i]);
+        sccs->components[i] = NULL;
+    }
+
+    free(sccs->components);
+    sccs->components = NULL;
+
+    free(sccs);
+}
+
+ptd_vertex_group_t *ptd_convert_strongly_connected_component_to_group(ptd_strongly_connected_component_t *scc) {
+    DIE_ERROR(1, "Not implemented\n");
+}
+
+int ptd_remove_edge(ptd_vertex_t *from, ptd_vertex_t *to) {
+    DIE_ERROR(1, "Not implemented\n");
+}
+
+ptd_graph_t *
+ptd_convert_strongly_connected_components_to_group(ptd_graph_t *graph, ptd_strongly_connected_components_t *sccs) {
+    ptd_label_vertices(graph);
+    ptd_graph_t *ret = ptd_graph_create(0, 0);
+
+    if (graph == NULL) {
+        return NULL;
+    }
+
+    ptd_vertex_t **vertices_scc;
+    vertices_scc = (ptd_vertex_t **) calloc(graph->vertices_length, sizeof(*vertices_scc));
+
+    if (vertices_scc == NULL) {
+        return NULL;
+    }
+
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        ptd_strongly_connected_component_t *scc = sccs->components[i];
+
+        // Make the scc into a vertex
+        ptd_vertex_t *group = ptd_vertex_create(ret);
+
+        if (group == NULL) {
+            return NULL;
+        }
+
+        for (size_t j = 0; j < scc->vertices_length; ++j) {
+            ptd_vertex_t *vertex = scc->vertices[j];
+
+            vertices_scc[vertex->index] = group;
+        }
+    }
+
+    set<ptd_vertex_t *> edges;
+/*
+    for (size_t j = 0; j < scc->vertices_length; ++j) {
+        ptd_vertex_t *vertex = scc->vertices[j];
+
+        for (size_t k = 0; k < vertex->edges_length; ++k) {
+            edges.insert(vertex->edges[k].to);
+        }
+    }
+
+    for (size_t k = 0; k < edges.size(); ++k) {
+        ptd_add_edge()
+    }
+
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        set<vertex_t *> edges_set;
+
+        edges.push_back(set);
+    }
+*/
+    return NULL;
+}
+
+double (*reward_function)(ptd_vertex_t *);
+
+static bool keep_zero_rewarded(ptd_vertex_t *vertex) {
+    return (reward_function(vertex) == 0);
+}
+
+int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(ptd_vertex_t *)) {
+    reward_function = reward_func;
+
+    // First we find all the vertices that we should add to a vertex when
+    // reward transforming. We do this by finding the strongly connected
+    // components where there is not a
+    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph, keep_zero_rewarded);
+
+    if (sccs == NULL) {
+        return -1;
+    }
+
+    vector<set<vertex_t *> > edges;
+
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        set<vertex_t *> set;
+
+
+        edges.push_back(set);
+    }
+
+    return 0;
 }

@@ -84,7 +84,7 @@ typedef struct vertex {
     vector<double> no_defect;
 
     size_t vertex_index;
-    size_t integer;
+    int integer;
     bool boolean;
     bool reset;
 } vertex_t;
@@ -103,12 +103,19 @@ typedef struct llp {
 } llp_t;
 
 vertex_t *vertex_init(vec_entry_t *state, vector<double> rewards, size_t state_length);
+
 void vertex_destroy(vertex_t *vertex);
+
 void vertex_add_edge(vertex_t *from, vertex_t *to, double weight);
+
 void graph_free(vertex_t *graph);
+
 vertex_t *get_abs_vertex(vertex_t *graph);
 
+queue<vertex_t *> topological_queue(vertex_t *graph);
+
 queue<vertex_t *> enqueue_vertices(vertex_t *graph);
+
 int label_vertex_index(size_t *largest_index, vertex_t *graph);
 
 struct graph_info {
@@ -129,13 +136,21 @@ struct vertex_pdf {
 };
 
 struct graph_info get_graph_info(vertex_t *graph);
+
 cov_exp_return mph_cov_exp_all(vertex_t *graph, size_t m);
+
 int reward_transform(vertex_t *graph, double (*reward_func)(vertex_t *));
+
 double fold(vertex_t *graph, double (*vertex_func)(vertex_t *));
+
 void set_graph_rewards(vertex_t *graph, vector<double> (*set_rewards_func)(vector<double>));
+
 void reduce_graph(vertex_t *graph);
+
 void calculate_prob(vertex_t *graph, size_t *size, double **probs);
+
 void calculate_var(vertex_t *graph, size_t *size, double **vars);
+
 void pdf(vertex_t *graph, double (*reward_func)(vertex_t *), struct vertex_pdf *out_vertex_pdfs);
 
 vertex_t *generate_state_space(
@@ -144,7 +159,132 @@ vertex_t *generate_state_space(
         vector<pair<double, vector<size_t> > >(*initial_states)(void),
         vector<double>(*rewards)(vector<size_t>)
 );
+
 int gen_kingman_graph(vertex_t **graph, size_t n, size_t m);
+
 int gen_kingman_graph_rw(vertex_t **graph, size_t n, size_t rw);
+
+typedef struct ptd_vertex ptd_vertex_t;
+typedef struct ptd_edge ptd_edge_t;
+
+/*
+// TODO: Not actual
+typedef struct expanding_array {
+    vector<char> vector;
+} expanding_array_t;
+
+expanding_array_t *expanding_array_create(size_t entry_size);
+
+expanding_array_t *expanding_array_create_from_array(size_t entry_size);
+
+void expanding_array_destroy(expanding_array_t *expanding_array);
+
+size_t expanding_array_length(const expanding_array_t *expanding_array);
+
+size_t expanding_array_entry_size(const expanding_array_t *expanding_array);
+
+void *expanding_array_entries(const expanding_array_t *expanding_array);
+ */
+
+typedef struct ptd_graph ptd_graph_t;
+typedef struct ptd_vertex ptd_vertex_t;
+
+struct ptd_vertex {
+    ptd_graph_t *graph;
+    size_t edges_length;
+    size_t edges_limit;
+    ptd_edge_t *edges;
+    long double rate;
+
+    size_t index;
+    bool visited;
+    bool reset;
+
+    vec_entry_t *state;
+    long double *rewards;
+};
+
+typedef struct ptd_edge {
+    ptd_vertex_t *to;
+    long double weight;
+} ptd_edge_t;
+
+struct ptd_graph {
+    size_t state_length;
+    size_t rewards_length;
+    ptd_vertex_t *start_vertex;
+    ptd_vertex_t *absorbing_vertex;
+    size_t vertices_length;
+};
+
+ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state);
+
+ptd_graph_t *ptd_graph_create(size_t state_length, size_t reward_length);
+
+void ptd_graph_destroy(ptd_graph_t *graph);
+
+ptd_vertex_t *ptd_vertex_create(ptd_graph_t *graph);
+
+void ptd_vertex_destroy(ptd_vertex_t *vertex);
+
+int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *));
+
+int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight);
+
+int ptd_remove_edge(ptd_vertex_t *from, ptd_vertex_t *to);
+
+int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(ptd_vertex_t *));
+
+
+// TODO: static
+
+typedef struct strongly_connected_component {
+    size_t vertices_length;
+    ptd_vertex_t **vertices;
+} ptd_strongly_connected_component_t;
+
+typedef struct strongly_connected_components {
+    size_t components_length;
+    ptd_strongly_connected_component_t **components;
+} ptd_strongly_connected_components_t;
+
+ptd_strongly_connected_components_t *
+ptd_find_strongly_connected_components(ptd_graph_t *graph, bool (*is_included_func)(ptd_vertex_t *));
+
+void ptd_strongly_connected_components_destroy(ptd_strongly_connected_components_t *sccs);
+
+typedef struct ptd_vertex_group ptd_vertex_group_t;
+
+struct ptd_vertex_group {
+    ptd_graph_t *graph;
+    size_t edges_length;
+    size_t edges_limit;
+    ptd_edge_t *edges;
+    long double rate;
+
+    size_t index;
+    bool visited;
+    bool reset;
+
+    vec_entry_t *state;
+    long double *rewards;
+};
+
+ptd_graph_t *
+ptd_convert_strongly_connected_components_to_group(ptd_graph_t *graph, ptd_strongly_connected_components_t *sccs);
+
+typedef struct ptd_avl_tree {
+    void *root;
+    size_t vec_length;
+} ptd_avl_tree_t;
+
+ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length);
+
+void ptd_avl_tree_destroy(ptd_avl_tree_t *avl_tree);
+
+ptd_vertex_t *ptd_avl_tree_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
+
+int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex);
+
 
 #endif //PTDALGORITHMS_PHASE_H

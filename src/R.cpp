@@ -4,6 +4,35 @@
 
 using namespace Rcpp;
 
+
+class PTDGraph {
+public:
+  PTDGraph(ptd_graph_t *graph) {
+    this->graph = graph;
+  }
+  
+  ~PTDGraph() {
+    fprintf(stderr, "Destroying graph\n");
+    ptd_graph_destroy(this->graph);
+  }
+  
+  ptd_graph_t *graph;
+};
+
+class PTDVertex {
+public:
+  PTDVertex(ptd_vertex_t *vertex) {
+    this->vertex = vertex;
+  }
+  
+  ~PTDVertex() {
+    fprintf(stderr, "Destroying vertex\n");
+    ptd_vertex_destroy(this->vertex);
+  }
+  
+  ptd_vertex_t *vertex;
+};
+
 class PhaseTypeGraph {
 public:
     PhaseTypeGraph(vertex_t *start, size_t rewards_length) {
@@ -28,10 +57,9 @@ public:
   vertex_t *vertex;
 };
 
-// [[Rcpp::export]]
-NumericVector rewards(SEXP phase_type_vertex) {
-  if (Rf_isList(phase_type_vertex) || Rf_isNewList(phase_type_vertex)) {
-    List list = Rcpp::as<List>(phase_type_vertex);
+SEXP get_first_list_entry(SEXP e, std::string message) {
+  if (Rf_isList(e) || Rf_isNewList(e)) {
+    List list = Rcpp::as<List>(e);
     
     if (list.size() != 1) {
       char message[1024];
@@ -39,7 +67,8 @@ NumericVector rewards(SEXP phase_type_vertex) {
       snprintf(
         message,
         1024, 
-        "Failed: When finding rewards of a list-type of vertices, list can only contain 1 vertex, it contained %zu. Did you use [] as lookup instead of [[]]?",
+        "Failed: When finding %s of a list-type of vertices, list can only contain 1 vertex, it contained %zu. Did you use [] as lookup instead of [[]]?",
+        message,
         (size_t)list.size()
       );
       
@@ -48,45 +77,55 @@ NumericVector rewards(SEXP phase_type_vertex) {
       );
     }
     
-    phase_type_vertex = list[0];
+    e = list[0];
   }
   
-  Rcpp::XPtr<PhaseTypeVertex> vertex(phase_type_vertex);
+  return e;
+}
+
+// [[Rcpp::export]]
+IntegerVector state(SEXP phase_type_vertex) {
+  phase_type_vertex = get_first_list_entry(phase_type_vertex, "state");
+  Rcpp::XPtr<PTDVertex> vertex(phase_type_vertex);
+  size_t *state = vertex->vertex->state;
+  size_t len = vertex->vertex->graph->state_length;
+  IntegerVector res(len);
   
-  return wrap(vertex->vertex->rewards);
+  for (size_t i = 0; i < len; i++) {
+    res(i) = state[i];
+  }
+  
+  return res;
+}
+
+
+// [[Rcpp::export]]
+NumericVector rewards(SEXP phase_type_vertex) {
+  phase_type_vertex = get_first_list_entry(phase_type_vertex, "rewards");
+  Rcpp::XPtr<PTDVertex> vertex(phase_type_vertex);
+  long double *rewards = vertex->vertex->rewards;
+  size_t len = vertex->vertex->graph->rewards_length;
+  NumericVector res(len);
+  
+  for (size_t i = 0; i < len; i++) {
+    res(i) = rewards[i];
+  }
+  
+  return res;
 }
 
 
 // [[Rcpp::export]]
 List edges(SEXP phase_type_vertex) {
-  if (Rf_isList(phase_type_vertex) || Rf_isNewList(phase_type_vertex)) {
-    List list = Rcpp::as<List>(phase_type_vertex);
-    
-    if (list.size() != 1) {
-      char message[1024];
-      
-      snprintf(
-        message,
-        1024, 
-        "Failed: When finding edges of a list-type of vertices, list can only contain 1 vertex, it contained %zu. Did you use [] as lookup instead of [[]]?",
-        (size_t)list.size()
-      );
-      
-      throw std::runtime_error(
-          message
-      );
-    }
-    
-    phase_type_vertex = list[0];
-  }
+  phase_type_vertex = get_first_list_entry(phase_type_vertex, "edges");
   
-  Rcpp::XPtr<PhaseTypeVertex> vertex(phase_type_vertex);
-  List edges(vertex->vertex->nedges);
+  Rcpp::XPtr<PTDVertex> vertex(phase_type_vertex);
+  List edges(vertex->vertex->edges_length);
   
-  for (size_t i = 0; i < vertex->vertex->nedges; i++) {
-    SEXP child = Rcpp::XPtr<PhaseTypeVertex>(
-      new PhaseTypeVertex(
-          vertex->vertex->edges[i].child
+  for (size_t i = 0; i < vertex->vertex->edges_length; i++) {
+    SEXP child = Rcpp::XPtr<PTDVertex>(
+      new PTDVertex(
+          vertex->vertex->edges[i].to
       )
     );
     
@@ -99,23 +138,57 @@ List edges(SEXP phase_type_vertex) {
 }
 
 // [[Rcpp::export]]
-SEXP start_vertex(SEXP phase_type_graph) {
-  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+SEXP create_graph(size_t state_length, size_t reward_length) {
+  return Rcpp::XPtr<PTDGraph>(
+    new PTDGraph(
+        ptd_graph_create(
+          state_length, reward_length
+        )
+    )
+  );
+}
+
+// [[Rcpp::export]]
+SEXP create_vertex(SEXP phase_type_graph, IntegerVector state, NumericVector rewards) {
+  Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
+  ptd_vertex_t *vertex = ptd_vertex_create(graph->graph);
   
-  return Rcpp::XPtr<PhaseTypeVertex>(
-    new PhaseTypeVertex(
-        graph->start
+  for (size_t i = 0; i < vertex->graph->state_length; i++) {
+    vertex->state[i] = state[i];
+  }
+  
+  for (size_t i = 0; i < vertex->graph->rewards_length; i++) {
+    vertex->rewards[i] = rewards[i];
+  }
+  
+  //std::copy(state.begin(), state.end(), vertex->state);
+  //std::copy(rewards.begin(), rewards.end(), vertex->rewards);
+  
+  return Rcpp::XPtr<PTDVertex>(
+    new PTDVertex(
+        vertex
+    )
+  );
+}
+
+// [[Rcpp::export]]
+SEXP start_vertex(SEXP phase_type_graph) {
+  Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
+  
+  return Rcpp::XPtr<PTDVertex>(
+    new PTDVertex(
+        graph->graph->start_vertex
     )
   );
 }
 
 // [[Rcpp::export]]
 SEXP absorbing_vertex(SEXP phase_type_graph) {
-  Rcpp::XPtr<PhaseTypeGraph> graph(phase_type_graph);
+  Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
   
-  return Rcpp::XPtr<PhaseTypeVertex>(
-    new PhaseTypeVertex(
-        get_abs_vertex(graph->start)
+  return Rcpp::XPtr<PTDVertex>(
+    new PTDVertex(
+        graph->graph->absorbing_vertex
     )
   );
 }
@@ -183,8 +256,11 @@ void visit_vertices(SEXP phase_type_graph, Rcpp::Function visit_function) {
 
 // [[Rcpp::export]]
 void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double weight) {
-  Rcpp::XPtr<PhaseTypeVertex> from(phase_type_vertex_from);
-  Rcpp::XPtr<PhaseTypeVertex> to(phase_type_vertex_to);
+  phase_type_vertex_from = get_first_list_entry(phase_type_vertex_from, "edge from");
+  phase_type_vertex_to = get_first_list_entry(phase_type_vertex_to, "edge to");
+  
+  Rcpp::XPtr<PTDVertex> from(phase_type_vertex_from);
+  Rcpp::XPtr<PTDVertex> to(phase_type_vertex_to);
   
   if (from->vertex == to->vertex) {
     throw new std::runtime_error(
@@ -192,7 +268,7 @@ void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double wei
     );
   }
   
-  vertex_add_edge(from->vertex, to->vertex, weight);
+  ptd_add_edge(from->vertex, to->vertex, weight);
 }
 
 // [[Rcpp::export]]
