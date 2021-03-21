@@ -385,7 +385,7 @@ avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child
 avl_vec_vertex_t *avl_vec_vertex_create(char *key, void *entry, avl_vec_vertex_t *parent) {
     avl_vec_vertex_t *vertex;
 
-    if ((vertex = (avl_vec_vertex_t *) malloc(sizeof(avl_vec_vertex_t))) == NULL) {
+    if ((vertex = (avl_vec_vertex_t *) malloc(sizeof(*vertex))) == NULL) {
         return NULL;
     }
 
@@ -2316,13 +2316,33 @@ ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length) {
     return avl_tree;
 }
 
-void _ptd_avl_tree_destroy(avl_vec_vertex_t *avl_vertex) {
+void _ptd_avl_tree_vertex_destroy(avl_vec_vertex_t *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
 
-    _ptd_avl_tree_destroy(avl_vertex->left);
-    _ptd_avl_tree_destroy(avl_vertex->right);
+    _ptd_avl_tree_vertex_destroy(avl_vertex->left);
+    _ptd_avl_tree_vertex_destroy(avl_vertex->right);
+
+    avl_vertex->left = NULL;
+    avl_vertex->right = NULL;
+    avl_vertex->entry = NULL;
+    free(avl_vertex);
+}
+
+void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree) {
+    _ptd_avl_tree_vertex_destroy((avl_vec_vertex_t *) avl_tree->root);
+    avl_tree->root = NULL;
+    free(avl_tree);
+}
+
+void _ptd_avl_tree_edge_destroy(avl_vec_vertex_t *avl_vertex) {
+    if (avl_vertex == NULL) {
+        return;
+    }
+
+    _ptd_avl_tree_edge_destroy(avl_vertex->left);
+    _ptd_avl_tree_edge_destroy(avl_vertex->right);
 
     avl_vertex->left = NULL;
     avl_vertex->right = NULL;
@@ -2331,8 +2351,8 @@ void _ptd_avl_tree_destroy(avl_vec_vertex_t *avl_vertex) {
     free(avl_vertex);
 }
 
-void ptd_avl_tree_destroy(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_destroy((avl_vec_vertex_t *) avl_tree->root);
+void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree) {
+    _ptd_avl_tree_edge_destroy((avl_vec_vertex_t *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
 }
@@ -2348,21 +2368,8 @@ size_t ptd_avl_tree_max_depth(void *avl_vec_vertex) {
     );
 }
 
-ptd_vertex_t *ptd_avl_tree_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
-    const avl_vec_vertex_t *avl_vertex = avl_vec_find(
-            (avl_vec_vertex_t *) avl_tree->root,
-            (char *) key,
-            avl_tree->vec_length * sizeof(vec_entry_t)
-    );
 
-    if (avl_vertex == NULL) {
-        return NULL;
-    }
-
-    return (ptd_vertex_t *) avl_vertex->entry;
-}
-
-int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex) {
+int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex) {
     int res;
 
     avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
@@ -2377,14 +2384,28 @@ int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex) {
     return 0;
 }
 
-int ptd_avl_tree_insert_or_increment(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex, long double weight) {
+ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
+    const avl_vec_vertex_t *avl_vertex = avl_vec_find(
+            (avl_vec_vertex_t *) avl_tree->root,
+            (char *) key,
+            avl_tree->vec_length * sizeof(vec_entry_t)
+    );
+
+    if (avl_vertex == NULL) {
+        return NULL;
+    }
+
+    return (ptd_vertex_t *) avl_vertex->entry;
+}
+
+int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex, long double weight) {
     avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
     avl_vec_vertex_t *child;
 
     if (root == NULL) {
         ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
         edge->weight = weight;
-        edge->to = (ptd_vertex_t *) vertex;
+        edge->to = vertex;
 
         if ((root = avl_vec_vertex_create((char *) vertex->state, (void *) edge, NULL)) == NULL) {
             return -1;
@@ -2404,7 +2425,7 @@ int ptd_avl_tree_insert_or_increment(ptd_avl_tree_t *avl_tree, const ptd_vertex_
             if (parent->left == NULL) {
                 ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
                 edge->weight = weight;
-                edge->to = (ptd_vertex_t *) vertex;
+                edge->to = vertex;
 
                 child = avl_vec_vertex_create((char *) vertex->state, edge, parent);
 
@@ -2422,7 +2443,7 @@ int ptd_avl_tree_insert_or_increment(ptd_avl_tree_t *avl_tree, const ptd_vertex_
             if (parent->right == NULL) {
                 ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
                 edge->weight = weight;
-                edge->to = (ptd_vertex_t *) vertex;
+                edge->to = vertex;
 
                 child = avl_vec_vertex_create((char *) vertex->state, edge, parent);
 
@@ -2444,11 +2465,30 @@ int ptd_avl_tree_insert_or_increment(ptd_avl_tree_t *avl_tree, const ptd_vertex_
     }
 
     avl_rebalance_tree(&root, child);
+    avl_tree->root = root;
 
     return 0;
-
 }
 
+ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
+    avl_vec_vertex_t *parent = (avl_vec_vertex_t *) avl_tree->root;
+
+    while (true) {
+        if (parent == NULL) {
+            return NULL;
+        }
+
+        int res = memcmp(parent->key, (char*)key, avl_tree->vec_length * sizeof(vec_entry_t));
+
+        if (res < 0) {
+            parent = parent->left;
+        } else if (res > 0) {
+            parent = parent->right;
+        } else {
+            return (ptd_edge_t *) parent->entry;
+        }
+    }
+}
 
 int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *)) {
     vertices_to_visit = new queue<ptd_vertex_t *>;

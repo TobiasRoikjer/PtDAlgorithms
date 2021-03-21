@@ -280,13 +280,16 @@ typedef struct ptd_avl_tree {
 
 ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length);
 
-void ptd_avl_tree_destroy(ptd_avl_tree_t *avl_tree);
+void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree);
+void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree);
 
-ptd_vertex_t *ptd_avl_tree_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
+int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex);
 
-int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex);
+ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
 
-int ptd_avl_tree_insert_or_increment(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex, long double weight);
+ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
+
+int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex, long double weight);
 
 //TODO: remove?
 size_t ptd_avl_tree_max_depth(void *avl_vec_vertex);
