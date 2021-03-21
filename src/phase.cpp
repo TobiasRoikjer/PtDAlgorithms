@@ -219,14 +219,9 @@ typedef struct avl_vec_vertex {
     struct avl_vec_vertex *right;
     struct avl_vec_vertex *parent;
     signed short balance;
-    vec_entry_t *key;
+    char *key;
     void *entry;
 } avl_vec_vertex_t;
-
-static inline int radix_cmp(const vec_entry_t *a, const vec_entry_t *b,
-                            const size_t vec_length) {
-    return (memcmp(a, b, sizeof(vec_entry_t) * vec_length));
-}
 
 /* Example:
 *     A            A            A
@@ -387,19 +382,21 @@ avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child
     return child;
 }
 
-int avl_vec_vertex_create(avl_vec_vertex_t **vertex, vec_entry_t *key, void *entry, avl_vec_vertex_t *parent) {
-    if ((*vertex = (avl_vec_vertex_t *) malloc(sizeof(avl_vec_vertex_t))) == NULL) {
-        return 1;
+avl_vec_vertex_t *avl_vec_vertex_create(char *key, void *entry, avl_vec_vertex_t *parent) {
+    avl_vec_vertex_t *vertex;
+
+    if ((vertex = (avl_vec_vertex_t *) malloc(sizeof(avl_vec_vertex_t))) == NULL) {
+        return NULL;
     }
 
-    (*vertex)->key = key;
-    (*vertex)->entry = entry;
-    (*vertex)->left = NULL;
-    (*vertex)->right = NULL;
-    (*vertex)->parent = parent;
-    (*vertex)->balance = 0;
+    vertex->key = key;
+    vertex->entry = entry;
+    vertex->left = NULL;
+    vertex->right = NULL;
+    vertex->parent = parent;
+    vertex->balance = 0;
 
-    return 0;
+    return vertex;
 }
 
 void avl_vec_vertex_destroy(avl_vec_vertex_t *vertex) {
@@ -424,7 +421,7 @@ static void avl_free(avl_vec_vertex_t *vertex) {
 }
 
 const avl_vec_vertex_t *
-avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size_t vec_length) {
+avl_vec_find(const avl_vec_vertex_t *rootptr, const char *key, const size_t vec_length) {
     if (rootptr == NULL) {
         return NULL;
     }
@@ -432,7 +429,8 @@ avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size
     const avl_vec_vertex_t *vertex = rootptr;
 
     while (true) {
-        int res = radix_cmp(key, vertex->key, vec_length);
+        int res = memcmp(key, vertex->key, vec_length);
+
         if (res < 0) {
             if (vertex->left == NULL) {
                 return NULL;
@@ -451,9 +449,9 @@ avl_vec_find(const avl_vec_vertex_t *rootptr, const vec_entry_t *key, const size
     }
 }
 
-int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_entry_t *key, void *entry,
+int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, char *key, void *entry,
                        const size_t vec_length) {
-    if (avl_vec_vertex_create(out, key, entry, NULL)) {
+    if ((*out = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
         return -1;
     }
 
@@ -464,7 +462,8 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_en
     avl_vec_vertex_t *vertex = rootptr;
 
     while (true) {
-        int res = radix_cmp(key, vertex->key, vec_length);
+        int res = memcmp(key, vertex->key, vec_length);
+
         if (res < 0) {
             if (vertex->left == NULL) {
                 vertex->left = *out;
@@ -481,6 +480,7 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_en
             }
         } else {
             *out = vertex;
+            return 0;
         }
     }
 
@@ -489,27 +489,7 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, vec_en
     return 0;
 }
 
-int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, void *entry, const size_t vec_length) {
-    avl_vec_vertex_t *child;
-
-    if (*root == NULL) {
-        if (avl_vec_vertex_create(root, key, entry, NULL)) {
-            return 1;
-        }
-
-        return 0;
-    }
-
-    int res = find_or_insert_vec(&child, *root, key, entry, vec_length);
-
-    if (res == -1) {
-        return 1;
-    }
-
-    if (res == 0) {
-        return 0;
-    }
-
+int avl_rebalance_tree(avl_vec_vertex_t **root, avl_vec_vertex_t *child) {
     avl_vec_vertex_t *pivot, *rotated_parent;
 
     for (avl_vec_vertex_t *parent = child->parent; parent != NULL; parent = child->parent) {
@@ -573,6 +553,33 @@ int avl_vec_insert(avl_vec_vertex_t **root, vec_entry_t *key, void *entry, const
 
     return 0;
 }
+
+int avl_vec_insert(avl_vec_vertex_t **root, char *key, void *entry, const size_t vec_length) {
+    avl_vec_vertex_t *child;
+
+    if (*root == NULL) {
+        if ((*root = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
+            return -1;
+        }
+
+        return 0;
+    }
+
+    int res = find_or_insert_vec(&child, *root, key, entry, vec_length);
+
+    if (res == -1) {
+        return -1;
+    }
+
+    if (res == 0) {
+        return 0;
+    }
+
+    avl_rebalance_tree(root, child);
+
+    return 0;
+}
+
 
 static size_t avl_vec_get_size(avl_vec_vertex_t *vertex) {
     if (vertex == NULL) {
@@ -699,7 +706,8 @@ vertex_t *generate_state_space(
         }
 
         vertex_t *child;
-        avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, &state[0], state_length);
+        avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, (char *) &state[0],
+                                                                        state_length * sizeof(vec_entry_t));
 
         if (bst_entry != NULL) {
             fprintf(stderr, "Two edges with the same state have already been added to the initial state\n");
@@ -726,7 +734,7 @@ vertex_t *generate_state_space(
 
             child->vertex_index = index++;
 
-            avl_vec_insert(&bst, vec_entry, child, state_length);
+            avl_vec_insert(&bst, (char *) vec_entry, child, state_length * sizeof(vec_entry_t));
 
             pair<vertex_t *, vector<pair<double, vector<size_t> > > > pair(child, child_children);
             vertices_to_visit.push(pair);
@@ -779,7 +787,8 @@ vertex_t *generate_state_space(
             }
 
             vertex_t *child;
-            avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, &child_state[0], state_length);
+            avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, (char *) &child_state[0],
+                                                                            state_length * sizeof(vec_entry_t));
 
             if (bst_entry == NULL) {
                 vector<pair<double, vector<size_t> > > children = visit_function(child_state);
@@ -800,7 +809,7 @@ vertex_t *generate_state_space(
                             state_length
                     );
 
-                    avl_vec_insert(&bst, vec_entry, child, state_length);
+                    avl_vec_insert(&bst, (char *) vec_entry, child, state_length * sizeof(vec_entry_t));
 
                     pair<vertex_t *, vector<pair<double, vector<size_t> > > > pair(child, children);
                     vertices_to_visit.push(pair);
@@ -881,345 +890,11 @@ vertex_t *generate_state_space(
     return NULL;
 }
 
-static int kingman_visit_vertex(vertex_t **out_initial_vertex,
-                                vec_entry_t *initial_state,
-                                vertex_t *abs_vertex,
-                                const size_t m) {
-    avl_vec_vertex_t *bst = NULL;
-
-    queue<vertex_t *> vertices_to_visit;
-    vertex_t *initial_vertex = vertex_init(initial_state,
-                                           vector<double>(initial_state, initial_state + m),
-                                           m);
-    vertices_to_visit.push(initial_vertex);
-    vec_entry_t *v = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
-    avl_vec_vertex_t *bst_vertex;
-
-    size_t end = 0;
-
-    initial_vertex->vertex_index = 2;
-    size_t index = 3;
-
-    while (!vertices_to_visit.empty()) {
-        vertex_t *vertex = vertices_to_visit.front();
-        vertices_to_visit.pop();
-        memcpy(v, vertex->state, sizeof(vec_entry_t) * m);
-        size_t n_remaining = 0;
-        size_t start = -1;
-
-        vector<edge> edges;
-
-        for (vec_entry_t i = 0; i < m; i++) {
-            n_remaining += v[i];
-
-            if (v[i] > 0) {
-                end = i;
-
-                if (start == (size_t) -1) {
-                    start = i;
-                }
-            }
-        }
-
-        for (vec_entry_t i = start; i <= end; i++) {
-            if (v[i] == 0) {
-                continue;
-            }
-
-            for (vec_entry_t j = i; j <= end; j++) {
-                if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
-                    double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
-
-                    const size_t inc_pos = min((i + j + 2) - 1, m - 1);
-                    v[i]--;
-                    v[j]--;
-                    v[inc_pos]++;
-
-                    vertex_t *new_vertex;
-                    const bool only_tail = (v[m - 1] == n_remaining - 1);
-
-                    if (only_tail) {
-                        new_vertex = abs_vertex;
-                    } else {
-                        bst_vertex = (avl_vec_vertex_t *) avl_vec_find(bst, v, m);
-
-                        if (bst_vertex == NULL) {
-                            vec_entry_t *new_state = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
-                            memcpy(new_state, v, sizeof(vec_entry_t) * m);
-                            vertex_t *to = vertex_init(
-                                    new_state,
-                                    vector<double>(new_state, new_state + m),
-                                    m
-                            );
-
-                            to->vertex_index = index++;
-
-                            avl_vec_insert(&bst, new_state, to, m);
-                            vertices_to_visit.push(to);
-                            new_vertex = to;
-                        } else {
-                            new_vertex = (vertex_t *) bst_vertex->entry;
-                        }
-                    }
-
-                    v[i]++;
-                    v[j]++;
-                    v[inc_pos]--;
-
-                    struct edge edge;
-                    edge.weight = t;
-                    edge.vertex = new_vertex;
-
-                    edges.push_back(edge);
-                }
-            }
-        }
-
-        if (edges.size() != 0) {
-            vertex->edges = (llc_t *) calloc(edges.size(), sizeof(llc_t));
-            struct edge *e = &edges[0];
-            qsort(e, edges.size(), sizeof(struct edge), edgecmp);
-
-            for (size_t i = 0; i < edges.size(); ++i) {
-                add_edge(vertex, e[i].vertex, i, e[i].weight);
-            }
-
-            for (size_t i = 0; i < edges.size(); ++i) {
-                vertex->edges[i].llp->llc = &(vertex->edges[i]);
-            }
-        }
-    }
-
-    free(v);
-    *out_initial_vertex = initial_vertex;
-    avl_free(bst);
-    return 0;
-}
-
-int gen_kingman_graph(vertex_t **graph, size_t n, size_t m) {
-    if (m < n) {
-        m += 1;
-    }
-
-    vec_entry_t *initial = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
-    initial[0] = n;
-
-    vec_entry_t *mrca = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
-    mrca[m - 1] = 1;
-
-    vertex_t *absorbing_vertex = vertex_init(
-            mrca,
-            vector<double>(mrca, mrca + m),
-            m
-    );
-
-    absorbing_vertex->vertex_index = 0;
-
-    vertex_t *state_graph;
-
-    kingman_visit_vertex(
-            &state_graph,
-            initial, absorbing_vertex,
-            m
-    );
-
-    vec_entry_t *start_state = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
-
-    vertex_t *start = vertex_init(start_state, vector<double>(start_state, start_state + m), m);
-
-    start->edges = (llc_t *) calloc(1, sizeof(llc_t));
-    add_edge(start, state_graph, 0, 1);
-
-    start->vertex_index = 1;
-
-    // TODO: remove this. Replace entire function with generic one
-    get_abs_vertex(start)->vertex_index = 0;
-
-    *graph = start;
-
-    return 0;
-}
 
 size_t reward_state = 0;
 
 static double reward_by_state(vertex_t *vertex) {
     return vertex->rewards[reward_state];
-}
-
-static int kingman_visit_vertex_rw(vertex_t **out_initial_vertex,
-                                   vec_entry_t *initial_state,
-                                   vertex_t *abs_vertex,
-                                   const size_t rw) {
-    reward_state = rw;
-    size_t m = rw + 2;
-    avl_vec_vertex_t *bst = NULL;
-
-    queue<vertex_t *> vertices_to_visit;
-
-    vertex_t *initial_vertex = vertex_init(initial_state,
-                                           vector<double>(initial_state, initial_state + m),
-                                           m);
-    vertices_to_visit.push(initial_vertex);
-    vec_entry_t *v = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
-    avl_vec_vertex_t *bst_vertex;
-
-    size_t end = 0;
-    size_t previous_layer = 0;
-    vector<vertex_t *> unrewarded_vertices;
-    vector<vertex_t *> current_layer_vertices;
-
-    while (!vertices_to_visit.empty()) {
-        vertex_t *vertex = vertices_to_visit.front();
-        vertices_to_visit.pop();
-
-
-        memcpy(v, vertex->state, sizeof(vec_entry_t) * m);
-        size_t n_remaining = 0;
-        size_t start = -1;
-
-        vector<edge> edges;
-
-        for (vec_entry_t i = 0; i < m; i++) {
-            n_remaining += v[i];
-
-            if (v[i] > 0) {
-                end = i;
-
-                if (start == (size_t) -1) {
-                    start = i;
-                }
-            }
-        }
-
-        if (n_remaining != previous_layer) {
-            previous_layer = n_remaining;
-
-            for (vector<vertex_t *>::iterator it =
-                    unrewarded_vertices.begin(); it != unrewarded_vertices.end(); ++it) {
-                reward_transform_vertex(*it, &reward_by_state);
-            }
-
-            unrewarded_vertices = current_layer_vertices;
-            current_layer_vertices.clear();
-        }
-
-        current_layer_vertices.push_back(vertex);
-
-        for (vec_entry_t i = start; i <= end; i++) {
-            if (v[i] == 0) {
-                continue;
-            }
-
-            for (vec_entry_t j = i; j <= end; j++) {
-                if (((i == j && v[i] >= 2) || (i != j && v[i] > 0 && v[j] > 0))) {
-                    double t = i == j ? v[i] * (v[i] - 1) / 2 : v[i] * v[j];
-
-                    const size_t inc_pos = min((i + j + 2) - 1, m - 1);
-                    v[i]--;
-                    v[j]--;
-                    v[inc_pos]++;
-
-                    vertex_t *new_vertex;
-                    const bool only_tail = (v[m - 1] == n_remaining - 1);
-
-                    if (only_tail) {
-                        new_vertex = abs_vertex;
-                    } else {
-                        bst_vertex = (avl_vec_vertex_t *) avl_vec_find(bst, v, m);
-
-                        if (bst_vertex == NULL) {
-                            vec_entry_t *new_state = (vec_entry_t *) malloc(sizeof(vec_entry_t) * m);
-                            memcpy(new_state, v, sizeof(vec_entry_t) * m);
-                            vertex_t *to = vertex_init(new_state,
-                                                       vector<double>(new_state, new_state + m),
-                                                       m);
-
-                            avl_vec_insert(&bst, new_state, to, m);
-                            vertices_to_visit.push(to);
-                            new_vertex = to;
-                        } else {
-                            new_vertex = (vertex_t *) bst_vertex->entry;
-                        }
-                    }
-
-                    v[i]++;
-                    v[j]++;
-                    v[inc_pos]--;
-
-                    struct edge edge;
-                    edge.weight = t;
-                    edge.vertex = new_vertex;
-
-                    edges.push_back(edge);
-                }
-            }
-        }
-
-        if (edges.size() != 0) {
-            vertex->edges = (llc_t *) calloc(edges.size(), sizeof(llc_t));
-            struct edge *e = &edges[0];
-            qsort(e, edges.size(), sizeof(struct edge), edgecmp);
-
-            for (size_t i = 0; i < edges.size(); ++i) {
-                add_edge(vertex, e[i].vertex, i, e[i].weight);
-            }
-
-            for (size_t i = 0; i < edges.size(); ++i) {
-                vertex->edges[i].llp->llc = &(vertex->edges[i]);
-            }
-        }
-    }
-
-    for (vector<vertex_t *>::iterator it =
-            unrewarded_vertices.begin(); it != unrewarded_vertices.end(); ++it) {
-        reward_transform_vertex(*it, &reward_by_state);
-    }
-
-    for (vector<vertex_t *>::iterator it =
-            current_layer_vertices.begin(); it != current_layer_vertices.end(); ++it) {
-        reward_transform_vertex(*it, &reward_by_state);
-    }
-
-    unrewarded_vertices.clear();
-    current_layer_vertices.clear();
-
-    free(v);
-    *out_initial_vertex = initial_vertex;
-    avl_free(bst);
-    return 0;
-}
-
-int gen_kingman_graph_rw(vertex_t **graph, size_t n, size_t rw) {
-    size_t m = rw + 2;
-
-    vec_entry_t *initial = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
-    initial[0] = n;
-
-    vec_entry_t *mrca = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
-    mrca[m - 1] = 1;
-
-    vertex_t *absorbing_vertex = vertex_init(mrca,
-                                             vector<double>(mrca, mrca + m),
-                                             m);
-
-    vertex_t *state_graph;
-
-    kingman_visit_vertex_rw(&state_graph,
-                            initial, absorbing_vertex,
-                            rw);
-
-    vec_entry_t *start_state = (vec_entry_t *) calloc(m, sizeof(vec_entry_t));
-
-    vertex_t *start = vertex_init(start_state, vector<double>(start_state, start_state + m), m);
-
-    start->edges = (llc_t *) calloc(1, sizeof(llc_t));
-    add_edge(start, state_graph, 0, 1);
-
-    reward_transform_vertex(state_graph, &reward_by_state);
-
-    *graph = start;
-
-    return 0;
 }
 
 static void _print_graph_list(FILE *stream, vertex_t *vertex,
@@ -2566,14 +2241,14 @@ queue<ptd_vertex_t *> *vertices_to_visit;
 ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state) {
     ptd_vertex_t *vertex;
 
-    vertex = (ptd_vertex_t *) malloc(sizeof(ptd_vertex_t));
+    vertex = (ptd_vertex_t *) malloc(sizeof(*vertex));
 
     if (vertex == NULL) {
         return NULL;
     }
 
     vertex->edges_limit = 8;
-    vertex->edges = (ptd_edge_t *) calloc(8, sizeof(ptd_edge_t));
+    vertex->edges = (ptd_edge_t *) calloc(8, sizeof(*vertex->edges));
 
     if (vertex->edges == NULL) {
         return NULL;
@@ -2583,7 +2258,7 @@ ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state) {
 
     vertex->state = state;
 
-    vertex->rewards = (long double *) calloc(graph->rewards_length, sizeof(size_t));;
+    vertex->rewards = (long double *) calloc(graph->rewards_length, sizeof(*vertex->rewards));
 
     if (vertex->rewards == NULL) {
         return NULL;
@@ -2641,17 +2316,43 @@ ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length) {
     return avl_tree;
 }
 
+void _ptd_avl_tree_destroy(avl_vec_vertex_t *avl_vertex) {
+    if (avl_vertex == NULL) {
+        return;
+    }
+
+    _ptd_avl_tree_destroy(avl_vertex->left);
+    _ptd_avl_tree_destroy(avl_vertex->right);
+
+    avl_vertex->left = NULL;
+    avl_vertex->right = NULL;
+    free(avl_vertex->entry);
+    avl_vertex->entry = NULL;
+    free(avl_vertex);
+}
+
 void ptd_avl_tree_destroy(ptd_avl_tree_t *avl_tree) {
-    avl_vec_vertex_destroy((avl_vec_vertex_t *) avl_tree->root);
+    _ptd_avl_tree_destroy((avl_vec_vertex_t *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
+}
+
+size_t ptd_avl_tree_max_depth(void *avl_vec_vertex) {
+    if ((avl_vec_vertex_t *) avl_vec_vertex == NULL) {
+        return 0;
+    }
+
+    return max(
+            ptd_avl_tree_max_depth((void *) ((avl_vec_vertex_t *) avl_vec_vertex)->left) + 1,
+            ptd_avl_tree_max_depth((void *) ((avl_vec_vertex_t *) avl_vec_vertex)->left) + 1
+    );
 }
 
 ptd_vertex_t *ptd_avl_tree_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
     const avl_vec_vertex_t *avl_vertex = avl_vec_find(
             (avl_vec_vertex_t *) avl_tree->root,
-            key,
-            avl_tree->vec_length
+            (char *) key,
+            avl_tree->vec_length * sizeof(vec_entry_t)
     );
 
     if (avl_vertex == NULL) {
@@ -2665,7 +2366,7 @@ int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex) {
     int res;
 
     avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
-    res = avl_vec_insert(&root, vertex->state, (void *) vertex, avl_tree->vec_length);
+    res = avl_vec_insert(&root, (char *) vertex->state, (void *) vertex, avl_tree->vec_length * sizeof(vec_entry_t));
 
     if (res != 0) {
         return res;
@@ -2674,6 +2375,78 @@ int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex) {
     avl_tree->root = root;
 
     return 0;
+}
+
+int ptd_avl_tree_insert_or_increment(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex, long double weight) {
+    avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
+    avl_vec_vertex_t *child;
+
+    if (root == NULL) {
+        ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
+        edge->weight = weight;
+        edge->to = (ptd_vertex_t *) vertex;
+
+        if ((root = avl_vec_vertex_create((char *) vertex->state, (void *) edge, NULL)) == NULL) {
+            return -1;
+        }
+
+        avl_tree->root = root;
+
+        return 0;
+    }
+
+    avl_vec_vertex_t *parent = root;
+
+    while (true) {
+        int res = memcmp(parent->key, vertex->state, vertex->graph->state_length * sizeof(vec_entry_t));
+
+        if (res < 0) {
+            if (parent->left == NULL) {
+                ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
+                edge->weight = weight;
+                edge->to = (ptd_vertex_t *) vertex;
+
+                child = avl_vec_vertex_create((char *) vertex->state, edge, parent);
+
+                if (child == NULL) {
+                    return -1;
+                }
+
+                parent->left = child;
+
+                break;
+            } else {
+                parent = parent->left;
+            }
+        } else if (res > 0) {
+            if (parent->right == NULL) {
+                ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
+                edge->weight = weight;
+                edge->to = (ptd_vertex_t *) vertex;
+
+                child = avl_vec_vertex_create((char *) vertex->state, edge, parent);
+
+                if (child == NULL) {
+                    return -1;
+                }
+
+                parent->right = child;
+
+                break;
+            } else {
+                parent = parent->right;
+            }
+        } else {
+            ((ptd_edge_t *) parent->entry)->weight += weight;
+
+            return 0;
+        }
+    }
+
+    avl_rebalance_tree(&root, child);
+
+    return 0;
+
 }
 
 

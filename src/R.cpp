@@ -4,6 +4,11 @@
 
 using namespace Rcpp;
 
+/*** R
+g <- create_graph(4, 4)
+v1 <- create_vertex(g, c(1,2,3,4),c(0.1,0.2,0.3,0.4))
+v2 <- create_vertex(g, c(1,2,3,4),c(0.1,0.2,0.3,0.4))
+*/
 
 class PTDGraph {
 public:
@@ -139,11 +144,20 @@ List edges(SEXP phase_type_vertex) {
 
 // [[Rcpp::export]]
 SEXP create_graph(size_t state_length, size_t reward_length) {
+  ptd_graph_t *graph = ptd_graph_create(
+    state_length,
+    reward_length
+  );
+
+  if (graph == NULL) {
+	 throw new std::runtime_error(
+			 "memory allocation failed"
+				        );
+  }
+
   return Rcpp::XPtr<PTDGraph>(
     new PTDGraph(
-        ptd_graph_create(
-          state_length, reward_length
-        )
+	    graph
     )
   );
 }
@@ -152,7 +166,12 @@ SEXP create_graph(size_t state_length, size_t reward_length) {
 SEXP create_vertex(SEXP phase_type_graph, IntegerVector state, NumericVector rewards) {
   Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
   ptd_vertex_t *vertex = ptd_vertex_create(graph->graph);
-  
+
+  if (vertex == NULL) {
+	 throw new std::runtime_error(
+			 "memory allocation failed"
+				        );
+  } 
   for (size_t i = 0; i < vertex->graph->state_length; i++) {
     vertex->state[i] = state[i];
   }
@@ -221,6 +240,7 @@ List vertices(SEXP phase_type_graph) {
   return list;
 }
 
+/*
 Rcpp::Function *custom_visit_function;
 
 void custom_visit(vertex_t *vertex) {
@@ -907,3 +927,4 @@ SEXP generate_graphM2(int n1, int n2, int t1, int t2, double m) {
   
   return Rcpp::XPtr<PhaseTypeGraph>(new PhaseTypeGraph(graph, graph->rewards.size()));
 }
+*/

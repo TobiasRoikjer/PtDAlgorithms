@@ -286,5 +286,9 @@ ptd_vertex_t *ptd_avl_tree_find(const ptd_avl_tree_t *avl_tree, const vec_entry_
 
 int ptd_avl_tree_insert(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex);
 
+int ptd_avl_tree_insert_or_increment(ptd_avl_tree_t *avl_tree, const ptd_vertex_t *vertex, long double weight);
+
+//TODO: remove?
+size_t ptd_avl_tree_max_depth(void *avl_vec_vertex);
 
 #endif //PTDALGORITHMS_PHASE_H
