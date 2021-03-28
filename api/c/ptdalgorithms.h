@@ -1,5 +1,5 @@
-#ifndef PTDALGORITHMS_PHASE_H
-#define PTDALGORITHMS_PHASE_H
+#ifndef PTDALGORITHMS_PTD_H
+#define PTDALGORITHMS_PTD_H
 
 #include <vector>
 #include <utility>
@@ -213,7 +213,6 @@ struct ptd_graph {
     size_t state_length;
     size_t rewards_length;
     ptd_vertex_t *start_vertex;
-    ptd_vertex_t *absorbing_vertex;
     size_t vertices_length;
 };
 
@@ -233,8 +232,12 @@ int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight);
 
 int ptd_remove_edge(ptd_vertex_t *from, ptd_vertex_t *to);
 
-int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(ptd_vertex_t *));
+int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_vertex_t *));
 
+queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph);
+
+// TODO: This does not belong here
+int ptd_label_vertices(ptd_graph_t *graph);
 
 // TODO: static
 
@@ -283,15 +286,17 @@ ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length);
 void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree);
 void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree);
 
-int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex);
+int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex);
 
 ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
 
-ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
+int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex, long double weight);
 
-int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex, long double weight);
+int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
+
+ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
 
 //TODO: remove?
 size_t ptd_avl_tree_max_depth(void *avl_vec_vertex);
 
-#endif //PTDALGORITHMS_PHASE_H
+#endif //PTDALGORITHMS_PTD_H

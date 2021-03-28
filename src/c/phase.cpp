@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <set>
-#include "phase.h"
+#include "../../api/c/ptdalgorithms.h"
 
 static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
 
@@ -2158,7 +2158,7 @@ static void ptd_reset_graph_visited(ptd_graph_t *graph) {
     }
 }
 
-static queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
+queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
     ptd_reset_graph_visited(graph);
     // TODO: add failures to these
     queue<ptd_vertex_t *> ret;
@@ -2188,7 +2188,7 @@ static queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
 
 ptd_graph_t *ptd_graph_create(size_t state_length, size_t reward_length) {
     ptd_graph_t *graph;
-    ptd_vertex_t *start, *absorbing;
+    ptd_vertex_t *start;
 
     if ((graph = (ptd_graph_t *) malloc(sizeof(ptd_graph_t))) == NULL) {
         return NULL;
@@ -2202,13 +2202,7 @@ ptd_graph_t *ptd_graph_create(size_t state_length, size_t reward_length) {
         return NULL;
     }
 
-    if ((absorbing = ptd_vertex_create(graph)) == NULL) {
-        free(graph);
-        return NULL;
-    }
-
     graph->start_vertex = start;
-    graph->absorbing_vertex = absorbing;
     graph->vertices_length = 2;
 
     return graph;
@@ -2369,11 +2363,11 @@ size_t ptd_avl_tree_max_depth(void *avl_vec_vertex) {
 }
 
 
-int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex) {
+int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex) {
     int res;
 
     avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
-    res = avl_vec_insert(&root, (char *) vertex->state, (void *) vertex, avl_tree->vec_length * sizeof(vec_entry_t));
+    res = avl_vec_insert(&root, (char *) key, (void *) vertex, avl_tree->vec_length * sizeof(vec_entry_t));
 
     if (res != 0) {
         return res;
@@ -2398,7 +2392,8 @@ ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec
     return (ptd_vertex_t *) avl_vertex->entry;
 }
 
-int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t *vertex, long double weight) {
+int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex,
+                                          long double weight) {
     avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
     avl_vec_vertex_t *child;
 
@@ -2407,7 +2402,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t
         edge->weight = weight;
         edge->to = vertex;
 
-        if ((root = avl_vec_vertex_create((char *) vertex->state, (void *) edge, NULL)) == NULL) {
+        if ((root = avl_vec_vertex_create((char *) key, (void *) edge, NULL)) == NULL) {
             return -1;
         }
 
@@ -2419,7 +2414,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t
     avl_vec_vertex_t *parent = root;
 
     while (true) {
-        int res = memcmp(parent->key, vertex->state, vertex->graph->state_length * sizeof(vec_entry_t));
+        int res = memcmp(parent->key, key, avl_tree->vec_length * sizeof(vec_entry_t));
 
         if (res < 0) {
             if (parent->left == NULL) {
@@ -2427,7 +2422,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t
                 edge->weight = weight;
                 edge->to = vertex;
 
-                child = avl_vec_vertex_create((char *) vertex->state, edge, parent);
+                child = avl_vec_vertex_create((char *) key, edge, parent);
 
                 if (child == NULL) {
                     return -1;
@@ -2445,7 +2440,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t
                 edge->weight = weight;
                 edge->to = vertex;
 
-                child = avl_vec_vertex_create((char *) vertex->state, edge, parent);
+                child = avl_vec_vertex_create((char *) key, edge, parent);
 
                 if (child == NULL) {
                     return -1;
@@ -2468,6 +2463,152 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, ptd_vertex_t
     avl_tree->root = root;
 
     return 0;
+
+
+
+    return 0;
+}
+
+/*avl_vec_vertex_t * _ptd_avl_tree_edge_remove(avl_vec_vertex_t *root, char *key, size_t length) {
+    if (root == NULL) {
+        return root;
+    }
+
+    int res = memcmp(root->key, key, length);
+
+    if (res < 0) {
+        root->left = _ptd_avl_tree_edge_remove(root->left, key, length);
+    } else if (res > 0) {
+        root->right = _ptd_avl_tree_edge_remove(root->right, key, length);
+    } else {
+        // node with only one child or no child
+        if (root->left == NULL || root->right == NULL){
+            avl_vec_vertex_t *temp = NULL;
+
+            if (temp == root->left)
+                temp = root->right;
+            else
+                temp = root->left;
+
+            // No child case
+            if (temp == NULL) {
+                temp = root;
+                root = NULL;
+            }
+            else // One child case
+                root = temp; // Copy the contents of
+            // the non-empty child
+        }
+        else
+        {
+            Node temp = minValueNode(root.right);
+
+            // Copy the inorder successor's data to this node
+            root.key = temp.key;
+
+            // Delete the inorder successor
+            root.right = deleteNode(root.right, temp.key);
+        }
+    }
+
+    // If the tree had only one node then return
+    if (root == null)
+        return root;
+
+    // STEP 2: UPDATE HEIGHT OF THE CURRENT NODE
+    root.height = max(height(root.left),
+                      height(root.right)) + 1;
+
+    // STEP 3: GET THE BALANCE FACTOR
+    // OF THIS NODE (to check whether
+    // this node became unbalanced)
+    int balance = getBalance(root);
+
+    // If this node becomes unbalanced,
+    // then there are 4 cases
+    // Left Left Case
+    if (balance > 1 && getBalance(root.left) >= 0)
+        return rightRotate(root);
+
+    // Left Right Case
+    if (balance > 1 && getBalance(root.left) < 0)
+    {
+        root.left = leftRotate(root.left);
+        return rightRotate(root);
+    }
+
+    // Right Right Case
+    if (balance < -1 && getBalance(root.right) <= 0)
+        return leftRotate(root);
+
+    // Right Left Case
+    if (balance < -1 && getBalance(root.right) > 0)
+    {
+        root.right = rightRotate(root.right);
+        return leftRotate(root);
+    }
+
+    return root;
+}
+
+int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
+
+}
+*/
+int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
+    avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
+
+    if (root == NULL) {
+        return 0;
+    }
+
+    avl_vec_vertex_t *parent = root;
+
+    enum DIR {NONE, LEFT, RIGHT};
+    DIR dir = NONE;
+
+    while (true) {
+        int res = memcmp(parent->key, key, avl_tree->vec_length * sizeof(vec_entry_t));
+
+        if (res < 0) {
+            if (parent->left == NULL) {
+                return 0;
+            } else {
+                parent = parent->left;
+                dir = LEFT;
+            }
+        } else if (res > 0) {
+            if (parent->right == NULL) {
+                return 0;
+            } else {
+                parent = parent->right;
+                dir = RIGHT;
+            }
+        } else {
+            break;
+        }
+    }
+
+    if (parent->parent != NULL) {
+        if (dir == LEFT) {
+            parent->parent->left = NULL;
+        }
+
+        avl_rebalance_tree((avl_vec_vertex_t**)&avl_tree->root, parent->parent);
+    } else {
+        if (parent->left != NULL) {
+            avl_tree->root = parent->left;
+        } else if (parent->right != NULL) {
+            avl_tree->root = parent->right;
+        } else {
+            avl_tree->root = NULL;
+            return 0;
+        }
+
+        avl_rebalance_tree((avl_vec_vertex_t**)&avl_tree->root, (avl_vec_vertex_t*)avl_tree->root);
+    }
+
+    return 0;
 }
 
 ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
@@ -2478,7 +2619,7 @@ ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_ent
             return NULL;
         }
 
-        int res = memcmp(parent->key, (char*)key, avl_tree->vec_length * sizeof(vec_entry_t));
+        int res = memcmp(parent->key, (char *) key, avl_tree->vec_length * sizeof(vec_entry_t));
 
         if (res < 0) {
             parent = parent->left;
@@ -2498,7 +2639,7 @@ int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *)) {
         ptd_vertex_t *vertex = vertices_to_visit->front();
         vertices_to_visit->pop();
 
-        if (vertex == graph->start_vertex || vertex == graph->absorbing_vertex) {
+        if (vertex == graph->start_vertex) {
             continue;
         }
 
@@ -2530,6 +2671,7 @@ int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
 
     from->edges[from->edges_length] = (ptd_edge_t) {.to = to, .weight = weight};
     from->edges_length++;
+    from->rate += weight;
 
     return 0;
 }
@@ -2607,13 +2749,11 @@ int strongconnect(ptd_vertex_t *vertex, bool (*is_included_func)(ptd_vertex_t *)
     return 0;
 }
 
-static int ptd_label_vertices(ptd_graph_t *graph) {
+int ptd_label_vertices(ptd_graph_t *graph) {
     ptd_reset_graph_visited(graph);
-    graph->start_vertex->index = 0;
-    graph->absorbing_vertex->index = 1;
 
     queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
-    size_t index = 2;
+    size_t index = 0;
 
     while (!q.empty()) {
         ptd_vertex_t *vertex = q.front();
@@ -2766,25 +2906,192 @@ static bool keep_zero_rewarded(ptd_vertex_t *vertex) {
     return (reward_function(vertex) == 0);
 }
 
-int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(ptd_vertex_t *)) {
-    reward_function = reward_func;
+ptd_avl_tree_t **edges;
+ptd_avl_tree_t **parents;
+ptd_vertex_t **vertices;
+vec_entry_t **states;
+double *rewards;
 
-    // First we find all the vertices that we should add to a vertex when
-    // reward transforming. We do this by finding the strongly connected
-    // components where there is not a
-    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph, keep_zero_rewarded);
+static inline vector<ptd_edge_t *> avl_tree_as_list(ptd_avl_tree_t *avl_tree) {
+    vector<ptd_edge_t *> vec;
+    stack<avl_vec_vertex_t *> s;
 
-    if (sccs == NULL) {
-        return -1;
+    s.push((avl_vec_vertex_t *) avl_tree->root);
+
+    while (!s.empty()) {
+        avl_vec_vertex_t *v = s.top();
+        s.pop();
+
+        if (v == NULL) {
+            continue;
+        }
+
+        vec.push_back((ptd_edge_t *) v->entry);
+        s.push(v->left);
+        s.push(v->right);
     }
 
-    vector<set<vertex_t *> > edges;
+    return vec;
+}
 
-    for (size_t i = 0; i < sccs->components_length; ++i) {
-        set<vertex_t *> set;
+//extern int print_func(ptd_vertex_t *vertex);
+
+// TODO: We should always reset before doing anything else everywhere
+
+int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_vertex_t *)) {
+    ptd_reset_graph_visited(graph);
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+
+    ptd_reset_graph_visited(graph);
+    ptd_label_vertices(graph);
+    size_t n = q.size();
+
+    edges = (ptd_avl_tree_t **) calloc(n, sizeof(*edges));
+
+    if (edges == NULL) {
+        return 1;
+    }
+
+    parents = (ptd_avl_tree_t **) calloc(n, sizeof(*parents));
+    vertices = (ptd_vertex_t **) calloc(n, sizeof(*vertices));
+    states = (vec_entry_t **) calloc(n, sizeof(*states));
+    rewards = (double *) calloc(n, sizeof(*rewards));
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        vertices[vertex->index] = vertex;
+        edges[vertex->index] = ptd_avl_tree_create(1);
+
+        if (edges[vertex->index] == NULL) {
+            return -1;
+        }
+
+        parents[vertex->index] = ptd_avl_tree_create(1);
+
+        if (parents[vertex->index] == NULL) {
+            // TODO: Free rest
+            return -1;
+        }
+
+        states[vertex->index] = (vec_entry_t *) calloc(1, sizeof(*(states[vertex->index])));
+        states[vertex->index][0] = vertex->index;
+
+        double reward;
+
+        if (vertex->index == 0 || vertex->edges_length == 0) {
+            reward = 1;
+        } else {
+            reward = reward_func(vertex);
+        }
+
+        rewards[vertex->index] = reward;
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+        ptd_vertex_t *vertex = vertices[i];
+
+        // We make the weight be the probability of transitioning.
+        // Store the new reward for later
+        rewards[i] /= vertex->rate;
+
+        for (size_t j = 0; j < vertex->edges_length; ++j) {
+            ptd_vertex_t *child_vertex = vertex->edges[j].to;
+            size_t child_index = child_vertex->index;
+
+            ptd_avl_tree_edge_insert_or_increment(
+                    edges[i],
+                    states[child_index],
+                    child_vertex,
+                    vertex->edges[j].weight / vertex->rate
+            );
+
+            ptd_avl_tree_edge_insert_or_increment(
+                    parents[child_index],
+                    states[i],
+                    vertex,
+                    vertex->edges[j].weight / vertex->rate
+            );
+        }
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+        double reward = rewards[i];
+
+        if (reward == 0) {
+            vector<ptd_edge_t *> outgoing_edges = avl_tree_as_list(edges[i]);
+            vector<ptd_edge_t *> ingoing_edges = avl_tree_as_list(parents[i]);
+
+            for (size_t p = 0; p < ingoing_edges.size(); ++p) {
+                ptd_edge_t *ingoing_edge = ingoing_edges[p];
+                size_t parent_index = ingoing_edge->to->index;
+
+                for (size_t c = 0; c < outgoing_edges.size(); ++c) {
+                    ptd_edge_t *outgoing_edge = outgoing_edges[c];
+                    size_t child_index = outgoing_edge->to->index;
+
+                    if (child_index != parent_index) {
+                        // Add new child to parent
+                        // Weight has been set to probability earlier
+                        ptd_avl_tree_edge_insert_or_increment(
+                                edges[parent_index],
+                                states[child_index],
+                                outgoing_edge->to,
+                                ingoing_edge->weight * outgoing_edge->weight
+                        );
+
+                        ptd_avl_tree_edge_insert_or_increment(
+                                parents[child_index],
+                                states[parent_index],
+                                ingoing_edge->to,
+                                ingoing_edge->weight * outgoing_edge->weight
+                        );
+                    }
+                }
+
+                ptd_avl_tree_edge_remove(edges[parent_index], states[i]);
+            }
+
+            for (size_t c = 0; c < outgoing_edges.size(); ++c) {
+                ptd_edge_t *outgoing_edge = outgoing_edges[c];
+                size_t child_index = outgoing_edge->to->index;
+
+                ptd_avl_tree_edge_remove(parents[child_index], states[i]);
+            }
+        }
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+        ptd_vertex_t *vertex = vertices[i];
+        vertex->rate = 0;
+        vertex->edges_length = 0;
+        double reward = rewards[i];
+
+        if (reward == 0) {
+            continue;
+        }
+
+        vector<ptd_edge_t *> outgoing_edges = avl_tree_as_list(edges[i]);
 
 
-        edges.push_back(set);
+        fprintf(stderr, "\n=============\n\nGoing to vertex with %zu edges: ", outgoing_edges.size());
+        //print_func(vertex);
+
+        for (size_t j = 0; j < outgoing_edges.size(); ++j) {
+            fprintf(stderr, "Adding edge between: ");
+            //print_func(vertex);
+            fprintf(stderr, "and: ");
+            //print_func(outgoing_edges[j]->to);
+            ptd_add_edge(
+                    vertex,
+                    outgoing_edges[j]->to,
+                    outgoing_edges[j]->weight / reward
+            );
+        }
+
+        fprintf(stderr, "Resulting in: ");
+        //print_func(vertex);
     }
 
     return 0;

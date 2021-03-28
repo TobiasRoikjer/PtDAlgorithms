@@ -1,5 +1,4 @@
 #include "io.h"
-#include "phase.h"
 
 /*
  * Assumes the graph has been labelled, as they should all be.
