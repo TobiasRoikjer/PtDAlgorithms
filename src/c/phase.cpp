@@ -2186,7 +2186,7 @@ queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
     return ret;
 }
 
-ptd_graph_t *ptd_graph_create(size_t state_length, size_t reward_length) {
+ptd_graph_t *ptd_graph_create(size_t state_length) {
     ptd_graph_t *graph;
     ptd_vertex_t *start;
 
@@ -2195,7 +2195,6 @@ ptd_graph_t *ptd_graph_create(size_t state_length, size_t reward_length) {
     }
 
     graph->state_length = state_length;
-    graph->rewards_length = reward_length;
 
     if ((start = ptd_vertex_create(graph)) == NULL) {
         free(graph);
@@ -2226,7 +2225,7 @@ void ptd_graph_destroy(ptd_graph_t *graph) {
         ptd_vertex_destroy(vertex);
     }
 
-    memset(&graph, 0, sizeof(graph));
+    memset(graph, 0, sizeof(*graph));
     free(graph);
 }
 
@@ -2251,12 +2250,6 @@ ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state) {
     vertex->edges_length = 0;
 
     vertex->state = state;
-
-    vertex->rewards = (long double *) calloc(graph->rewards_length, sizeof(*vertex->rewards));
-
-    if (vertex->rewards == NULL) {
-        return NULL;
-    }
 
     vertex->rate = 0;
     vertex->visited = false;
@@ -2287,8 +2280,6 @@ void ptd_vertex_destroy(ptd_vertex_t *vertex) {
     vertex->edges = NULL;
     free(vertex->state);
     vertex->state = NULL;
-    free(vertex->rewards);
-    vertex->rewards = NULL;
 
     if (vertex->graph != NULL) {
         vertex->graph->vertices_length--;
@@ -2329,6 +2320,28 @@ void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree) {
     avl_tree->root = NULL;
     free(avl_tree);
 }
+
+void _ptd_avl_tree_vertex_destroy_free(avl_vec_vertex_t *avl_vertex) {
+    if (avl_vertex == NULL) {
+        return;
+    }
+
+    _ptd_avl_tree_vertex_destroy_free(avl_vertex->left);
+    _ptd_avl_tree_vertex_destroy_free(avl_vertex->right);
+
+    ptd_vertex_destroy((ptd_vertex_t*)avl_vertex->entry);
+    avl_vertex->left = NULL;
+    avl_vertex->right = NULL;
+    avl_vertex->entry = NULL;
+    free(avl_vertex);
+}
+
+void ptd_avl_tree_vertex_destroy_free(ptd_avl_tree_t *avl_tree) {
+    _ptd_avl_tree_vertex_destroy_free((avl_vec_vertex_t *) avl_tree->root);
+    avl_tree->root = NULL;
+    free(avl_tree);
+}
+
 
 void _ptd_avl_tree_edge_destroy(avl_vec_vertex_t *avl_vertex) {
     if (avl_vertex == NULL) {
@@ -2669,7 +2682,8 @@ int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
         }
     }
 
-    from->edges[from->edges_length] = (ptd_edge_t) {.to = to, .weight = weight};
+    from->edges[from->edges_length].to = to;
+    from->edges[from->edges_length].weight = weight;
     from->edges_length++;
     from->rate += weight;
 
@@ -2847,7 +2861,7 @@ int ptd_remove_edge(ptd_vertex_t *from, ptd_vertex_t *to) {
 ptd_graph_t *
 ptd_convert_strongly_connected_components_to_group(ptd_graph_t *graph, ptd_strongly_connected_components_t *sccs) {
     ptd_label_vertices(graph);
-    ptd_graph_t *ret = ptd_graph_create(0, 0);
+    ptd_graph_t *ret = ptd_graph_create(0);
 
     if (graph == NULL) {
         return NULL;

@@ -201,7 +201,6 @@ struct ptd_vertex {
     bool reset;
 
     vec_entry_t *state;
-    long double *rewards;
 };
 
 typedef struct ptd_edge {
@@ -211,14 +210,13 @@ typedef struct ptd_edge {
 
 struct ptd_graph {
     size_t state_length;
-    size_t rewards_length;
     ptd_vertex_t *start_vertex;
     size_t vertices_length;
 };
 
 ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state);
 
-ptd_graph_t *ptd_graph_create(size_t state_length, size_t reward_length);
+ptd_graph_t *ptd_graph_create(size_t state_length);
 
 void ptd_graph_destroy(ptd_graph_t *graph);
 
@@ -270,7 +268,7 @@ struct ptd_vertex_group {
     bool reset;
 
     vec_entry_t *state;
-    long double *rewards;
+
 };
 
 ptd_graph_t *
@@ -284,13 +282,17 @@ typedef struct ptd_avl_tree {
 ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length);
 
 void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree);
+
+void ptd_avl_tree_vertex_destroy_free(ptd_avl_tree_t *avl_tree);
+
 void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree);
 
 int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex);
 
 ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
 
-int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex, long double weight);
+int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex,
+                                          long double weight);
 
 int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
 

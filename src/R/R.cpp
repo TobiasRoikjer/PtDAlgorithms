@@ -1,8 +1,8 @@
 #include <Rcpp.h>
-#include "phase.h"
-#include "io.h"
+#include "../../api/cpp/ptdalgorithmscpp.h"
 
 using namespace Rcpp;
+using namespace ptdalgorithms;
 
 /*** R
 n = 25
@@ -47,74 +47,6 @@ kingman_visit <- function(vertex) {
   vertices(graph)
 */
 
-class AVLTree {
-public:
-  AVLTree(ptd_avl_tree_t *tree) {
-    this->tree = tree;
-  }
-  
-  ~AVLTree() {
-    ptd_avl_tree_vertex_destroy(tree);
-  }
-  
-  ptd_avl_tree_t *tree;
-};
-
-class PTDGraph {
-public:
-  PTDGraph(ptd_graph_t *graph) {
-    this->graph = graph;
-    this->tree = ptd_avl_tree_create(graph->state_length);
-  }
-  
-  ~PTDGraph() {
-    fprintf(stderr, "Destroying graph\n");
-    //ptd_avl_tree_vertex_destroy(this->tree);
-    //ptd_graph_destroy(this->graph);
-  }
-  
-  ptd_graph_t *graph;
-  ptd_avl_tree_t *tree;
-};
-
-class PTDVertex {
-public:
-  PTDVertex(ptd_vertex_t *vertex) {
-    this->vertex = vertex;
-  }
-  
-  ~PTDVertex() {
-    fprintf(stderr, "Destroying vertex\n");
-    //ptd_vertex_destroy(this->vertex);
-  }
-  
-  ptd_vertex_t *vertex;
-};
-
-class PhaseTypeGraph {
-public:
-    PhaseTypeGraph(vertex_t *start, size_t rewards_length) {
-        this->start = start;
-        this->rewards_length = rewards_length;
-    }
-
-    ~PhaseTypeGraph() {
-        graph_free(this->start);
-    }
-  
-    vertex_t *start;
-    size_t rewards_length;
-};
-
-class PhaseTypeVertex {
-public:
-  PhaseTypeVertex(vertex_t *vertex) {
-    this->vertex = vertex;
-  }
-  
-  vertex_t *vertex;
-};
-
 SEXP get_first_list_entry(SEXP e, std::string message) {
   if (Rf_isList(e) || Rf_isNewList(e)) {
     List list = Rcpp::as<List>(e);
@@ -144,73 +76,34 @@ SEXP get_first_list_entry(SEXP e, std::string message) {
 // [[Rcpp::export]]
 IntegerVector state(SEXP phase_type_vertex) {
   phase_type_vertex = get_first_list_entry(phase_type_vertex, "state");
-  Rcpp::XPtr<PTDVertex> vertex(phase_type_vertex);
-  size_t *state = vertex->vertex->state;
-  size_t len = vertex->vertex->graph->state_length;
-  IntegerVector res(len);
+  Rcpp::XPtr<Vertex> vertex(phase_type_vertex);
   
-  for (size_t i = 0; i < len; i++) {
-    res(i) = state[i];
-  }
-  
-  return res;
+  return IntegerVector(vertex->state().begin(), vertex->state().end());
 }
-
-
-// [[Rcpp::export]]
-NumericVector rewards(SEXP phase_type_vertex) {
-  phase_type_vertex = get_first_list_entry(phase_type_vertex, "rewards");
-  Rcpp::XPtr<PTDVertex> vertex(phase_type_vertex);
-  long double *rewards = vertex->vertex->rewards;
-  size_t len = vertex->vertex->graph->rewards_length;
-  NumericVector res(len);
-  
-  for (size_t i = 0; i < len; i++) {
-    res(i) = rewards[i];
-  }
-  
-  return res;
-}
-
 
 // [[Rcpp::export]]
 List edges(SEXP phase_type_vertex) {
   phase_type_vertex = get_first_list_entry(phase_type_vertex, "edges");
   
-  Rcpp::XPtr<PTDVertex> vertex(phase_type_vertex);
-  List edges(vertex->vertex->edges_length);
+  Rcpp::XPtr<Vertex> vertex(phase_type_vertex);
+  vector<Edge> edges = vertex->edges();
+  List r_edges(edges.size());
   
-  for (size_t i = 0; i < vertex->vertex->edges_length; i++) {
-    SEXP child = Rcpp::XPtr<PTDVertex>(
-      new PTDVertex(
-          vertex->vertex->edges[i].to
-      )
+  for (size_t i = 0; i < edges.size(); i++) {
+    r_edges[i] = List::create(
+      Named("weight") = edges[i].weight,
+      _["child"] = Rcpp::XPtr<Vertex>(edges[i].to)
     );
-    
-    double weight = vertex->vertex->edges[i].weight;
-    
-    edges[i] = List::create(Named("weight") = weight, _["child"] = child);
   }
   
-  return edges;
+  return r_edges;
 }
 
 // [[Rcpp::export]]
-SEXP create_graph(size_t state_length, size_t reward_length) {
-  ptd_graph_t *graph = ptd_graph_create(
-    state_length,
-    reward_length
-  );
-
-  if (graph == NULL) {
-	 throw new std::runtime_error(
-			 "memory allocation failed"
-				        );
-  }
-
-  return Rcpp::XPtr<PTDGraph>(
-    new PTDGraph(
-	    graph
+SEXP create_graph(size_t state_length) {
+  return Rcpp::XPtr<Graph>(
+    new Graph(
+	    state_length
     )
   );
 }
@@ -220,79 +113,30 @@ void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double wei
   phase_type_vertex_from = get_first_list_entry(phase_type_vertex_from, "edge from");
   phase_type_vertex_to = get_first_list_entry(phase_type_vertex_to, "edge to");
   
-  Rcpp::XPtr<PTDVertex> from(phase_type_vertex_from);
-  Rcpp::XPtr<PTDVertex> to(phase_type_vertex_to);
+  Rcpp::XPtr<Vertex> from(phase_type_vertex_from);
+  Rcpp::XPtr<Vertex> to(phase_type_vertex_to);
   
-  if (from->vertex == to->vertex) {
-    throw new std::runtime_error(
-        "The edge to add is from the same vertex to the same vertex."
-    );
-  }
-  
-  ptd_add_edge(from->vertex, to->vertex, weight);
+  from->add_edge(to, weight);
 }
 
 // [[Rcpp::export]]
-SEXP create_vertex(SEXP phase_type_graph, IntegerVector state, NumericVector rewards) {
-  Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
-  ptd_vertex_t *vertex = ptd_vertex_create(graph->graph);
+SEXP create_vertex(SEXP phase_type_graph, IntegerVector state) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  Vertex vertex = graph->create_vertex(as<std::vector<size_t> >(state));
 
-  if (vertex == NULL) {
-	 throw new std::runtime_error(
-			 "memory allocation failed"
-				        );
-  }
-  
-  for (size_t i = 0; i < vertex->graph->state_length; i++) {
-    vertex->state[i] = state[i];
-  }
-  
-  for (size_t i = 0; i < vertex->graph->rewards_length; i++) {
-    vertex->rewards[i] = rewards[i];
-  }
-  
-  //std::copy(state.begin(), state.end(), vertex->state);
-  //std::copy(rewards.begin(), rewards.end(), vertex->rewards);
-  
-  ptd_avl_tree_vertex_insert(graph->tree, vertex->state, vertex);
-  
-  return Rcpp::XPtr<PTDVertex>(
-    new PTDVertex(
-        vertex
-    )
-  );
-}
-
-int print_func(ptd_vertex_t *vertex) {
-  return 0;
+  return Rcpp::XPtr<Vertex>(vertex);
 }
 
 // [[Rcpp::export]]
 SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
-  Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
   
-  if (state.size() != graph->graph->state_length) {
-    throw new std::runtime_error(
-        "state size must be equal to state length TODO"
-    );
-  }
-  
-  vec_entry_t *c_state = (vec_entry_t*) calloc(graph->graph->state_length, sizeof(*c_state));
-  
-  for (size_t i = 0; i < graph->graph->state_length; i++) {
-    c_state[i] = state[i];
-  }
-  
-  ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(graph->tree, c_state);
-  
-  if (vertex == NULL) {
+  if (!graph->vertex_exists(as<std::vector<size_t> >(state))) {
     return List::get_na();
   }
   
-  return Rcpp::XPtr<PTDVertex>(
-    new PTDVertex(
-        vertex
-    )
+  return Rcpp::XPtr<Vertex>(
+    graph->find_vertex(as<std::vector<size_t> >(state))
   );
 }
 
@@ -301,21 +145,17 @@ SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
 SEXP find_or_create_vertex(SEXP phase_type_graph, IntegerVector state, NumericVector rewards) {
   SEXP vertex = find_vertex(phase_type_graph, state);
   
-  if (vertex == List::get_na()) {
-return create_vertex(phase_type_graph, state, rewards);
-  } else {
-    return vertex;
-  }
+  return Rcpp::XPtr<Vertex>(
+    graph->find_or_create_vertex(as<std::vector<size_t> >(state))
+  );
 }
 
 // [[Rcpp::export]]
 SEXP start_vertex(SEXP phase_type_graph) {
-  Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
   
-  return Rcpp::XPtr<PTDVertex>(
-    new PTDVertex(
-        graph->graph->start_vertex
-    )
+  return Rcpp::XPtr<Vertex>(
+      graph->start_vertex()
   );
 }
 
