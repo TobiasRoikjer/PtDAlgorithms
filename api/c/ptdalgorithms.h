@@ -50,6 +50,16 @@ struct llp;
 
 static size_t id = 0;
 
+
+typedef struct avl_node {
+    struct avl_node *left;
+    struct avl_node *right;
+    struct avl_node *parent;
+    signed short balance;
+    char *key;
+    void *entry;
+} avl_node_t;
+
 typedef struct vertex {
     vertex(vec_entry_t *state, vector<double> rewards, size_t state_length) {
         this->vertex_index = id;
@@ -287,7 +297,7 @@ void ptd_avl_tree_vertex_destroy_free(ptd_avl_tree_t *avl_tree);
 
 void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree);
 
-int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex);
+int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, const ptd_vertex_t *vertex);
 
 ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key);
 

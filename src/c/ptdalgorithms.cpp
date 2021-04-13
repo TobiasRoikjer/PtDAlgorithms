@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <set>
-#include "../../api/c/ptdalgorithms.h"
+#include "ptdalgorithms.h"
 
 static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
 
@@ -213,16 +213,6 @@ static void reset_graph_visited(vertex_t *graph) {
 }
 
 
-//TODO AVL should use char* as key
-typedef struct avl_vec_vertex {
-    struct avl_vec_vertex *left;
-    struct avl_vec_vertex *right;
-    struct avl_vec_vertex *parent;
-    signed short balance;
-    char *key;
-    void *entry;
-} avl_vec_vertex_t;
-
 /* Example:
 *     A            A            A
 *   B   (left)    B  (right)   D
@@ -233,9 +223,9 @@ typedef struct avl_vec_vertex {
 *  B: parent
 *  D: child_right
 */
-avl_vec_vertex_t *rotate_left_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
-    avl_vec_vertex_t *child_right_left, *child_right_right;
-    avl_vec_vertex_t *child_right = child->right;
+avl_node_t *rotate_left_right(avl_node_t *parent, avl_node_t *child) {
+    avl_node_t *child_right_left, *child_right_right;
+    avl_node_t *child_right = child->right;
     child_right_left = child_right->left;
     child->right = child_right_left;
 
@@ -281,9 +271,9 @@ avl_vec_vertex_t *rotate_left_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *
 *  B: parent
 *  D: child_left
 */
-avl_vec_vertex_t *rotate_right_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
-    avl_vec_vertex_t *child_left_right, *child_left_left;
-    avl_vec_vertex_t *child_left = child->left;
+avl_node_t *rotate_right_left(avl_node_t *parent, avl_node_t *child) {
+    avl_node_t *child_left_right, *child_left_left;
+    avl_node_t *child_left = child->left;
 
     child_left_right = child_left->right;
 
@@ -328,8 +318,8 @@ avl_vec_vertex_t *rotate_right_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *
 *    B   (left) A   C
 *      C   ->
 */
-avl_vec_vertex_t *rotate_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
-    avl_vec_vertex_t *child_left;
+avl_node_t *rotate_left(avl_node_t *parent, avl_node_t *child) {
+    avl_node_t *child_left;
 
     child_left = child->left;
     parent->right = child_left;
@@ -358,8 +348,8 @@ avl_vec_vertex_t *rotate_left(avl_vec_vertex_t *parent, avl_vec_vertex_t *child)
 *    B    (right) C   A
 *  C        ->
 */
-avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child) {
-    avl_vec_vertex_t *child_right;
+avl_node_t *rotate_right(avl_node_t *parent, avl_node_t *child) {
+    avl_node_t *child_right;
 
     child_right = child->right;
     parent->left = child_right;
@@ -382,10 +372,10 @@ avl_vec_vertex_t *rotate_right(avl_vec_vertex_t *parent, avl_vec_vertex_t *child
     return child;
 }
 
-avl_vec_vertex_t *avl_vec_vertex_create(char *key, void *entry, avl_vec_vertex_t *parent) {
-    avl_vec_vertex_t *vertex;
+avl_node_t *avl_vec_vertex_create(char *key, void *entry, avl_node_t *parent) {
+    avl_node_t *vertex;
 
-    if ((vertex = (avl_vec_vertex_t *) malloc(sizeof(*vertex))) == NULL) {
+    if ((vertex = (avl_node_t *) malloc(sizeof(*vertex))) == NULL) {
         return NULL;
     }
 
@@ -399,7 +389,7 @@ avl_vec_vertex_t *avl_vec_vertex_create(char *key, void *entry, avl_vec_vertex_t
     return vertex;
 }
 
-void avl_vec_vertex_destroy(avl_vec_vertex_t *vertex) {
+void avl_vec_vertex_destroy(avl_node_t *vertex) {
     if (vertex == NULL) {
         return;
     }
@@ -410,7 +400,7 @@ void avl_vec_vertex_destroy(avl_vec_vertex_t *vertex) {
     free(vertex);
 }
 
-static void avl_free(avl_vec_vertex_t *vertex) {
+static void avl_free(avl_node_t *vertex) {
     if (vertex == NULL) {
         return;
     }
@@ -420,13 +410,13 @@ static void avl_free(avl_vec_vertex_t *vertex) {
     free(vertex);
 }
 
-const avl_vec_vertex_t *
-avl_vec_find(const avl_vec_vertex_t *rootptr, const char *key, const size_t vec_length) {
+const avl_node_t *
+avl_vec_find(const avl_node_t *rootptr, const char *key, const size_t vec_length) {
     if (rootptr == NULL) {
         return NULL;
     }
 
-    const avl_vec_vertex_t *vertex = rootptr;
+    const avl_node_t *vertex = rootptr;
 
     while (true) {
         int res = memcmp(key, vertex->key, vec_length);
@@ -449,7 +439,7 @@ avl_vec_find(const avl_vec_vertex_t *rootptr, const char *key, const size_t vec_
     }
 }
 
-int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, char *key, void *entry,
+int find_or_insert_vec(avl_node_t **out, avl_node_t *rootptr, char *key, void *entry,
                        const size_t vec_length) {
     if ((*out = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
         return -1;
@@ -459,7 +449,7 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, char *
         return 1;
     }
 
-    avl_vec_vertex_t *vertex = rootptr;
+    avl_node_t *vertex = rootptr;
 
     while (true) {
         int res = memcmp(key, vertex->key, vec_length);
@@ -489,10 +479,10 @@ int find_or_insert_vec(avl_vec_vertex_t **out, avl_vec_vertex_t *rootptr, char *
     return 0;
 }
 
-int avl_rebalance_tree(avl_vec_vertex_t **root, avl_vec_vertex_t *child) {
-    avl_vec_vertex_t *pivot, *rotated_parent;
+int avl_rebalance_tree(avl_node_t **root, avl_node_t *child) {
+    avl_node_t *pivot, *rotated_parent;
 
-    for (avl_vec_vertex_t *parent = child->parent; parent != NULL; parent = child->parent) {
+    for (avl_node_t *parent = child->parent; parent != NULL; parent = child->parent) {
         if (child == parent->right) {
             if (parent->balance > 0) {
                 pivot = parent->parent;
@@ -554,8 +544,8 @@ int avl_rebalance_tree(avl_vec_vertex_t **root, avl_vec_vertex_t *child) {
     return 0;
 }
 
-int avl_vec_insert(avl_vec_vertex_t **root, char *key, void *entry, const size_t vec_length) {
-    avl_vec_vertex_t *child;
+int avl_vec_insert(avl_node_t **root, char *key, void *entry, const size_t vec_length) {
+    avl_node_t *child;
 
     if (*root == NULL) {
         if ((*root = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
@@ -581,7 +571,7 @@ int avl_vec_insert(avl_vec_vertex_t **root, char *key, void *entry, const size_t
 }
 
 
-static size_t avl_vec_get_size(avl_vec_vertex_t *vertex) {
+static size_t avl_vec_get_size(avl_node_t *vertex) {
     if (vertex == NULL) {
         return 0;
     }
@@ -669,7 +659,7 @@ vertex_t *generate_state_space(
 ) {
     DEBUG_PRINT("Start generate state space\n");
 
-    avl_vec_vertex_t *bst = NULL;
+    avl_node_t *bst = NULL;
     queue<pair<vertex_t *, vector<pair<double, vector<size_t> > > > > vertices_to_visit;
     queue<vertex_t *> q;
     vertex_t *start_vertex = vertex_init(
@@ -706,7 +696,7 @@ vertex_t *generate_state_space(
         }
 
         vertex_t *child;
-        avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, (char *) &state[0],
+        avl_node_t *bst_entry = (avl_node_t *) avl_vec_find(bst, (char *) &state[0],
                                                                         state_length * sizeof(vec_entry_t));
 
         if (bst_entry != NULL) {
@@ -787,7 +777,7 @@ vertex_t *generate_state_space(
             }
 
             vertex_t *child;
-            avl_vec_vertex_t *bst_entry = (avl_vec_vertex_t *) avl_vec_find(bst, (char *) &child_state[0],
+            avl_node_t *bst_entry = (avl_node_t *) avl_vec_find(bst, (char *) &child_state[0],
                                                                             state_length * sizeof(vec_entry_t));
 
             if (bst_entry == NULL) {
@@ -2301,7 +2291,7 @@ ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length) {
     return avl_tree;
 }
 
-void _ptd_avl_tree_vertex_destroy(avl_vec_vertex_t *avl_vertex) {
+void _ptd_avl_tree_vertex_destroy(avl_node_t *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
@@ -2316,12 +2306,12 @@ void _ptd_avl_tree_vertex_destroy(avl_vec_vertex_t *avl_vertex) {
 }
 
 void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_vertex_destroy((avl_vec_vertex_t *) avl_tree->root);
+    _ptd_avl_tree_vertex_destroy((avl_node_t *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
 }
 
-void _ptd_avl_tree_vertex_destroy_free(avl_vec_vertex_t *avl_vertex) {
+void _ptd_avl_tree_vertex_destroy_free(avl_node_t *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
@@ -2337,13 +2327,13 @@ void _ptd_avl_tree_vertex_destroy_free(avl_vec_vertex_t *avl_vertex) {
 }
 
 void ptd_avl_tree_vertex_destroy_free(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_vertex_destroy_free((avl_vec_vertex_t *) avl_tree->root);
+    _ptd_avl_tree_vertex_destroy_free((avl_node_t *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
 }
 
 
-void _ptd_avl_tree_edge_destroy(avl_vec_vertex_t *avl_vertex) {
+void _ptd_avl_tree_edge_destroy(avl_node_t *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
@@ -2359,27 +2349,27 @@ void _ptd_avl_tree_edge_destroy(avl_vec_vertex_t *avl_vertex) {
 }
 
 void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_edge_destroy((avl_vec_vertex_t *) avl_tree->root);
+    _ptd_avl_tree_edge_destroy((avl_node_t *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
 }
 
 size_t ptd_avl_tree_max_depth(void *avl_vec_vertex) {
-    if ((avl_vec_vertex_t *) avl_vec_vertex == NULL) {
+    if ((avl_node_t *) avl_vec_vertex == NULL) {
         return 0;
     }
 
     return max(
-            ptd_avl_tree_max_depth((void *) ((avl_vec_vertex_t *) avl_vec_vertex)->left) + 1,
-            ptd_avl_tree_max_depth((void *) ((avl_vec_vertex_t *) avl_vec_vertex)->left) + 1
+            ptd_avl_tree_max_depth((void *) ((avl_node_t *) avl_vec_vertex)->left) + 1,
+            ptd_avl_tree_max_depth((void *) ((avl_node_t *) avl_vec_vertex)->left) + 1
     );
 }
 
 
-int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex) {
+int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, const ptd_vertex_t *vertex) {
     int res;
 
-    avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
+    avl_node_t *root = (avl_node_t *) avl_tree->root;
     res = avl_vec_insert(&root, (char *) key, (void *) vertex, avl_tree->vec_length * sizeof(vec_entry_t));
 
     if (res != 0) {
@@ -2392,8 +2382,8 @@ int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key,
 }
 
 ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
-    const avl_vec_vertex_t *avl_vertex = avl_vec_find(
-            (avl_vec_vertex_t *) avl_tree->root,
+    const avl_node_t *avl_vertex = avl_vec_find(
+            (avl_node_t *) avl_tree->root,
             (char *) key,
             avl_tree->vec_length * sizeof(vec_entry_t)
     );
@@ -2407,8 +2397,8 @@ ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec
 
 int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex,
                                           long double weight) {
-    avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
-    avl_vec_vertex_t *child;
+    avl_node_t *root = (avl_node_t *) avl_tree->root;
+    avl_node_t *child;
 
     if (root == NULL) {
         ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
@@ -2424,7 +2414,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
         return 0;
     }
 
-    avl_vec_vertex_t *parent = root;
+    avl_node_t *parent = root;
 
     while (true) {
         int res = memcmp(parent->key, key, avl_tree->vec_length * sizeof(vec_entry_t));
@@ -2482,7 +2472,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
     return 0;
 }
 
-/*avl_vec_vertex_t * _ptd_avl_tree_edge_remove(avl_vec_vertex_t *root, char *key, size_t length) {
+/*avl_node_t * _ptd_avl_tree_edge_remove(avl_node_t *root, char *key, size_t length) {
     if (root == NULL) {
         return root;
     }
@@ -2496,7 +2486,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
     } else {
         // node with only one child or no child
         if (root->left == NULL || root->right == NULL){
-            avl_vec_vertex_t *temp = NULL;
+            avl_node_t *temp = NULL;
 
             if (temp == root->left)
                 temp = root->right;
@@ -2569,13 +2559,13 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
 }
 */
 int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
-    avl_vec_vertex_t *root = (avl_vec_vertex_t *) avl_tree->root;
+    avl_node_t *root = (avl_node_t *) avl_tree->root;
 
     if (root == NULL) {
         return 0;
     }
 
-    avl_vec_vertex_t *parent = root;
+    avl_node_t *parent = root;
 
     enum DIR {NONE, LEFT, RIGHT};
     DIR dir = NONE;
@@ -2607,7 +2597,7 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
             parent->parent->left = NULL;
         }
 
-        avl_rebalance_tree((avl_vec_vertex_t**)&avl_tree->root, parent->parent);
+        avl_rebalance_tree((avl_node_t**)&avl_tree->root, parent->parent);
     } else {
         if (parent->left != NULL) {
             avl_tree->root = parent->left;
@@ -2618,14 +2608,14 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
             return 0;
         }
 
-        avl_rebalance_tree((avl_vec_vertex_t**)&avl_tree->root, (avl_vec_vertex_t*)avl_tree->root);
+        avl_rebalance_tree((avl_node_t**)&avl_tree->root, (avl_node_t*)avl_tree->root);
     }
 
     return 0;
 }
 
 ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
-    avl_vec_vertex_t *parent = (avl_vec_vertex_t *) avl_tree->root;
+    avl_node_t *parent = (avl_node_t *) avl_tree->root;
 
     while (true) {
         if (parent == NULL) {
@@ -2928,12 +2918,12 @@ double *rewards;
 
 static inline vector<ptd_edge_t *> avl_tree_as_list(ptd_avl_tree_t *avl_tree) {
     vector<ptd_edge_t *> vec;
-    stack<avl_vec_vertex_t *> s;
+    stack<avl_node_t *> s;
 
-    s.push((avl_vec_vertex_t *) avl_tree->root);
+    s.push((avl_node_t *) avl_tree->root);
 
     while (!s.empty()) {
-        avl_vec_vertex_t *v = s.top();
+        avl_node_t *v = s.top();
         s.pop();
 
         if (v == NULL) {

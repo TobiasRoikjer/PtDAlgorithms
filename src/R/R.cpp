@@ -1,12 +1,13 @@
 #include <Rcpp.h>
-#include "../../api/cpp/ptdalgorithmscpp.h"
+#include "../../src/c/ptdalgorithms.h"
+#include "../../src/cpp/ptdalgorithmscpp.h"
 
 using namespace Rcpp;
 using namespace ptdalgorithms;
 
 /*** R
 n = 25
-graph <- create_graph(n, n)
+graph <- create_graph(n)
   
 kingman_visit <- function(vertex) {
   for (i in 1:n) {
@@ -33,18 +34,18 @@ kingman_visit <- function(vertex) {
       child_state[j] <- child_state[j] - 1
       child_state[i+j] <- child_state[i+j] + 1
       
-      child = find_or_create_vertex(graph, child_state, child_state)
+      child = find_or_create_vertex(graph, child_state)
         
       add_edge(vertex,child, rate)
     }
   }
 }
 
-  start <- create_vertex(graph, c(n, rep(0, n-1)), c(n, rep(0, n-1)))
-  add_edge(start_vertex(graph), start, 1)
-  visit_vertices(graph, kingman_visit)
+  start <- create_vertex(graph, c(n, rep(0, n-1)))
+  #add_edge(start_vertex(graph), start, 1)
+  #visit_vertices(graph, kingman_visit)
   
-  vertices(graph)
+  #vertices(graph)
 */
 
 SEXP get_first_list_entry(SEXP e, std::string message) {
@@ -90,9 +91,12 @@ List edges(SEXP phase_type_vertex) {
   List r_edges(edges.size());
   
   for (size_t i = 0; i < edges.size(); i++) {
+    Vertex child = edges[i].to;
+    Rcpp::XPtr<Vertex> xptr_child(&child);
+    
     r_edges[i] = List::create(
       Named("weight") = edges[i].weight,
-      _["child"] = Rcpp::XPtr<Vertex>(edges[i].to)
+      _["child"] = xptr_child
     );
   }
   
@@ -116,15 +120,17 @@ void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double wei
   Rcpp::XPtr<Vertex> from(phase_type_vertex_from);
   Rcpp::XPtr<Vertex> to(phase_type_vertex_to);
   
-  from->add_edge(to, weight);
+  from->add_edge(*to.get(), weight);
 }
 
 // [[Rcpp::export]]
 SEXP create_vertex(SEXP phase_type_graph, IntegerVector state) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
-  Vertex vertex = graph->create_vertex(as<std::vector<size_t> >(state));
+  Vertex *vertex = graph->create_vertex_p(as<std::vector<size_t> >(state));
 
-  return Rcpp::XPtr<Vertex>(vertex);
+  return Rcpp::XPtr<Vertex>(
+    vertex
+  );
 }
 
 // [[Rcpp::export]]
@@ -135,30 +141,35 @@ SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
     return List::get_na();
   }
   
+  Vertex *found = graph->find_vertex_p(as<std::vector<size_t> >(state));
+  
   return Rcpp::XPtr<Vertex>(
-    graph->find_vertex(as<std::vector<size_t> >(state))
+    found
   );
 }
 
 
 // [[Rcpp::export]]
 SEXP find_or_create_vertex(SEXP phase_type_graph, IntegerVector state, NumericVector rewards) {
-  SEXP vertex = find_vertex(phase_type_graph, state);
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  Vertex *found = graph->find_or_create_vertex_p(as<std::vector<size_t> >(state));
   
   return Rcpp::XPtr<Vertex>(
-    graph->find_or_create_vertex(as<std::vector<size_t> >(state))
+    found
   );
 }
 
 // [[Rcpp::export]]
 SEXP start_vertex(SEXP phase_type_graph) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
+  Vertex *vertex = graph->start_vertex_p();
   
   return Rcpp::XPtr<Vertex>(
-      graph->start_vertex()
+      vertex
   );
 }
 
+/*
 // [[Rcpp::export]]
 List vertices(SEXP phase_type_graph) {
   Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
@@ -213,7 +224,7 @@ void visit_vertices(SEXP phase_type_graph, Rcpp::Function visit_function) {
   ptd_visit_vertices(graph->graph, custom_visit);
 }
 
-/*
+
 Rcpp::Function *custom_visit_function;
 
 void custom_visit(vertex_t *vertex) {

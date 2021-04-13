@@ -1,8 +1,8 @@
 #include <stdexcept>
 #include <sstream>
+#include <stack>
 #include "../c/io.h"
-#include "../../api/c/ptdalgorithms.h"
-#include "../../api/cpp/ptdalgorithmscpp.h"
+#include "ptdalgorithmscpp.h"
 
 static void assert_same_length(vector<size_t> state, ptd_graph_t *graph) {
     if (state.size() != graph->state_length) {
@@ -15,14 +15,14 @@ static void assert_same_length(vector<size_t> state, ptd_graph_t *graph) {
 }
 
 ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<size_t> state) {
-    assert_same_length(state, this->graph);
+    assert_same_length(state, this->rf_graph->graph);
 
     size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
     Vertex vertex = ptdalgorithms::Vertex(*this, c_state);
 
-    if (ptd_avl_tree_vertex_insert(this->tree, c_state, vertex.vertex)) {
+    if (ptd_avl_tree_vertex_insert(this->rf_graph->tree, c_state, vertex.vertex)) {
         throw runtime_error(
                 "Failed to insert into AVL tree\n"
         );
@@ -31,13 +31,30 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<size_t> state) 
     return vertex;
 }
 
-ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<size_t> state) const {
-    assert_same_length(state, this->graph);
+ptdalgorithms::Vertex *ptdalgorithms::Graph::create_vertex_p(vector<size_t> state) {
+    assert_same_length(state, this->rf_graph->graph);
 
     size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->tree, c_state);
+    Vertex *vertex = new ptdalgorithms::Vertex(*this, c_state);
+
+    if (ptd_avl_tree_vertex_insert(this->rf_graph->tree, c_state, vertex->vertex)) {
+        throw runtime_error(
+                "Failed to insert into AVL tree\n"
+        );
+    }
+
+    return vertex;
+}
+
+ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<size_t> state) {
+    assert_same_length(state, this->rf_graph->graph);
+
+    size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
+    std::copy(state.begin(), state.end(), c_state);
+
+    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     if (vertex == NULL) {
         throw runtime_error(
@@ -50,13 +67,32 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<size_t> state) co
     return ptdalgorithms::Vertex(*this, vertex);
 }
 
-bool ptdalgorithms::Graph::vertex_exists(std::vector<size_t> state) {
-    assert_same_length(state, this->graph);
+ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<size_t> state) {
+    assert_same_length(state, this->rf_graph->graph);
 
     size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->tree, c_state);
+    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+
+    if (vertex == NULL) {
+        throw runtime_error(
+                "No such vertex found\n"
+        );
+    }
+
+    free(c_state);
+
+    return new ptdalgorithms::Vertex(*this, vertex);
+}
+
+bool ptdalgorithms::Graph::vertex_exists(std::vector<size_t> state) {
+    assert_same_length(state, this->rf_graph->graph);
+
+    size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
+    std::copy(state.begin(), state.end(), c_state);
+
+    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     free(c_state);
 
@@ -71,34 +107,46 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::find_or_create_vertex(vector<size_t>
     }
 }
 
-ptdalgorithms::Vertex ptdalgorithms::Graph::start_vertex() const {
-    return Vertex(*this, this->graph->start_vertex);
+ptdalgorithms::Vertex *ptdalgorithms::Graph::find_or_create_vertex_p(vector<size_t> state) {
+    if (vertex_exists(state)) {
+        return find_vertex_p(state);
+    } else {
+        return this->create_vertex_p(state);
+    }
 }
 
-std::vector<ptdalgorithms::Vertex> ptdalgorithms::Graph::vertices() const {
-    std::vector<ptd_edge_t *> vec;
-    std::stack<avl_vec_vertex_t *> s;
+ptdalgorithms::Vertex ptdalgorithms::Graph::start_vertex() {
+    return Vertex(*this, this->rf_graph->graph->start_vertex);
+}
 
-    s.push((avl_vec_vertex_t *) avl_tree->root);
+ptdalgorithms::Vertex *ptdalgorithms::Graph::start_vertex_p() {
+    return new Vertex(*this, this->rf_graph->graph->start_vertex);
+}
+
+std::vector<ptdalgorithms::Vertex> ptdalgorithms::Graph::vertices() {
+    std::vector<Vertex> vec;
+    std::stack<avl_node_t *> s;
+
+    s.push((avl_node_t *) rf_graph->tree->root);
 
     while (!s.empty()) {
-        avl_vec_vertex_t *v = s.top();
+        avl_node_t *v = s.top();
         s.pop();
 
         if (v == NULL) {
             continue;
         }
 
-        vec.push_back((ptd_edge_t *) v->entry);
+        vec.push_back(Vertex(*this, ((ptd_vertex_t *) v->entry)));
         s.push(v->left);
         s.push(v->right);
     }
 
 
-    return Vertex(*this, this->graph->start_vertex);
+    return vec;
 }
 
-void ptdalgorithms::Vertex::add_edge(const Vertex &to, long double weight) {
+void ptdalgorithms::Vertex::add_edge(Vertex &to, long double weight) {
     if (this->vertex == to.vertex) {
         throw new std::invalid_argument(
                 "The edge to add is between the same vertex\n"
@@ -111,7 +159,7 @@ void ptdalgorithms::Vertex::add_edge(const Vertex &to, long double weight) {
 std::vector<size_t> ptdalgorithms::Vertex::state() {
     return std::vector<size_t>(
             this->vertex->state,
-            this->vertex->state + this->graph.graph->state_length
+            this->vertex->state + this->graph.rf_graph->graph->state_length
     );
 }
 
@@ -119,8 +167,9 @@ std::vector<ptdalgorithms::Edge> ptdalgorithms::Vertex::edges() {
     std::vector<Edge> vector;
 
     for (size_t i = 0; i < this->vertex->edges_length; ++i) {
+        Vertex vertex = Vertex(this->graph, this->vertex->edges[i].to);
         Edge edge_i(
-                Vertex(this->graph, this->vertex->edges[i].to),
+                vertex,
                 this->vertex->edges[i].weight
         );
 

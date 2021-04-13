@@ -10,14 +10,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 #set(CMAKE_CXX_FLAGS_DEBUG "-O3")
 #set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 #add_executable(cpp_test test/test.cpp api/c/ptd.h test/generation.h src/c/phase.cpp test/generation.cpp src/c/io.cpp src/c/io.h)
-add_executable(tester2 test/tester.cpp src/c/phase.cpp api/c/ptdalgorithms.h src/c/io.cpp src/c/io.h)
+add_executable(tester2 test/tester.cpp src/c/ptdalgorithms.cpp api/c/ptdalgorithms.h src/c/io.cpp src/c/io.h)
 #add_executable(experiments test/experiments.cpp src/c/phase.cpp api/c/ptd.h src/c/io.cpp src/c/io.h)
 
 
 cmake_minimum_required(VERSION 3.9)
 project(ptdalgorithms VERSION 1.0.0 DESCRIPTION "Efficient graph based phase-type distribution algorithms")
 include(GNUInstallDirs)
-add_library(libptdalgorithms SHARED api/c/ptdalgorithms.h src/c/phase.cpp)
+add_library(libptdalgorithms SHARED api/c/ptdalgorithms.h src/c/ptdalgorithms.cpp)
 set_target_properties(libptdalgorithms PROPERTIES
         VERSION ${PROJECT_VERSION}
         SOVERSION 1
@@ -30,7 +30,7 @@ install(TARGETS libptdalgorithms
 install(FILES ${CMAKE_BINARY_DIR}/ptdalgorithms.pc
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pkgconfig)
 
-add_library(libptdalgorithmscpp SHARED api/c/ptdalgorithms.h src/c/phase.cpp src/c/io.cpp src/c/io.h src/cpp/ptdalgorithmscpp.cpp api/cpp/ptdalgorithmscpp.h)
+add_library(libptdalgorithmscpp SHARED api/c/ptdalgorithms.h src/c/ptdalgorithms.cpp src/c/ptdalgorithms.h src/c/io.cpp src/c/io.h src/cpp/ptdalgorithmscpp.cpp api/cpp/ptdalgorithmscpp.h src/cpp/ptdalgorithmscpp.h)
 add_executable(testcpp test/testcpp.cpp)
 target_link_libraries (testcpp LINK_PUBLIC libptdalgorithmscpp)
 
