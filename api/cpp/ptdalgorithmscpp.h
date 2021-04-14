@@ -14,6 +14,8 @@ namespace ptdalgorithms {
 
     struct Edge;
 
+    class PhaseTypeDistribution;
+
     class Graph {
     public:
         Graph(const Graph &o) {
@@ -49,7 +51,7 @@ namespace ptdalgorithms {
 
 
             if (*this->rf_graph->references == 0) {
-                ptd_avl_tree_vertex_destroy_free(this->rf_graph->tree);
+                ptd_avl_tree_vertex_destroy(this->rf_graph->tree);
                 ptd_graph_destroy(this->rf_graph->graph);
                 free(this->rf_graph->references);
             }
@@ -76,6 +78,10 @@ namespace ptdalgorithms {
         Vertex *start_vertex_p();
 
         std::vector<Vertex> vertices();
+
+        void visit_vertices(int (*visit_func)(Graph &graph, Vertex &vertex));
+
+        PhaseTypeDistribution phase_type_distribution();
 
     public:
         Graph &operator=(const Graph &o) {
@@ -114,23 +120,23 @@ namespace ptdalgorithms {
                 throw std::runtime_error("Failed to create ptd_vertex\n");
             }
 
-            fprintf(stderr, "Vertex created\n");
-        }
-
-        Vertex(Graph &graph, ptd_vertex_t *vertex) : graph(graph) {
-            this->vertex = vertex;
-
-            fprintf(stderr, "Vertex created\n");
+            //fprintf(stderr, "Vertex created\n");
         }
 
     public:
+        Vertex(Graph &graph, ptd_vertex_t *vertex) : graph(graph) {
+            this->vertex = vertex;
+
+            //fprintf(stderr, "Vertex created\n");
+        }
+
         ~Vertex() {
-            fprintf(stderr, "Destroying vertex  \n");
+            //fprintf(stderr, "Destroying vertex  \n");
         }
 
         void add_edge(Vertex &to, long double weight);
 
-        std::vector<size_t> state();
+        std::vector<size_t> state() const;
 
         std::vector<Edge> edges();
 
@@ -168,6 +174,31 @@ namespace ptdalgorithms {
         }
 
         friend class Vertex;
+    };
+
+    class PhaseTypeDistribution {
+    private:
+        PhaseTypeDistribution(ptd_phase_type_distribution_t *matrix) {
+            this->length = matrix->length;
+            this->sub_intensity_matrix = matrix->sub_intensity_matrix;
+            this->initial_probability_vector = matrix->initial_probability_vector;
+            this->vertices = matrix->vertices;
+            this->distribution = matrix;
+        }
+
+        ptd_phase_type_distribution_t *distribution;
+
+    public:
+        ~PhaseTypeDistribution() {
+            ptd_phase_type_distribution_free(distribution);
+        }
+
+        size_t length;
+        long double **sub_intensity_matrix;
+        long double *initial_probability_vector;
+        ptd_vertex_t **vertices;
+
+        friend class Graph;
     };
 }
 

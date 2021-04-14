@@ -1,6 +1,8 @@
 #include <stdexcept>
 #include <sstream>
 #include <stack>
+#include <cerrno>
+#include <cstring>
 #include "../c/io.h"
 #include "ptdalgorithmscpp.h"
 
@@ -146,6 +148,50 @@ std::vector<ptdalgorithms::Vertex> ptdalgorithms::Graph::vertices() {
     return vec;
 }
 
+ptdalgorithms::PhaseTypeDistribution ptdalgorithms::Graph::phase_type_distribution() {
+    ptd_phase_type_distribution_t *matrix = ptd_graph_as_phase_type_distribution(this->rf_graph->graph);
+
+    if (matrix == NULL) {
+        char msg[1024];
+
+        snprintf(msg, 1024, "Failed to make sub-intensity matrix: %s \n", std::strerror(errno));
+
+        throw new std::runtime_error(
+                msg
+        );
+    }
+
+    return PhaseTypeDistribution(matrix);
+}
+
+static int (*cpp_visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &vertex);
+
+static ptdalgorithms::Graph *cpp_graph;
+
+static int visit_from_cpp(ptd_vertex_t *vertex) {
+    ptdalgorithms::Vertex t(*cpp_graph, vertex);
+
+    return cpp_visit_func(*cpp_graph, t);
+}
+
+void ptdalgorithms::Graph::visit_vertices(
+        int (*visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &vertex)
+) {
+    cpp_visit_func = visit_func;
+    cpp_graph = this;
+    int res = ptd_visit_vertices(this->rf_graph->graph, visit_from_cpp);
+
+    if (res != 0) {
+        char msg[1024];
+
+        snprintf(msg, 1024, "Failed to visit vertices, visit function returned non-zero: %s \n", std::strerror(errno));
+
+        throw new std::runtime_error(
+                msg
+        );
+    }
+}
+
 void ptdalgorithms::Vertex::add_edge(Vertex &to, long double weight) {
     if (this->vertex == to.vertex) {
         throw new std::invalid_argument(
@@ -156,7 +202,7 @@ void ptdalgorithms::Vertex::add_edge(Vertex &to, long double weight) {
     ptd_add_edge(this->vertex, to.vertex, weight);
 }
 
-std::vector<size_t> ptdalgorithms::Vertex::state() {
+std::vector<size_t> ptdalgorithms::Vertex::state() const {
     return std::vector<size_t>(
             this->vertex->state,
             this->vertex->state + this->graph.rf_graph->graph->state_length

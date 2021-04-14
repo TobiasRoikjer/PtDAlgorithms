@@ -697,7 +697,7 @@ vertex_t *generate_state_space(
 
         vertex_t *child;
         avl_node_t *bst_entry = (avl_node_t *) avl_vec_find(bst, (char *) &state[0],
-                                                                        state_length * sizeof(vec_entry_t));
+                                                            state_length * sizeof(vec_entry_t));
 
         if (bst_entry != NULL) {
             fprintf(stderr, "Two edges with the same state have already been added to the initial state\n");
@@ -778,7 +778,7 @@ vertex_t *generate_state_space(
 
             vertex_t *child;
             avl_node_t *bst_entry = (avl_node_t *) avl_vec_find(bst, (char *) &child_state[0],
-                                                                            state_length * sizeof(vec_entry_t));
+                                                                state_length * sizeof(vec_entry_t));
 
             if (bst_entry == NULL) {
                 vector<pair<double, vector<size_t> > > children = visit_function(child_state);
@@ -2270,6 +2270,8 @@ void ptd_vertex_destroy(ptd_vertex_t *vertex) {
     vertex->edges = NULL;
     free(vertex->state);
     vertex->state = NULL;
+    vertex->edges_length = 0;
+    vertex->edges_limit = 0;
 
     if (vertex->graph != NULL) {
         vertex->graph->vertices_length--;
@@ -2319,7 +2321,7 @@ void _ptd_avl_tree_vertex_destroy_free(avl_node_t *avl_vertex) {
     _ptd_avl_tree_vertex_destroy_free(avl_vertex->left);
     _ptd_avl_tree_vertex_destroy_free(avl_vertex->right);
 
-    ptd_vertex_destroy((ptd_vertex_t*)avl_vertex->entry);
+    ptd_vertex_destroy((ptd_vertex_t *) avl_vertex->entry);
     avl_vertex->left = NULL;
     avl_vertex->right = NULL;
     avl_vertex->entry = NULL;
@@ -2468,7 +2470,6 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
     return 0;
 
 
-
     return 0;
 }
 
@@ -2567,7 +2568,9 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
 
     avl_node_t *parent = root;
 
-    enum DIR {NONE, LEFT, RIGHT};
+    enum DIR {
+        NONE, LEFT, RIGHT
+    };
     DIR dir = NONE;
 
     while (true) {
@@ -2597,7 +2600,7 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
             parent->parent->left = NULL;
         }
 
-        avl_rebalance_tree((avl_node_t**)&avl_tree->root, parent->parent);
+        avl_rebalance_tree((avl_node_t **) &avl_tree->root, parent->parent);
     } else {
         if (parent->left != NULL) {
             avl_tree->root = parent->left;
@@ -2608,7 +2611,7 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
             return 0;
         }
 
-        avl_rebalance_tree((avl_node_t**)&avl_tree->root, (avl_node_t*)avl_tree->root);
+        avl_rebalance_tree((avl_node_t **) &avl_tree->root, (avl_node_t *) avl_tree->root);
     }
 
     return 0;
@@ -2757,14 +2760,18 @@ int ptd_label_vertices(ptd_graph_t *graph) {
     ptd_reset_graph_visited(graph);
 
     queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
-    size_t index = 0;
+    size_t index = 1;
 
     while (!q.empty()) {
         ptd_vertex_t *vertex = q.front();
         q.pop();
 
-        vertex->index = index;
-        index++;
+        if (vertex->edges_length == 0) {
+            vertex->index = 0;
+        } else {
+            vertex->index = index;
+            index++;
+        }
     }
 
     return 0;
@@ -3100,3 +3107,120 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
 
     return 0;
 }
+
+void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd) {
+    for (size_t i = 0; i < ptd->memory_allocated; ++i) {
+        free(ptd->sub_intensity_matrix[i]);
+
+        ptd->sub_intensity_matrix[i] = NULL;
+    }
+
+    free(ptd->vertices);
+    free(ptd->sub_intensity_matrix);
+    free(ptd->initial_probability_vector);
+
+    ptd->vertices = NULL;
+    ptd->sub_intensity_matrix = NULL;
+    ptd->initial_probability_vector = NULL;
+
+    ptd->memory_allocated = 0;
+    ptd->length = 0;
+
+    free(ptd);
+}
+
+ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph) {
+    // TODO: remove this
+    ptd_label_vertices(graph);
+
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+
+    ptd_phase_type_distribution_t *res = (ptd_phase_type_distribution_t *) malloc(sizeof(*res));
+
+    if (res == NULL) {
+        return NULL;
+    }
+
+    res->length = 0;
+
+    size_t size = (size_t) q.size();
+
+    res->memory_allocated = size;
+    res->vertices = (ptd_vertex_t **) calloc(size, sizeof(ptd_vertex_t *));
+
+    if (res->vertices == NULL) {
+        free(res);
+        return NULL;
+    }
+
+    res->initial_probability_vector = (long double *) calloc(size, sizeof(long double));
+
+    if (res->initial_probability_vector == NULL) {
+        free(res->vertices);
+        free(res);
+        return NULL;
+    }
+
+    res->sub_intensity_matrix = (long double **) calloc(size, sizeof(long double *));
+
+    if (res->sub_intensity_matrix == NULL) {
+        free(res->initial_probability_vector);
+        free(res->vertices);
+        free(res);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < size; ++i) {
+        res->sub_intensity_matrix[i] = (long double *) calloc(size, sizeof(long double));
+
+        if ((res->sub_intensity_matrix)[i] == NULL) {
+            for (size_t j = 0; j < i; ++j) {
+                free(res->sub_intensity_matrix[j]);
+            }
+
+            free(res->sub_intensity_matrix);
+            free(res->initial_probability_vector);
+            free(res->vertices);
+            free(res);
+            return NULL;
+        }
+
+    }
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        if (vertex->index == 0) {
+            continue;
+        }
+
+        if (vertex == graph->start_vertex) {
+            for (size_t i = 0; i < vertex->edges_length; ++i) {
+                ptd_edge_t edge = vertex->edges[i];
+
+                if (edge.to->index != 0) {
+                    res->initial_probability_vector[edge.to->index - 1 - 1] = edge.weight;
+                }
+            }
+
+            continue;
+        }
+
+        res->vertices[vertex->index - 2] = vertex;
+        res->length++;
+
+        for (size_t i = 0; i < vertex->edges_length; ++i) {
+            ptd_edge_t edge = vertex->edges[i];
+
+            if (edge.to->index != 0) {
+                res->sub_intensity_matrix[vertex->index - 2][edge.to->index - 2] += edge.weight;
+            }
+
+            res->sub_intensity_matrix[vertex->index - 2][vertex->index - 2] -= edge.weight;
+        }
+    }
+
+    return res;
+}
+

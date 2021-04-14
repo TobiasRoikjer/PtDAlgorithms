@@ -311,4 +311,16 @@ ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_ent
 //TODO: remove?
 size_t ptd_avl_tree_max_depth(void *avl_vec_vertex);
 
+typedef struct {
+    size_t length;
+    long double *initial_probability_vector;
+    long double **sub_intensity_matrix;
+    ptd_vertex_t **vertices;
+    size_t memory_allocated;
+} ptd_phase_type_distribution_t;
+
+ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph);
+
+void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd);
+
 #endif //PTDALGORITHMS_PTD_H

@@ -5,8 +5,8 @@ graph_as_matrix <- function(phase_type_graph) {
     .Call('_ptdalgorithms_graph_as_matrix', PACKAGE = 'ptdalgorithms', phase_type_graph)
 }
 
-matrix_as_graph <- function(initial_probability_vector, subintensity_matrix, rewards) {
-    .Call('_ptdalgorithms_matrix_as_graph', PACKAGE = 'ptdalgorithms', initial_probability_vector, subintensity_matrix, rewards)
+matrix_as_graph <- function(initial_probability_vector, phase_type_distribution, rewards) {
+    .Call('_ptdalgorithms_matrix_as_graph', PACKAGE = 'ptdalgorithms', initial_probability_vector, phase_type_distribution, rewards)
 }
 
 kingman_gen_graph <- function(n, m) {

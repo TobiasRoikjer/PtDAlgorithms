@@ -17,15 +17,15 @@ BEGIN_RCPP
 END_RCPP
 }
 // matrix_as_graph
-SEXP matrix_as_graph(NumericVector initial_probability_vector, NumericMatrix subintensity_matrix, NumericMatrix rewards);
-RcppExport SEXP _ptdalgorithms_matrix_as_graph(SEXP initial_probability_vectorSEXP, SEXP subintensity_matrixSEXP, SEXP rewardsSEXP) {
+SEXP matrix_as_graph(NumericVector initial_probability_vector, NumericMatrix phase_type_distribution, NumericMatrix rewards);
+RcppExport SEXP _ptdalgorithms_matrix_as_graph(SEXP initial_probability_vectorSEXP, SEXP phase_type_distributionSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericVector >::type initial_probability_vector(initial_probability_vectorSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type subintensity_matrix(subintensity_matrixSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type phase_type_distribution(phase_type_distributionSEXP);
     Rcpp::traits::input_parameter< NumericMatrix >::type rewards(rewardsSEXP);
-    rcpp_result_gen = Rcpp::wrap(matrix_as_graph(initial_probability_vector, subintensity_matrix, rewards));
+    rcpp_result_gen = Rcpp::wrap(matrix_as_graph(initial_probability_vector, phase_type_distribution, rewards));
     return rcpp_result_gen;
 END_RCPP
 }
