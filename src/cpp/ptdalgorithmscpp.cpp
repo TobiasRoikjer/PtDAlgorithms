@@ -175,11 +175,12 @@ static int visit_from_cpp(ptd_vertex_t *vertex) {
 }
 
 void ptdalgorithms::Graph::visit_vertices(
-        int (*visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &vertex)
+        int (*visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &vertex),
+        bool include_start
 ) {
     cpp_visit_func = visit_func;
     cpp_graph = this;
-    int res = ptd_visit_vertices(this->rf_graph->graph, visit_from_cpp);
+    int res = ptd_visit_vertices(this->rf_graph->graph, visit_from_cpp, include_start);
 
     if (res != 0) {
         char msg[1024];
@@ -202,10 +203,10 @@ void ptdalgorithms::Vertex::add_edge(Vertex &to, long double weight) {
     ptd_add_edge(this->vertex, to.vertex, weight);
 }
 
-std::vector<size_t> ptdalgorithms::Vertex::state() const {
+std::vector<size_t> ptdalgorithms::Vertex::state() {
     return std::vector<size_t>(
             this->vertex->state,
-            this->vertex->state + this->graph.rf_graph->graph->state_length
+            this->vertex->state + this->vertex->graph->state_length
     );
 }
 
@@ -213,9 +214,9 @@ std::vector<ptdalgorithms::Edge> ptdalgorithms::Vertex::edges() {
     std::vector<Edge> vector;
 
     for (size_t i = 0; i < this->vertex->edges_length; ++i) {
-        Vertex vertex = Vertex(this->graph, this->vertex->edges[i].to);
         Edge edge_i(
-                vertex,
+                this->vertex->edges[i].to,
+                graph,
                 this->vertex->edges[i].weight
         );
 

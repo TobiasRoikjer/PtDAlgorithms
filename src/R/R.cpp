@@ -6,7 +6,7 @@ using namespace Rcpp;
 using namespace ptdalgorithms;
 
 /*** R
-n = 5
+n = 6
 graph <- create_graph(n)
   
   kingman_visit <- function(vertex) {
@@ -46,8 +46,12 @@ graph <- create_graph(n)
   add_edge(start_vertex(graph), start, 1)
   visit_vertices(graph, kingman_visit)
   
-   print(graph_as_matrix(graph))
-  */
+  index_topological(graph)
+  index_invert(graph)
+  
+  
+  print(graph_as_matrix(graph))
+*/
 
 SEXP get_first_list_entry(SEXP e, std::string message) {
   if (Rf_isList(e) || Rf_isNewList(e)) {
@@ -135,6 +139,20 @@ SEXP create_vertex(SEXP phase_type_graph, IntegerVector state) {
   return Rcpp::XPtr<Vertex>(
     vertex
   );
+}
+
+// [[Rcpp::export]]
+void index_topological(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  graph->index_topological();
+}
+
+// [[Rcpp::export]]
+void index_invert(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  graph->index_invert();
 }
 
 // [[Rcpp::export]]

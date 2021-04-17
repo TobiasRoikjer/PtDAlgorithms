@@ -211,6 +211,7 @@ struct ptd_vertex {
     bool reset;
 
     vec_entry_t *state;
+    void *data;
 };
 
 typedef struct ptd_edge {
@@ -222,6 +223,8 @@ struct ptd_graph {
     size_t state_length;
     ptd_vertex_t *start_vertex;
     size_t vertices_length;
+
+    bool is_indexed;
 };
 
 ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state);
@@ -234,7 +237,7 @@ ptd_vertex_t *ptd_vertex_create(ptd_graph_t *graph);
 
 void ptd_vertex_destroy(ptd_vertex_t *vertex);
 
-int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *));
+int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *), bool include_start);
 
 int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight);
 
@@ -322,5 +325,9 @@ typedef struct {
 ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph);
 
 void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd);
+
+int ptd_index_topological(ptd_graph_t *graph);
+
+int ptd_index_invert(ptd_graph_t *graph);
 
 #endif //PTDALGORITHMS_PTD_H

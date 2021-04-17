@@ -2193,6 +2193,7 @@ ptd_graph_t *ptd_graph_create(size_t state_length) {
 
     graph->start_vertex = start;
     graph->vertices_length = 2;
+    graph->is_indexed = true;
 
     return graph;
 }
@@ -2245,6 +2246,8 @@ ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state) {
     vertex->visited = false;
     vertex->reset = true;
     vertex->graph = graph;
+    vertex->data = NULL;
+    vertex->index = 0;
 
     graph->vertices_length++;
 
@@ -2272,6 +2275,8 @@ void ptd_vertex_destroy(ptd_vertex_t *vertex) {
     vertex->state = NULL;
     vertex->edges_length = 0;
     vertex->edges_limit = 0;
+    free(vertex->data);
+    vertex->data = NULL;
 
     if (vertex->graph != NULL) {
         vertex->graph->vertices_length--;
@@ -2637,7 +2642,7 @@ ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_ent
     }
 }
 
-int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *)) {
+int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *), bool include_start) {
     vertices_to_visit = new queue<ptd_vertex_t *>;
     *vertices_to_visit = ptd_enqueue_vertices(graph);
 
@@ -2645,7 +2650,7 @@ int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *)) {
         ptd_vertex_t *vertex = vertices_to_visit->front();
         vertices_to_visit->pop();
 
-        if (vertex == graph->start_vertex) {
+        if (!include_start && vertex == graph->start_vertex) {
             continue;
         }
 
@@ -2663,6 +2668,35 @@ int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *)) {
 }
 
 int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
+    /*fprintf(stderr, "Adding edge between ");
+    fprintf(stderr, "%zu %zu %zu %zu %zu %zu ",
+            from->state[0],
+            from->state[1],
+            from->state[2],
+            from->state[3],
+            from->state[4],
+            from->state[5]
+    );
+
+    fprintf(stderr, "AND %zu %zu %zu %zu %zu %zu\n",
+            to->state[0],
+            to->state[1],
+            to->state[2],
+            to->state[3],
+            to->state[4],
+            to->state[5]
+    );*/
+
+    // TODO: improve the speed of this...
+    for (size_t i = 0; i < from->edges_length; ++i) {
+        if (from->edges[i].to == to) {
+            from->edges[i].weight += weight;
+            from->rate += weight;
+            return 0;
+        }
+    }
+
+
     if (from->edges_length + 1 >= from->edges_limit) {
         from->edges_limit *= 2;
         from->edges = (ptd_edge_t *) realloc(
@@ -2679,6 +2713,7 @@ int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
     from->edges[from->edges_length].weight = weight;
     from->edges_length++;
     from->rate += weight;
+    from->graph->is_indexed = false;
 
     return 0;
 }
@@ -2773,6 +2808,8 @@ int ptd_label_vertices(ptd_graph_t *graph) {
             index++;
         }
     }
+
+    graph->is_indexed = true;
 
     return 0;
 }
@@ -3130,8 +3167,9 @@ void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd) {
 }
 
 ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph) {
-    // TODO: remove this
-    ptd_label_vertices(graph);
+    if (!graph->is_indexed) {
+        ptd_label_vertices(graph);
+    }
 
     queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
 
@@ -3224,3 +3262,115 @@ ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t 
     return res;
 }
 
+static int *topo_values;
+
+int ptd_index_topological(ptd_graph_t *graph) {
+    queue<ptd_vertex_t *> topological_queue;
+    queue<ptd_vertex_t *> q;
+
+    q = ptd_enqueue_vertices(graph);
+    topo_values = (int *) calloc(q.size(), sizeof(*topo_values));
+
+    if (topo_values == NULL) {
+        return -1;
+    }
+
+    size_t index = 0;
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        vertex->index = index;
+
+        index++;
+    }
+
+    q = ptd_enqueue_vertices(graph);
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        for (size_t i = 0; i < vertex->edges_length; ++i) {
+            topo_values[vertex->edges[i].to->index]++;
+        }
+    }
+
+    ptd_reset_graph_visited(graph);
+
+    q.push(graph->start_vertex);
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        topological_queue.push(vertex);
+
+        for (size_t i = 0; i < vertex->edges_length; ++i) {
+            ptd_vertex_t *child = vertex->edges[i].to;
+
+            topo_values[child->index] -= 1;
+
+            if (topo_values[child->index] == 0 && !child->visited) {
+                child->visited = true;
+                q.push(child);
+            }
+        }
+    }
+
+    index = 1;
+
+    while (!topological_queue.empty()) {
+        ptd_vertex_t *vertex = topological_queue.front();
+        topological_queue.pop();
+
+        if (vertex->edges_length == 0) {
+            vertex->index = 0;
+            continue;
+        }
+
+        vertex->index = index;
+        index++;
+    }
+
+    free(topo_values);
+    graph->is_indexed = true;
+
+    return 0;
+}
+
+int ptd_index_invert(ptd_graph_t *graph) {
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+    size_t largest_index = 0;
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        if (vertex->index > largest_index) {
+            largest_index = vertex->index;
+        }
+    }
+
+    q = ptd_enqueue_vertices(graph);
+
+    while (!q.empty()) {
+        ptd_vertex_t *vertex = q.front();
+        q.pop();
+
+        if (vertex->edges_length == 0) {
+            vertex->index = 0;
+            continue;
+        }
+
+        if (vertex == graph->start_vertex) {
+            vertex->index = 1;
+            continue;
+        }
+
+        vertex->index = largest_index - vertex->index + 2;
+    }
+
+    return 0;
+}

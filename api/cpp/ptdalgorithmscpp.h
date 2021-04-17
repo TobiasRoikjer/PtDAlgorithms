@@ -79,7 +79,16 @@ namespace ptdalgorithms {
 
         std::vector<Vertex> vertices();
 
-        void visit_vertices(int (*visit_func)(Graph &graph, Vertex &vertex));
+        void index_topological() {
+            ptd_index_topological(rf_graph->graph);
+        }
+
+        void index_invert() {
+            ptd_index_invert(rf_graph->graph);
+        }
+
+        void visit_vertices(int (*visit_func)(Graph &graph, Vertex &vertex),
+                            bool include_start = false);
 
         PhaseTypeDistribution phase_type_distribution();
 
@@ -105,6 +114,10 @@ namespace ptdalgorithms {
             return *this;
         }
 
+        ptd_graph_t *c_graph() {
+            return rf_graph->graph;
+        }
+
     private:
         struct rf_graph *rf_graph;
 
@@ -119,24 +132,19 @@ namespace ptdalgorithms {
             if (this->vertex == NULL) {
                 throw std::runtime_error("Failed to create ptd_vertex\n");
             }
-
-            //fprintf(stderr, "Vertex created\n");
         }
 
     public:
         Vertex(Graph &graph, ptd_vertex_t *vertex) : graph(graph) {
             this->vertex = vertex;
-
-            //fprintf(stderr, "Vertex created\n");
         }
 
         ~Vertex() {
-            //fprintf(stderr, "Destroying vertex  \n");
         }
 
         void add_edge(Vertex &to, long double weight);
 
-        std::vector<size_t> state() const;
+        std::vector<size_t> state();
 
         std::vector<Edge> edges();
 
@@ -151,25 +159,56 @@ namespace ptdalgorithms {
             return *this;
         }
 
+        ptd_vertex_t *c_vertex() {
+            return vertex;
+        }
+
+        long double rate() {
+            return vertex->rate;
+        }
+
+        void *getData() {
+            return vertex->data;
+        }
+
+        void setData(void *data) {
+            vertex->data = data;
+        }
+
     private:
-        ptd_vertex_t *vertex;
         Graph &graph;
+
+        ptd_vertex_t *vertex;
 
         friend class Graph;
     };
 
     struct Edge {
     private:
-        Edge(const Vertex &vertex, long double weight) : to(vertex) {
-            this->weight = weight;
+        Edge(ptd_vertex_t *vertex, Graph &graph, long double weight) : graph(graph) {
+            this->_weight = weight;
+            this->_vertex = vertex;
         }
 
+    private:
+        Graph &graph;
+        ptd_vertex_t *_vertex;
+        long double _weight;
+
     public:
-        const Vertex &to;
-        long double weight;
+        Vertex to() {
+            return Vertex(graph, _vertex);
+        }
+
+        long double weight() {
+            return _weight;
+        }
 
         Edge &operator=(const Edge &o) {
-            weight = o.weight;
+            _weight = o._weight;
+            _vertex = o._vertex;
+            graph = o.graph;
+
             return *this;
         }
 
