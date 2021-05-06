@@ -335,24 +335,30 @@ void test_can_find_scc2_graph() {
         ptd_vertex_t **vs;
         size_t length;
 
-        ptd_find_local_matrix(v, &length, &mat, &vs);
+        ptd_phase_type_distribution_t *ptd = ptd_find_local_matrix(v);
+        mat = ptd->sub_intensity_matrix;
+        vs = ptd->vertices;
+        length = ptd->length;
 
         for (size_t k = 0; k < length; ++k) {
             fprintf(stderr, "mat vertex %s\n", vertex_name((vs[k])));
         }
 
-        double *ipv = (double *) calloc(length, sizeof(*ipv));
+        long double *ipv = (long double *) calloc(length, sizeof(*ipv));
 
         fprintf(stderr, "IPV: ");
 
         for (size_t k = 0; k < length; ++k) {
             ipv[k] = *((double *) vs[k]->data);
-            fprintf(stderr, "%.2f\n", ipv[k]);
+            fprintf(stderr, "%.2Lf\n", ipv[k]);
+            *((double *) vs[k]->data) = 0;
         }
+        ptd->initial_probability_vector = ipv;
 
         fprintf(stderr, "\n");
 
         if (length == 1) {
+            ptd_phase_type_distribution_free(ptd);
             continue;
         }
 
@@ -383,14 +389,19 @@ void test_can_find_scc2_graph() {
 
             for (size_t k = 0; k < length; ++k) {
                 for (size_t j = 0; j < length; ++j) {
-                    fprintf(stderr, "MUltiplying vertex %s which is %f by %f * %f\n", vertex_name(vs[k]),
+                    fprintf(stderr, "MUltiplying vertex %s which is %f by %Lf * %f\n", vertex_name(vs[k]),
                             *((double *) vs[j]->data), ipv[k], -gsl_matrix_get(inv, k, j));
                     *((double *) vs[j]->data) += ipv[k] * -gsl_matrix_get(inv, k, j);
                 }
                 fprintf(stderr, "\n");
             }
             fprintf(stderr, "\n");
+
+            gsl_matrix_free(full);
+            gsl_matrix_free(inv);
         }
+
+        ptd_phase_type_distribution_free(ptd);
     }
 
     ptd_label_vertices(graph);
@@ -399,8 +410,19 @@ void test_can_find_scc2_graph() {
     gsl_matrix *full = gsl_matrix_alloc(ptd->length, ptd->length);
 
     for (size_t k = 0; k < ptd->length; ++k) {
+        fprintf(stderr, "   %s  ", vertex_name(ptd->vertices[k]));
+    }
+
+    fprintf(stderr, "\n");
+
+    for (size_t k = 0; k < ptd->length; ++k) {
+        fprintf(stderr, "%s ", vertex_name(ptd->vertices[k]));
         for (size_t j = 0; j < ptd->length; ++j) {
-            fprintf(stderr, "%.2Lf ", ptd->sub_intensity_matrix[k][j]);
+            if (k == j) {
+                fprintf(stderr, "%.2Lf ", ptd->sub_intensity_matrix[k][j]);
+            } else {
+                fprintf(stderr, "%.3Lf ", ptd->sub_intensity_matrix[k][j]);
+            }
             gsl_matrix_set(full, k, j, (double) ptd->sub_intensity_matrix[k][j]);
         }
         fprintf(stderr, "\n");
@@ -408,6 +430,7 @@ void test_can_find_scc2_graph() {
     fprintf(stderr, "\n");
 
     gsl_matrix *inv = matrix_invert(full, ptd->length);
+    gsl_matrix_free(full);
 
     for (size_t k = 0; k < ptd->length; ++k) {
         for (size_t j = 0; j < ptd->length; ++j) {
@@ -421,27 +444,38 @@ void test_can_find_scc2_graph() {
     fprintf(stderr, "TRUE RES: ");
 
     for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%s %Lf, ", vertex_name(ptd->vertices[k]),  *((double *) ptd->vertices[k]->data)/ ptd->vertices[k]->rate);
+        fprintf(stderr, "%s %f, ", vertex_name(ptd->vertices[k]),  -gsl_matrix_get(inv, 0, k));
     }
 
     fprintf(stderr, "\n");
 
-    fprintf(stderr, "RES: ");
+    fprintf(stderr, "OURS RES: ");
 
     for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%f ", *((double *) ptd->vertices[k]->data));
+        fprintf(stderr, "%s %Lf, ", vertex_name(ptd->vertices[k]), (*((double *) ptd->vertices[k]->data)) / ptd->vertices[k]->rate);
     }
 
     fprintf(stderr, "\n");
 
-
-    fprintf(stderr, "RESW: ");
+    fprintf(stderr, "TRUE RESP: ");
 
     for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%Lf ", (*((double *) ptd->vertices[k]->data)) / ptd->vertices[k]->rate);
+        fprintf(stderr, "%s %Lf, ", vertex_name(ptd->vertices[k]),  -gsl_matrix_get(inv, 0, k)* ptd->vertices[k]->rate);
     }
 
     fprintf(stderr, "\n");
+
+    fprintf(stderr, "OURS RESP: ");
+
+    for (size_t k = 0; k < ptd->length; ++k) {
+        fprintf(stderr, "%s %f, ", vertex_name(ptd->vertices[k]), (*((double *) ptd->vertices[k]->data)));
+    }
+
+    fprintf(stderr, "\n");
+
+
+
+    gsl_matrix_free(inv);
 
     ptd_strongly_connected_components_destroy(sccs);
     ptd_graph_destroy(graph);

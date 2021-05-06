@@ -282,8 +282,6 @@ ptd_order_strongly_connected_components(
         ptd_strongly_connected_components_t *sccs
 );
 
-int ptd_find_local_matrix(ptd_scc_vertex_t *in, size_t *length, long double ***mat, ptd_vertex_t ***vertices);
-
 typedef struct ptd_vertex_group ptd_vertex_group_t;
 
 struct ptd_vertex_group {
@@ -340,6 +338,9 @@ typedef struct {
 } ptd_phase_type_distribution_t;
 
 ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph);
+
+ptd_phase_type_distribution_t *
+ptd_find_local_matrix(ptd_scc_vertex_t *in);
 
 void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd);
 
