@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <math.h>
 #include <set>
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_linalg.h>
 #include "ptdalgorithms.h"
 
 static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
@@ -4071,6 +4073,7 @@ int ptd_visit_assign_probability(ptd_graph_t *graph) {
 
 static int compute_expected(ptd_vertex_t *vertex) {
     long double my_prob = *((long double *) vertex->data);
+
     long double my_expected;
 
     if (vertex->rate != 0) {
@@ -4085,8 +4088,6 @@ static int compute_expected(ptd_vertex_t *vertex) {
 }
 
 int ptd_visit_assign_expectation(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
-    ptd_index_topological(graph);
-    ptd_index_invert(graph);
     reward_function = reward;
     return ptd_visit_vertices(graph, compute_expected, true);
 }
@@ -4199,4 +4200,97 @@ int ptd_covariance(
     *covariance = cov_sum;
 
     return 0;
+}
+
+static int set_data_as_int(ptd_vertex_t *vertex) {
+    vertex->data = malloc(sizeof(long double));
+    *((long double *) vertex->data) = 0;
+
+    return 0;
+}
+
+static bool keep_all(ptd_vertex_t *vertex) {
+    return true;
+}
+
+static gsl_matrix *
+matrix_invert(gsl_matrix *matrix, size_t size) {
+    gsl_matrix *inverse = gsl_matrix_alloc(size, size);
+
+    int sign;
+    gsl_permutation *p = gsl_permutation_alloc(size);
+
+    gsl_linalg_LU_decomp(matrix, p, &sign);
+
+    gsl_linalg_LU_invert(matrix, p, inverse);
+
+    gsl_permutation_free(p);
+
+    return inverse;
+}
+
+double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
+    ptd_visit_vertices(graph, set_data_as_int, true);
+
+    *((long double *) graph->start_vertex->data) = 1;
+
+    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(
+            graph, keep_all
+    );
+
+    ptd_scc_vertex_t **vertices = ptd_order_strongly_connected_components(sccs);
+
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        ptd_scc_vertex_t *v = vertices[i];
+
+        long double **mat;
+        ptd_vertex_t **vs;
+        size_t length;
+
+        ptd_phase_type_distribution_t *ptd = ptd_find_local_matrix(v);
+        mat = ptd->sub_intensity_matrix;
+        vs = ptd->vertices;
+        length = ptd->length;
+
+        long double *ipv = (long double *) calloc(length, sizeof(*ipv));
+
+        for (size_t k = 0; k < length; ++k) {
+            ipv[k] = *((long double *) vs[k]->data);
+            *((long double *) vs[k]->data) = 0;
+        }
+
+        ptd->initial_probability_vector = ipv;
+
+        if (length == 1) {
+            ptd_phase_type_distribution_free(ptd);
+            continue;
+        }
+        gsl_matrix *full = gsl_matrix_alloc(length, length);
+
+        for (size_t k = 0; k < length; ++k) {
+            for (size_t j = 0; j < length; ++j) {
+                gsl_matrix_set(full, k, j, (double) mat[k][j]);
+            }
+        }
+
+        gsl_matrix *inv = matrix_invert(full, length);
+
+        for (size_t k = 0; k < length; ++k) {
+            for (size_t j = 0; j < length; ++j) {
+                *((long double *) vs[j]->data) += ipv[k] * -gsl_matrix_get(inv, k, j);
+            }
+        }
+        gsl_matrix_free(full);
+        gsl_matrix_free(inv);
+
+        ptd_phase_type_distribution_free(ptd);
+    }
+
+    *((long double*)graph->start_vertex->data) = 0;
+    ptd_visit_assign_expectation(graph, reward);
+
+    return ptd_visit_reduce_sum_long_double(graph);
+
+
+    ptd_strongly_connected_components_destroy(sccs);
 }

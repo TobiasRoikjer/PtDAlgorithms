@@ -9,7 +9,7 @@
 #include <gsl/gsl_matrix_double.h>
 #include <gsl/gsl_linalg.h>
 
-gsl_matrix *
+static gsl_matrix *
 matrix_invert(gsl_matrix *matrix, size_t size) {
     gsl_matrix *inverse = gsl_matrix_alloc(size, size);
 
@@ -266,6 +266,10 @@ void test_can_find_scc2() {
     ptd_graph_destroy(graph);
 }
 
+double reward_one(ptd_vertex_t *vertex) {
+    return 1;
+}
+
 int set_data_as_int(ptd_vertex_t *vertex) {
     vertex->data = malloc(sizeof(double));
     *((double *) vertex->data) = 0;
@@ -472,6 +476,8 @@ void test_can_find_scc2_graph() {
     }
 
     fprintf(stderr, "\n");
+
+    fprintf(stderr, "EXP %f\n", ptd_circular_exp(graph, reward_one));
 
 
 

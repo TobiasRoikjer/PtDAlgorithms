@@ -390,4 +390,6 @@ int ptd_covariance(
         double (*reward_1)(ptd_vertex_t *), double (*reward_2)(ptd_vertex_t *)
 );
 
+double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));
+
 #endif //PTDALGORITHMS_PTD_H
