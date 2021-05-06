@@ -6,10 +6,16 @@ using namespace Rcpp;
 using namespace ptdalgorithms;
 
 /*** R
-n = 6
+n = 25
 graph <- create_graph(n)
   
   kingman_visit <- function(vertex) {
+    if (vertex$vertex == start_vertex(graph)$vertex) {
+      start <- create_vertex(graph, c(n, rep(0, n-1)))
+      add_edge(start_vertex(graph), start, 1)
+      return()
+    }
+    
     for (i in 1:n) {
       for (j in i:n) {
         rate <- 0
@@ -41,27 +47,29 @@ graph <- create_graph(n)
     }
   }
 
-  start <- create_vertex(graph, c(n, rep(0, n-1)))
+  #add_edge(start_vertex(graph), start, 1)
+  visit_vertices(graph, kingman_visit, T)
   
-  add_edge(start_vertex(graph), start, 1)
-  visit_vertices(graph, kingman_visit)
-  
-  index_topological(graph)
-  index_invert(graph)
+  #index_topological(graph)
+  #index_invert(graph)
   
   
-  print(graph_as_matrix(graph))
+  #print(graph_as_matrix(graph))
 */
 
-SEXP get_first_list_entry(SEXP e, std::string message) {
+SEXP get_first_list_entry(SEXP e, char *message) {
+  char message_error[1024];
+  
   if (Rf_isList(e) || Rf_isNewList(e)) {
     List list = Rcpp::as<List>(e);
     
+    if (list.containsElementNamed("xptr_vertex")) {
+      return list["xptr_vertex"];
+    }
+    
     if (list.size() != 1) {
-      char message[1024];
-      
       snprintf(
-        message,
+        message_error,
         1024, 
         "Failed: When finding %s of a list-type of vertices, list can only contain 1 vertex, it contained %zu. Did you use [] as lookup instead of [[]]?",
         message,
@@ -69,11 +77,30 @@ SEXP get_first_list_entry(SEXP e, std::string message) {
       );
       
       throw std::runtime_error(
-          message
+          message_error
       );
     }
     
     e = list[0];
+    
+    if (Rf_isList(e) || Rf_isNewList(e)) {
+      List listc = Rcpp::as<List>(e);
+      
+      if (listc.containsElementNamed("xptr_vertex")) {
+        return listc["xptr_vertex"];
+      } else {
+        snprintf(
+          message_error,
+          1024, 
+          "Failed: When finding %s of a list-type of vertices, list did not have element with name xptr_vertex. Did you use [] as lookup instead of [[]]?",
+          message
+        );
+        
+        throw std::runtime_error(
+            message_error
+        );
+      }
+    }
   }
   
   return e;
@@ -81,7 +108,7 @@ SEXP get_first_list_entry(SEXP e, std::string message) {
 
 // [[Rcpp::export]]
 IntegerVector state(SEXP phase_type_vertex) {
-  phase_type_vertex = get_first_list_entry(phase_type_vertex, "state");
+  phase_type_vertex = get_first_list_entry(phase_type_vertex, (char*)"state");
   Rcpp::XPtr<Vertex> vertex(phase_type_vertex);
   
   vector<size_t> state = vertex->state();
@@ -90,21 +117,59 @@ IntegerVector state(SEXP phase_type_vertex) {
   return vec;
 }
 
+List vertex_as_list(Vertex *vertex) {
+  vector<size_t> state = vertex->state();
+  IntegerVector state_vec(state.begin(), state.end());
+  
+  return List::create(
+    Named("state") = state_vec,
+    _["vertex"] = (size_t)vertex->c_vertex(),
+    _["xptr_vertex"] = Rcpp::XPtr<Vertex>(vertex)
+  );
+}
+
+List vertex_as_list(Graph &graph, ptd_vertex_t *c_vertex) {
+  Vertex *vertex = new Vertex(graph, c_vertex);
+  
+  return vertex_as_list(vertex);
+}
+
+
+SEXP list_as_vertex(SEXP list) {
+  if (!Rf_isList(list) && !Rf_isNewList(list)) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: child entries in children list must be a list, the datatype was '%i' (R internal type description)",
+      (int)TYPEOF(list)
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  Rcpp::List child = Rcpp::as<Rcpp::List>(list);
+  
+  return child["xptr_vertex"];
+}
+
 // [[Rcpp::export]]
 List edges(SEXP phase_type_vertex) {
-  phase_type_vertex = get_first_list_entry(phase_type_vertex, "edges");
+  phase_type_vertex = get_first_list_entry(phase_type_vertex, (char*)"edges");
   
   Rcpp::XPtr<Vertex> vertex(phase_type_vertex);
   vector<Edge> edges = vertex->edges();
   List r_edges(edges.size());
   
   for (size_t i = 0; i < edges.size(); i++) {
-    Vertex child = edges[i].to;
-    Rcpp::XPtr<Vertex> xptr_child(&child);
+    Vertex child = edges[i].to();
     
     r_edges[i] = List::create(
-      Named("weight") = edges[i].weight,
-      _["child"] = xptr_child
+      Named("weight") = edges[i].weight(),
+      _["child"] = vertex_as_list(&child)
     );
   }
   
@@ -122,8 +187,8 @@ SEXP create_graph(size_t state_length) {
 
 // [[Rcpp::export]]
 void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double weight) {
-  phase_type_vertex_from = get_first_list_entry(phase_type_vertex_from, "edge from");
-  phase_type_vertex_to = get_first_list_entry(phase_type_vertex_to, "edge to");
+  phase_type_vertex_from = get_first_list_entry(phase_type_vertex_from, (char*)"edge from");
+  phase_type_vertex_to = get_first_list_entry(phase_type_vertex_to, (char*)"edge to");
   
   Rcpp::XPtr<Vertex> from(phase_type_vertex_from);
   Rcpp::XPtr<Vertex> to(phase_type_vertex_to);
@@ -136,9 +201,7 @@ SEXP create_vertex(SEXP phase_type_graph, IntegerVector state) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
   Vertex *vertex = graph->create_vertex_p(as<std::vector<size_t> >(state));
   
-  return Rcpp::XPtr<Vertex>(
-    vertex
-  );
+  return vertex_as_list(vertex);
 }
 
 // [[Rcpp::export]]
@@ -165,30 +228,24 @@ SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
   
   Vertex *found = graph->find_vertex_p(as<std::vector<size_t> >(state));
   
-  return Rcpp::XPtr<Vertex>(
-    found
-  );
+  return vertex_as_list(found);
 }
 
 
 // [[Rcpp::export]]
-SEXP find_or_create_vertex(SEXP phase_type_graph, IntegerVector state) {
+List find_or_create_vertex(SEXP phase_type_graph, IntegerVector state) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
   Vertex *found = graph->find_or_create_vertex_p(as<std::vector<size_t> >(state));
   
-  return Rcpp::XPtr<Vertex>(
-    found
-  );
+  return vertex_as_list(found);
 }
 
 // [[Rcpp::export]]
-SEXP start_vertex(SEXP phase_type_graph) {
+List start_vertex(SEXP phase_type_graph) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
   Vertex *vertex = graph->start_vertex_p();
   
-  return Rcpp::XPtr<Vertex>(
-    vertex
-  );
+  return vertex_as_list(vertex);
 }
 
 
@@ -196,18 +253,18 @@ Rcpp::Function *custom_visit_function;
 
 int custom_visit(Graph &graph, Vertex& vertex) {
   (*custom_visit_function)(
-      Rcpp::XPtr<Vertex>(new Vertex(vertex))
+      vertex_as_list(graph, vertex.c_vertex())
   );
   
   return 0;
 }
 
 // [[Rcpp::export]]
-void visit_vertices(SEXP phase_type_graph, Rcpp::Function visit_function) {
+void visit_vertices(SEXP phase_type_graph, Rcpp::Function visit_function, bool include_start_vertex=false) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
   custom_visit_function = &visit_function;
   
-  graph->visit_vertices(custom_visit);
+  graph->visit_vertices(custom_visit, include_start_vertex);
 }
 
 List _graph_as_matrix(SEXP phase_type_graph) {
@@ -229,7 +286,7 @@ List _graph_as_matrix(SEXP phase_type_graph) {
   Graph g = *graph;
   for (size_t i = 0; i < dist.length; i++) {
     Vertex *vertex = new Vertex(g, dist.vertices[i]);
-    vertices[i] = Rcpp::XPtr<Vertex>(vertex);
+    vertices[i] = vertex_as_list(vertex);
   }
   
   return List::create(Named("vertices") = vertices , _["SIM"] = SIM, _["IPV"] = IPV);

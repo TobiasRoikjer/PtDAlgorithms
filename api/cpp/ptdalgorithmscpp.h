@@ -1,6 +1,8 @@
 #ifndef PTDALGORITHMS_PTDCPP_H
 #define PTDALGORITHMS_PTDCPP_H
 
+#include <cstring>
+#include <errno.h>
 #include "../c/ptdalgorithms.h"
 
 struct rf_graph {
@@ -18,6 +20,18 @@ namespace ptdalgorithms {
 
     class Graph {
     public:
+        Graph(ptd_graph_t *graph) {
+            this->rf_graph = (struct rf_graph *) malloc(sizeof(*this->rf_graph));
+            this->rf_graph->references = (size_t *) malloc(sizeof(*this->rf_graph->references));
+            *this->rf_graph->references = 1;
+            this->rf_graph->graph = graph;
+            this->rf_graph->tree = ptd_avl_tree_create(this->rf_graph->graph->state_length);
+
+            if (this->rf_graph->tree == NULL) {
+                throw std::runtime_error("Failed to create ptd_avl_tree\n");
+            }
+        }
+
         Graph(const Graph &o) {
             this->rf_graph = (struct rf_graph *) malloc(sizeof(*this->rf_graph));
             this->rf_graph->references = o.rf_graph->references;
@@ -238,6 +252,28 @@ namespace ptdalgorithms {
         ptd_vertex_t **vertices;
 
         friend class Graph;
+    };
+
+    class Models {
+    public:
+        static Graph kingman(size_t n) {
+            char msg[1024];
+
+            ptd_graph_t *kingman;
+
+            if ((kingman = ptd_model_kingman(n)) == NULL) {
+                snprintf(
+                        msg, 1024,
+                        "Failed to create Kingman graph: %s \n", std::strerror(errno)
+                );
+
+                throw new std::runtime_error(
+                        msg
+                );
+            }
+
+            return Graph(kingman);
+        }
     };
 }
 

@@ -262,10 +262,27 @@ typedef struct strongly_connected_components {
     ptd_strongly_connected_component_t **components;
 } ptd_strongly_connected_components_t;
 
+typedef struct scc_vertex {
+    ptd_strongly_connected_component_t *scc;
+    size_t scc_edges_length;
+    scc_vertex **scc_edges;
+    size_t local_edges_length;
+    ptd_vertex_t **local_edges;
+    size_t topo;
+    bool visited;
+} ptd_scc_vertex_t;
+
 ptd_strongly_connected_components_t *
 ptd_find_strongly_connected_components(ptd_graph_t *graph, bool (*is_included_func)(ptd_vertex_t *));
 
 void ptd_strongly_connected_components_destroy(ptd_strongly_connected_components_t *sccs);
+
+ptd_scc_vertex_t **
+ptd_order_strongly_connected_components(
+        ptd_strongly_connected_components_t *sccs
+);
+
+int ptd_find_local_matrix(ptd_scc_vertex_t *in, size_t *length, long double ***mat, ptd_vertex_t ***vertices);
 
 typedef struct ptd_vertex_group ptd_vertex_group_t;
 
@@ -329,5 +346,47 @@ void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd);
 int ptd_index_topological(ptd_graph_t *graph);
 
 int ptd_index_invert(ptd_graph_t *graph);
+
+int ptd_vertex_to_s(ptd_vertex_t *vertex, char *buffer, size_t buffer_length);
+
+/*
+ * Models
+ */
+
+ptd_graph_t *ptd_model_kingman(size_t n);
+
+ptd_graph_t *ptd_model_two_island_two_loci_recomb(
+        size_t n1,
+        size_t n2,
+        size_t effective_population_size1,
+        size_t effective_population_size2,
+        double migration_rate1,
+        double migration_rate2,
+        double recombination_rate
+);
+
+/*
+ * Visit algorithms
+ */
+
+int ptd_visit_alloc(ptd_graph_t *graph, size_t size, char *value);
+
+int ptd_visit_assign_probability(ptd_graph_t *graph);
+
+int ptd_visit_assign_expectation(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));
+
+long double ptd_visit_reduce_sum_long_double(ptd_graph_t *graph);
+
+
+/*
+ * Properties
+ */
+
+int ptd_expected_value(long double *expected, ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));
+
+int ptd_covariance(
+        long double *covariance, ptd_graph_t *graph,
+        double (*reward_1)(ptd_vertex_t *), double (*reward_2)(ptd_vertex_t *)
+);
 
 #endif //PTDALGORITHMS_PTD_H

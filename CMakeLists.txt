@@ -7,10 +7,12 @@ set(CMAKE_BINARY_DIR .)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+find_package(GSL REQUIRED)
 #set(CMAKE_CXX_FLAGS_DEBUG "-O3")
 #set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 #add_executable(cpp_test test/test.cpp api/c/ptd.h test/generation.h src/c/phase.cpp test/generation.cpp src/c/io.cpp src/c/io.h)
-add_executable(tester2 test/tester.cpp src/c/ptdalgorithms.cpp api/c/ptdalgorithms.h src/c/io.cpp src/c/io.h)
+add_executable(tester2 test/tester.cpp src/c/ptdalgorithms.cpp api/c/ptdalgorithms.h src/c/io.cpp src/c/io.h )
+target_link_libraries(tester2  gsl gslcblas m)
 #add_executable(experiments test/experiments.cpp src/c/phase.cpp api/c/ptd.h src/c/io.cpp src/c/io.h)
 
 
