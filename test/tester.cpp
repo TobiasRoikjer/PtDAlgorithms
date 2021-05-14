@@ -31,7 +31,7 @@ void assert(bool a) {
     }
 }
 
-ptd_vertex_t *S, *A, *B, *C, *D, *E, *F, *G, *H, *I, *J, *K, *T;
+ptd_vertex_t *S, *A, *B, *C, *D, *E, *F, *G, *H, *I, *J, *K, *L, *T;
 
 void create_vertices(ptd_graph_t *graph) {
     S = graph->start_vertex;
@@ -48,6 +48,7 @@ void create_vertices(ptd_graph_t *graph) {
     I = ptd_vertex_create(graph);
     J = ptd_vertex_create(graph);
     K = ptd_vertex_create(graph);
+    L = ptd_vertex_create(graph);
 
     A->state[0] = 1;
     B->state[0] = 2;
@@ -60,6 +61,7 @@ void create_vertices(ptd_graph_t *graph) {
     I->state[0] = 9;
     J->state[0] = 10;
     K->state[0] = 11;
+    L->state[0] = 12;
 }
 
 void destroy_vertices() {
@@ -72,6 +74,7 @@ void destroy_vertices() {
     ptd_vertex_destroy(G);
     ptd_vertex_destroy(H);
     ptd_vertex_destroy(I);
+    ptd_vertex_destroy(L);
 
     A = NULL;
     B = NULL;
@@ -82,6 +85,7 @@ void destroy_vertices() {
     G = NULL;
     H = NULL;
     I = NULL;
+    L = NULL;
 }
 
 char *vertex_name(ptd_vertex_t *vertex) {
@@ -137,6 +141,10 @@ char *vertex_name(ptd_vertex_t *vertex) {
         return "J";
     }
 
+    if (vertex == L) {
+        return "L";
+    }
+
     return "Unknown";
 }
 
@@ -177,6 +185,10 @@ void draw_graph(ptd_graph_t *graph) {
 
 bool keep_all(ptd_vertex_t *vertex) {
     return true;
+}
+
+double reward_identity(ptd_vertex_t *vertex) {
+    return 1;
 }
 
 void test_can_find_scc() {
@@ -298,7 +310,8 @@ void test_can_find_scc2_graph() {
     ptd_add_edge(H, G, 1);
 
     ptd_add_edge(H, T, 1);
-    ptd_add_edge(I, T, 1);
+    ptd_add_edge(I, L, 1);
+    ptd_add_edge(L, T, 1);
 
     ptd_add_edge(C, J, 1);
 
@@ -307,137 +320,46 @@ void test_can_find_scc2_graph() {
 
     ptd_add_edge(K, E, 1);
 
-    draw_graph(graph);
 
-    ptd_visit_vertices(graph, set_data_as_int, true);
 
-    *((double *) graph->start_vertex->data) = 1;
-
-    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(
-            graph, keep_all
-    );
-
-    ptd_scc_vertex_t **vertices = ptd_order_strongly_connected_components(sccs);
-
-    for (size_t i = 0; i < sccs->components_length; ++i) {
-        ptd_scc_vertex_t *v = vertices[i];
-        fprintf(stderr, "\nComponents %p %zu:\n", (void *) v, i);
-
-        for (size_t j = 0; j < v->scc->vertices_length; ++j) {
-            fprintf(stderr, "Vertex %zu %s\n", j, vertex_name((v->scc->vertices[j])));
-        }
-
-        for (size_t k = 0; k < v->scc_edges_length; ++k) {
-            fprintf(stderr, "SCC edge to %p\n", (void *) v->scc_edges[k]);
-        }
-
-        for (size_t k = 0; k < v->local_edges_length; ++k) {
-            fprintf(stderr, "local edge to %s\n", vertex_name((v->local_edges[k])));
-        }
-
-        long double **mat;
-        ptd_vertex_t **vs;
-        size_t length;
-
-        ptd_phase_type_distribution_t *ptd = ptd_find_local_matrix(v);
-        mat = ptd->sub_intensity_matrix;
-        vs = ptd->vertices;
-        length = ptd->length;
-
-        for (size_t k = 0; k < length; ++k) {
-            fprintf(stderr, "mat vertex %s\n", vertex_name((vs[k])));
-        }
-
-        long double *ipv = (long double *) calloc(length, sizeof(*ipv));
-
-        fprintf(stderr, "IPV: ");
-
-        for (size_t k = 0; k < length; ++k) {
-            ipv[k] = *((double *) vs[k]->data);
-            fprintf(stderr, "%.2Lf\n", ipv[k]);
-            *((double *) vs[k]->data) = 0;
-        }
-        ptd->initial_probability_vector = ipv;
-
-        fprintf(stderr, "\n");
-
-        if (length == 1) {
-            ptd_phase_type_distribution_free(ptd);
-            continue;
-        }
-
-        {
-            fprintf(stderr, "MATRIX:\n");
-            gsl_matrix *full = gsl_matrix_alloc(length, length);
-
-            for (size_t k = 0; k < length; ++k) {
-                for (size_t j = 0; j < length; ++j) {
-                    fprintf(stderr, "%.2Lf ", mat[k][j]);
-                    gsl_matrix_set(full, k, j, (double) mat[k][j]);
-                }
-
-                fprintf(stderr, "\n");
-            }
-            fprintf(stderr, "\n");
-
-            fprintf(stderr, "INVERTED:\n");
-            gsl_matrix *inv = matrix_invert(full, length);
-
-            for (size_t k = 0; k < length; ++k) {
-                for (size_t j = 0; j < length; ++j) {
-                    fprintf(stderr, "%.2f ", -gsl_matrix_get(inv, k, j));
-                }
-                fprintf(stderr, "\n");
-            }
-            fprintf(stderr, "\n");
-
-            for (size_t k = 0; k < length; ++k) {
-                for (size_t j = 0; j < length; ++j) {
-                    fprintf(stderr, "MUltiplying vertex %s which is %f by %Lf * %f\n", vertex_name(vs[k]),
-                            *((double *) vs[j]->data), ipv[k], -gsl_matrix_get(inv, k, j));
-                    *((double *) vs[j]->data) += ipv[k] * -gsl_matrix_get(inv, k, j);
-                }
-                fprintf(stderr, "\n");
-            }
-            fprintf(stderr, "\n");
-
-            gsl_matrix_free(full);
-            gsl_matrix_free(inv);
-        }
-
-        ptd_phase_type_distribution_free(ptd);
-    }
-
-    ptd_label_vertices(graph);
+    long double **mat;
+    ptd_vertex_t **vs;
+    size_t length;
 
     ptd_phase_type_distribution_t *ptd = ptd_graph_as_phase_type_distribution(graph);
-    gsl_matrix *full = gsl_matrix_alloc(ptd->length, ptd->length);
+    mat = ptd->sub_intensity_matrix;
+    vs = ptd->vertices;
+    length = ptd->length;
 
-    for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "   %s  ", vertex_name(ptd->vertices[k]));
+
+
+
+    ptd_cyclic_desc(graph, reward_identity);
+
+    draw_graph(graph);
+    for (size_t j = 0; j < length; ++j) {
+        fprintf(stderr, "%s ", vertex_name(vs[j]));
     }
 
     fprintf(stderr, "\n");
+    fprintf(stderr, "MATRIX:\n");
+    gsl_matrix *full = gsl_matrix_alloc(length, length);
 
-    for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%s ", vertex_name(ptd->vertices[k]));
-        for (size_t j = 0; j < ptd->length; ++j) {
-            if (k == j) {
-                fprintf(stderr, "%.2Lf ", ptd->sub_intensity_matrix[k][j]);
-            } else {
-                fprintf(stderr, "%.3Lf ", ptd->sub_intensity_matrix[k][j]);
-            }
-            gsl_matrix_set(full, k, j, (double) ptd->sub_intensity_matrix[k][j]);
+    for (size_t k = 0; k < length; ++k) {
+        for (size_t j = 0; j < length; ++j) {
+            fprintf(stderr, "%.2Lf ", mat[k][j]);
+            gsl_matrix_set(full, k, j, (double) mat[k][j]);
         }
+
         fprintf(stderr, "\n");
     }
     fprintf(stderr, "\n");
 
-    gsl_matrix *inv = matrix_invert(full, ptd->length);
-    gsl_matrix_free(full);
+    fprintf(stderr, "INVERTED:\n");
+    gsl_matrix *inv = matrix_invert(full, length);
 
-    for (size_t k = 0; k < ptd->length; ++k) {
-        for (size_t j = 0; j < ptd->length; ++j) {
+    for (size_t k = 0; k < length; ++k) {
+        for (size_t j = 0; j < length; ++j) {
             fprintf(stderr, "%.2f ", -gsl_matrix_get(inv, k, j));
         }
         fprintf(stderr, "\n");
@@ -445,45 +367,96 @@ void test_can_find_scc2_graph() {
     fprintf(stderr, "\n");
 
 
-    fprintf(stderr, "TRUE RES: ");
 
-    for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%s %f, ", vertex_name(ptd->vertices[k]),  -gsl_matrix_get(inv, 0, k));
+    for (size_t k = 0; k < length; ++k) {
+
+        double desc = 0;
+
+        for (size_t j = 0; j < length; ++j) {
+            desc += gsl_matrix_get(inv, k, j) / vs[j]->rate;
+        }
+        fprintf(stderr, "P: Vertex %zu (%s) has %f\n", vs[k]->index, vertex_name(vs[k]), desc);
+
     }
 
-    fprintf(stderr, "\n");
+    ptd_graph_destroy(graph);
+}
 
-    fprintf(stderr, "OURS RES: ");
+void test_can_find_scc2_rand_graph() {
+    ptd_graph_t *graph = ptd_graph_create(4);
+    srand(1234);
 
-    for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%s %Lf, ", vertex_name(ptd->vertices[k]), (*((double *) ptd->vertices[k]->data)) / ptd->vertices[k]->rate);
+    ptd_vertex_t **vertices = (ptd_vertex_t**) calloc(50, sizeof(*vertices));
+    double *fulld = (double*) calloc(50, sizeof(*fulld));
+
+    ptd_vertex_t *abs = ptd_vertex_create(graph);
+
+    for (size_t i = 0; i < 50; ++i) {
+        vertices[i] = ptd_vertex_create(graph);
+        vertices[i]->state[0] = i + 1;
+        ptd_add_edge(vertices[i], abs, 2);
     }
 
-    fprintf(stderr, "\n");
+    ptd_add_edge(graph->start_vertex, vertices[0], 1);
 
-    fprintf(stderr, "TRUE RESP: ");
+    for (size_t i = 0; i < 100; ++i) {
+        int x = rand() % 50;
+        int y = rand() % 50;
 
-    for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%s %Lf, ", vertex_name(ptd->vertices[k]),  -gsl_matrix_get(inv, 0, k)* ptd->vertices[k]->rate);
+        if (x == y) {
+            continue;
+        }
+
+        assert(ptd_add_edge(vertices[x], vertices[y], rand() % 2) == 0);
     }
 
-    fprintf(stderr, "\n");
+    long double **mat;
+    ptd_vertex_t **vs;
+    size_t length;
 
-    fprintf(stderr, "OURS RESP: ");
+    ptd_phase_type_distribution_t *ptd = ptd_graph_as_phase_type_distribution(graph);
+    mat = ptd->sub_intensity_matrix;
+    vs = ptd->vertices;
+    length = ptd->length;
 
-    for (size_t k = 0; k < ptd->length; ++k) {
-        fprintf(stderr, "%s %f, ", vertex_name(ptd->vertices[k]), (*((double *) ptd->vertices[k]->data)));
+    double *algod = ptd_cyclic_desc(graph, reward_identity);
+
+    gsl_matrix *full = gsl_matrix_alloc(length, length);
+
+    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph, keep_all);
+
+    fprintf(stderr, "Sccs: %zu\n", sccs->components_length);
+
+    for (size_t k = 0; k < length; ++k) {
+        for (size_t j = 0; j < length; ++j) {
+            gsl_matrix_set(full, k, j, (double) mat[k][j]);
+        }
     }
 
-    fprintf(stderr, "\n");
+    gsl_matrix *inv = matrix_invert(full, length);
 
-    fprintf(stderr, "EXP %f\n", ptd_circular_exp(graph, reward_one));
+    for (size_t k = 0; k < length; ++k) {
+        double desc = 0;
 
+        for (size_t j = 0; j < length; ++j) {
+            desc += -gsl_matrix_get(inv, k, j) / vs[j]->rate;
+        }
 
+        fprintf(stderr, "P: Vertex %zu (%s) has %f\n", vs[k]->index, vertex_name(vs[k]), desc);
+        fulld[vs[k]->index] = desc;
+    }
 
-    gsl_matrix_free(inv);
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
 
-    ptd_strongly_connected_components_destroy(sccs);
+    while (!q.empty()) {
+        ptd_vertex_t *v = q.front();
+        q.pop();
+
+        fprintf(stdout, "Vertex %zu: %f vs %f\n", v->index, fulld[v->index], algod[v->index]);
+
+        assert(fabs(fulld[v->index] - algod[v->index]) < 0.01);
+    }
+
     ptd_graph_destroy(graph);
 }
 
@@ -736,7 +709,9 @@ void test_it_can_reward_transform() {
 int main(int argc, char **argv) {
 //    test_can_find_scc();
 //    test_can_find_scc2();
-    test_can_find_scc2_graph();
+    //test_can_find_scc2_graph();
+    test_can_find_scc2_rand_graph();
+
 //    test_it_can_insert_avl();
 //    test_avl_is_balanced();
     //   test_avl_is_balanced_and_updated();

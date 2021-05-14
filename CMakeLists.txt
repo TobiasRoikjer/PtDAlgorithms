@@ -34,7 +34,7 @@ install(FILES ${CMAKE_BINARY_DIR}/ptdalgorithms.pc
 
 add_library(libptdalgorithmscpp SHARED api/c/ptdalgorithms.h src/c/ptdalgorithms.cpp src/c/ptdalgorithms.h src/c/io.cpp src/c/io.h src/cpp/ptdalgorithmscpp.cpp api/cpp/ptdalgorithmscpp.h src/cpp/ptdalgorithmscpp.h)
 add_executable(testcpp test/testcpp.cpp)
-target_link_libraries (testcpp LINK_PUBLIC libptdalgorithmscpp)
+target_link_libraries (testcpp LINK_PUBLIC libptdalgorithmscpp   gsl gslcblas)
 add_executable(island examples/models.cpp)
 target_link_libraries (island LINK_PUBLIC libptdalgorithmscpp)
 

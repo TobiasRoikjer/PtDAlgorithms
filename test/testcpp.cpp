@@ -135,14 +135,18 @@ double reward_by_index(ptd_vertex_t *vertex) {
     return vertex->state[reward_index];
 }
 
+double reward_by_1(ptd_vertex_t *vertex) {
+    return 1;
+}
+
 bool always_true(ptd_vertex_t *v) {
     return true;
 }
 
 int main(void) {
     ptd_graph_t *two_loci = ptd_model_two_island_two_loci_recomb(
-            6,
-            6,
+            5,
+            5,
             1,
             1,
             1,
@@ -156,8 +160,10 @@ int main(void) {
     ptd_strongly_connected_components_t *scc =
             ptd_find_strongly_connected_components(two_loci, always_true);
 
-    fprintf(stderr, "We have %zu scc\n", scc->components_length);
+    fprintf(stderr, "We have %zu scc with %zu vertices\n", scc->components_length, two_loci->vertices_length);
 
+    fprintf(stderr, "EXP %f\n", ptd_circular_exp(two_loci, reward_by_1));
+    fprintf(stderr, "We have %zu scc with %zu vertices\n", scc->components_length, two_loci->vertices_length);
     return 0;
 
     for (size_t l = 0; l < scc->components_length; ++l) {

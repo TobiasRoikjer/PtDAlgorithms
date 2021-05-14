@@ -32,13 +32,13 @@ fprintf(stderr, "%s\n", error_formatted_line);     \
 } while(0)
 
 #define DEBUG_PRINT(message, ...) do {             \
-/*char formatted[2048];                              \
+char formatted[2048];                              \
                                                    \
 snprintf(formatted,                                \
          sizeof(formatted),                        \
          message, ##__VA_ARGS__);                  \
                                                    \
-fprintf(stderr, "%s", formatted); */                 \
+fprintf(stderr, "%s", formatted);                  \
 } while(0)
 
 using namespace std;
@@ -296,7 +296,6 @@ struct ptd_vertex_group {
     bool reset;
 
     vec_entry_t *state;
-
 };
 
 ptd_graph_t *
@@ -391,5 +390,6 @@ int ptd_covariance(
 );
 
 double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));
+double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));
 
 #endif //PTDALGORITHMS_PTD_H

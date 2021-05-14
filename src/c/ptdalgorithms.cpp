@@ -11,6 +11,7 @@
 #include <gsl/gsl_linalg.h>
 #include "ptdalgorithms.h"
 
+extern char *vertex_name(ptd_vertex_t *vertex);
 static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
 
 void print_graph_list(FILE *stream, vertex_t *graph,
@@ -1513,7 +1514,7 @@ void reduce_graph(vertex_t *graph) {
                 continue;
             }
 
-            DEBUG_PRINT("Vertices %zu and %zu are the same group with depth %zu and nedges %zu\n",
+            DEBUG_PRINT("Vertices %zu and %zu are the same group with depth %i and nedges %zu\n",
                         vertex_i->vertex_index, vertex_j->vertex_index,
                         vertex_i->integer, vertex_i->nedges);
 
@@ -2887,8 +2888,6 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph, bool (*is_included_fu
     scc_on_stack = (bool *) calloc(q.size() + 2, sizeof(bool));
     scc_components = new vector<ptd_strongly_connected_component_t *>();
 
-    fprintf(stderr, "Variable sizes %zu\n", q.size() + 2);
-
     while (!q.empty()) {
         ptd_vertex_t *vertex = q.front();
         q.pop();
@@ -3113,13 +3112,15 @@ ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_scc_vertex_t *in) {
 
     long double **mat = (long double **) calloc(full_length, sizeof(long double *));
     ptd_vertex_t **vertices = (ptd_vertex_t **) calloc(full_length, sizeof(ptd_vertex_t *));
-    void **old_data = (void **) calloc(full_length, sizeof(void *));
+    void **old_data = (void **) calloc(full_length, sizeof(*old_data));
+    size_t *old_indices = (size_t *) calloc(full_length, sizeof(*old_indices));
 
     for (size_t i = 0; i < full_length; ++i) {
         mat[i] = (long double *) calloc(full_length, sizeof(long double));
     }
 
     for (size_t i = 0; i < in->scc->vertices_length; ++i) {
+        old_indices[i] = in->scc->vertices[i]->index;
         vertices[i] = in->scc->vertices[i];
         old_data[i] = in->scc->vertices[i]->data;
         vertices[i]->data = malloc(sizeof(size_t));
@@ -3129,6 +3130,7 @@ ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_scc_vertex_t *in) {
     for (size_t i = 0; i < in->local_edges_length; ++i) {
         size_t index = in->scc->vertices_length + i;
         (vertices)[index] = in->local_edges[i];
+        old_indices[index] = (vertices)[index]->index;
         (vertices)[index]->index = index;
         old_data[index] = (vertices)[index]->data;
         (vertices)[index]->data = malloc(sizeof(size_t));
@@ -3159,6 +3161,8 @@ ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_scc_vertex_t *in) {
     for (size_t i = 0; i < full_length; ++i) {
         free((vertices)[i]->data);
         (vertices)[i]->data = old_data[i];
+        fprintf(stderr, "Setting %s back to %zu\n", vertex_name(vertices[i]), old_indices[i]);
+        (vertices)[i]->index = old_indices[i];
     }
 
     free(old_data);
@@ -4229,6 +4233,7 @@ matrix_invert(gsl_matrix *matrix, size_t size) {
     return inverse;
 }
 
+
 double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
     ptd_visit_vertices(graph, set_data_as_int, true);
 
@@ -4241,17 +4246,21 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
     ptd_scc_vertex_t **vertices = ptd_order_strongly_connected_components(sccs);
 
     for (size_t i = 0; i < sccs->components_length; ++i) {
+        DEBUG_PRINT("At scc %zu size %zu\n", i, sccs->components[i]->vertices_length);
         ptd_scc_vertex_t *v = vertices[i];
 
         long double **mat;
         ptd_vertex_t **vs;
         size_t length;
 
+        DEBUG_PRINT("As ptd...\n");
         ptd_phase_type_distribution_t *ptd = ptd_find_local_matrix(v);
+        DEBUG_PRINT("As ptd\n");
         mat = ptd->sub_intensity_matrix;
         vs = ptd->vertices;
         length = ptd->length;
 
+        fprintf(stderr, "A");
         long double *ipv = (long double *) calloc(length, sizeof(*ipv));
 
         for (size_t k = 0; k < length; ++k) {
@@ -4259,12 +4268,19 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
             *((long double *) vs[k]->data) = 0;
         }
 
+        fprintf(stderr, "B\n");
+
         ptd->initial_probability_vector = ipv;
 
         if (length == 1) {
+
+            fprintf(stderr, "F1\n");
             ptd_phase_type_distribution_free(ptd);
+            fprintf(stderr, "F2\n");
             continue;
         }
+
+        DEBUG_PRINT("Making mat...\n");
         gsl_matrix *full = gsl_matrix_alloc(length, length);
 
         for (size_t k = 0; k < length; ++k) {
@@ -4273,7 +4289,10 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
             }
         }
 
+        DEBUG_PRINT("Making mat %zu\n", length);
+        DEBUG_PRINT("Making inv...\n");
         gsl_matrix *inv = matrix_invert(full, length);
+        DEBUG_PRINT("inv\n");
 
         for (size_t k = 0; k < length; ++k) {
             for (size_t j = 0; j < length; ++j) {
@@ -4286,11 +4305,221 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
         ptd_phase_type_distribution_free(ptd);
     }
 
-    *((long double*)graph->start_vertex->data) = 0;
+    *((long double *) graph->start_vertex->data) = 0;
     ptd_visit_assign_expectation(graph, reward);
+
+    /*{
+        ptd_label_vertices(graph);
+
+        ptd_phase_type_distribution_t *ptd = ptd_graph_as_phase_type_distribution(graph);
+        gsl_matrix *full = gsl_matrix_alloc(ptd->length, ptd->length);
+
+        for (size_t k = 0; k < ptd->length; ++k) {
+            for (size_t j = 0; j < ptd->length; ++j) {
+                gsl_matrix_set(full, k, j, (double) ptd->sub_intensity_matrix[k][j]);
+            }
+        }
+
+        gsl_matrix *inv = matrix_invert(full, ptd->length);
+        gsl_matrix_free(full);
+
+        fprintf(stderr, "TRUE RES: ");
+        double e = 0;
+
+        for (size_t k = 0; k < ptd->length; ++k) {
+            e += -gsl_matrix_get(inv, 0, k);
+        }
+        fprintf(stderr, "%f", e);
+        fprintf(stderr, "\n");
+    }*/
 
     return ptd_visit_reduce_sum_long_double(graph);
 
 
     ptd_strongly_connected_components_destroy(sccs);
+}
+
+double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
+    if (!graph->is_indexed) {
+        ptd_label_vertices(graph);
+    }
+
+    queue<ptd_vertex_t*>qq = ptd_enqueue_vertices(graph);
+
+    while (!qq.empty()) {
+        ptd_vertex_t *v = qq.front();
+        qq.pop();
+
+        fprintf(stderr, "Vertex %zu %s\n", v->index, vertex_name(v));
+    }
+
+    struct desc_multiplier {
+        ptd_vertex_t *vertex;
+        double multiplier;
+        bool external;
+    };
+
+    struct desc_multiplier **desc_multipliers = (struct desc_multiplier **) calloc(
+            graph->vertices_length,
+            sizeof(*desc_multipliers)
+    );
+
+    size_t *desc_length = (size_t *) calloc(graph->vertices_length, sizeof(*desc_length));
+
+    ptd_visit_vertices(graph, set_data_as_int, true);
+
+    *((double *) graph->start_vertex->data) = 1;
+
+    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(
+            graph, keep_all
+    );
+
+    ptd_scc_vertex_t **vertices = ptd_order_strongly_connected_components(sccs);
+
+    qq = ptd_enqueue_vertices(graph);
+
+    while (!qq.empty()) {
+        ptd_vertex_t *v = qq.front();
+        qq.pop();
+
+        fprintf(stderr, "Vertex %zu %s\n", v->index, vertex_name(v));
+    }
+
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        ptd_scc_vertex_t *v = vertices[i];
+        fprintf(stderr, "\nComponents %p %zu:\n", (void *) v, i);
+
+        for (size_t j = 0; j < v->scc->vertices_length; ++j) {
+            fprintf(stderr, "Vertex %zu %s (index %zu)\n", j, vertex_name(v->scc->vertices[j]), v->scc->vertices[j]->index);
+        }
+
+        for (size_t k = 0; k < v->scc_edges_length; ++k) {
+            fprintf(stderr, "SCC edge to %p\n", (void *) v->scc_edges[k]);
+        }
+
+        for (size_t k = 0; k < v->local_edges_length; ++k) {
+            fprintf(stderr, "local edge to %s\n", vertex_name((v->local_edges[k])));
+        }
+
+        long double **mat;
+        ptd_vertex_t **vs;
+        size_t length;
+
+        ptd_phase_type_distribution_t *ptd = ptd_find_local_matrix(v);
+        mat = ptd->sub_intensity_matrix;
+        vs = ptd->vertices;
+        length = ptd->length;
+
+        if (length == 1) {
+            fprintf(stderr, "Length 1, returning...\n");
+            continue;
+        }
+
+        gsl_matrix *full = gsl_matrix_alloc(length, length);
+
+        for (size_t k = 0; k < length; ++k) {
+            for (size_t j = 0; j < length; ++j) {
+                gsl_matrix_set(full, k, j, (double) mat[k][j]);
+            }
+        }
+
+        gsl_matrix *inv = matrix_invert(full, length);
+        /*fprintf(stderr, "INVERTED:\n");
+
+        for (size_t k = 0; k < length; ++k) {
+            for (size_t j = 0; j < length; ++j) {
+                fprintf(stderr, "%.2f ", -gsl_matrix_get(inv, k, j));
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");*/
+
+        for (size_t k = 0; k < v->scc->vertices_length; ++k) {
+            fprintf(stderr, "mat vertex %s\n", vertex_name((vs[k])));
+            if (vs[k]->index != 0) {
+                desc_length[vs[k]->index] = length;
+                desc_multipliers[vs[k]->index] = (struct desc_multiplier *) calloc(
+                        length, sizeof(*(desc_multipliers[vs[k]->index]))
+                );
+
+                fprintf(stderr, "VERTEX %zu %s. Setting length to %zu \n", vs[k]->index, vertex_name(vs[k]),
+                        length);
+
+                size_t idx = 0;
+
+                for (size_t j = 0; j < length; ++j) {
+                    fprintf(stderr, "VERTEX %zu %s. Setting at %zu:\n", vs[k]->index, vertex_name(vs[k]), idx);
+                    desc_multipliers[vs[k]->index][idx].external = j >= v->scc->vertices_length;
+                    desc_multipliers[vs[k]->index][idx].vertex = vs[j];
+                    if (!desc_multipliers[vs[k]->index][idx].external) {
+                        desc_multipliers[vs[k]->index][idx].multiplier =
+                                -gsl_matrix_get(inv, k, j) / (double) desc_multipliers[vs[k]->index][idx].vertex->rate;
+                    } else {
+                        desc_multipliers[vs[k]->index][idx].multiplier =
+                                -gsl_matrix_get(inv, k, j);
+                    }
+                    fprintf(stderr, "\text %i, vertex %s, mul %f\n",
+                            desc_multipliers[vs[k]->index][idx].external,
+                            vertex_name(desc_multipliers[vs[k]->index][idx].vertex ),
+                            desc_multipliers[vs[k]->index][idx].multiplier);
+                    idx++;
+                }
+            } else {
+                desc_length[vs[k]->index] = 0;
+            }
+        }
+    }
+
+    double *desc_value = (double *) calloc(graph->vertices_length, sizeof(*desc_value));
+
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        size_t length = sccs->components[i]->vertices_length;
+        ptd_vertex_t **vertices = sccs->components[i]->vertices;
+
+
+        for (size_t k = 0; k < length; ++k) {
+            if (vertices[k]->index != 0) {
+                //desc_value[vertices[k]->index] += reward(vertices[k]) / vertices[k]->rate;
+
+
+                fprintf(stderr, "VERTEX %zu %s own %f\n", vertices[k]->index, vertex_name(vertices[k]), desc_value[vertices[k]->index]);
+
+                for (size_t j = 0; j < desc_length[vertices[k]->index]; ++j) {
+                    fprintf(stderr, "\tCHILD %zu %s\n", desc_multipliers[vertices[k]->index][j].vertex->index, vertex_name(desc_multipliers[vertices[k]->index][j].vertex));
+
+                    if (desc_multipliers[vertices[k]->index][j].vertex->index == 0) {
+                        fprintf(stderr, "\tNOT Adding, is absorbing\n");
+                        continue;
+                    }
+
+                    if (!desc_multipliers[vertices[k]->index][j].external) {
+                        double multiplier = desc_multipliers[vertices[k]->index][j].multiplier;
+                        double reward_value = reward(desc_multipliers[vertices[k]->index][j].vertex);
+                        double rate = (double) desc_multipliers[vertices[k]->index][j].vertex->rate;
+                        fprintf(stderr, "\tAdding %f * %f / %f = %f\n", multiplier, reward_value, rate, multiplier * reward_value / rate);
+                        desc_value[vertices[k]->index] += multiplier * reward_value / rate;
+                    } else {
+                        double multiplier = desc_multipliers[vertices[k]->index][j].multiplier;
+                        fprintf(stderr, "\tAdding %f * %f = %f\n", multiplier,
+                                desc_value[desc_multipliers[vertices[k]->index][j].vertex->index],
+                                multiplier * desc_value[desc_multipliers[vertices[k]->index][j].vertex->index]);
+                        desc_value[vertices[k]->index] += multiplier * desc_value[desc_multipliers[vertices[k]->index][j].vertex->index];
+                    }
+                }
+            }
+        }
+    }
+
+    desc_value[1] = 0;
+
+    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+
+    while (!q.empty()) {
+        ptd_vertex_t *v = q.front();
+        q.pop();
+
+        fprintf(stderr, "Vertex %zu (%s) has %f\n", v->index, vertex_name(v), desc_value[v->index]);
+    }
+
+    return desc_value;
 }
