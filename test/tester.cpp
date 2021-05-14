@@ -333,8 +333,9 @@ void test_can_find_scc2_graph() {
 
 
 
+    ptd_desc_multipliers_t *multipliers = ptd_cyclic_descendant_multipliers(graph);
 
-    ptd_cyclic_desc(graph, reward_identity);
+    ptd_cyclic_desc(graph, multipliers,  reward_identity);
 
     draw_graph(graph);
     for (size_t j = 0; j < length; ++j) {
@@ -419,13 +420,17 @@ void test_can_find_scc2_rand_graph() {
     vs = ptd->vertices;
     length = ptd->length;
 
-    double *algod = ptd_cyclic_desc(graph, reward_identity);
+    ptd_desc_multipliers_t *multipliers = ptd_cyclic_descendant_multipliers(graph);
+
+    double *algod = ptd_cyclic_desc(graph, multipliers,  reward_identity);
 
     gsl_matrix *full = gsl_matrix_alloc(length, length);
 
     ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph, keep_all);
 
     fprintf(stderr, "Sccs: %zu\n", sccs->components_length);
+
+    ptd_strongly_connected_components_destroy(sccs);
 
     for (size_t k = 0; k < length; ++k) {
         for (size_t j = 0; j < length; ++j) {
@@ -442,7 +447,6 @@ void test_can_find_scc2_rand_graph() {
             desc += -gsl_matrix_get(inv, k, j) / vs[j]->rate;
         }
 
-        fprintf(stderr, "P: Vertex %zu (%s) has %f\n", vs[k]->index, vertex_name(vs[k]), desc);
         fulld[vs[k]->index] = desc;
     }
 
@@ -456,6 +460,20 @@ void test_can_find_scc2_rand_graph() {
 
         assert(fabs(fulld[v->index] - algod[v->index]) < 0.01);
     }
+
+    ptd_phase_type_distribution_destroy(ptd);
+    gsl_matrix_free(inv);
+    gsl_matrix_free(full);
+    free(algod);
+    free(fulld);
+
+    for (size_t i = 0; i < 50; ++i) {
+        ptd_vertex_destroy(vertices[i]);
+    }
+
+    ptd_vertex_destroy(abs);
+
+    free(vertices);
 
     ptd_graph_destroy(graph);
 }

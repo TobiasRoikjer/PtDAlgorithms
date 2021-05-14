@@ -270,17 +270,24 @@ typedef struct scc_vertex {
     ptd_vertex_t **local_edges;
     size_t topo;
     bool visited;
-} ptd_scc_vertex_t;
+} ptd_ordered_scc_t;
+
+typedef struct {
+    size_t ordered_components_length;
+    ptd_ordered_scc_t **ordered_components;
+} ptd_ordered_sccs_t;
 
 ptd_strongly_connected_components_t *
 ptd_find_strongly_connected_components(ptd_graph_t *graph, bool (*is_included_func)(ptd_vertex_t *));
 
 void ptd_strongly_connected_components_destroy(ptd_strongly_connected_components_t *sccs);
 
-ptd_scc_vertex_t **
+ptd_ordered_sccs_t *
 ptd_order_strongly_connected_components(
         ptd_strongly_connected_components_t *sccs
 );
+
+void ptd_ordered_sccs_destroy(ptd_ordered_sccs_t *ordered_strongly_connected_components);
 
 typedef struct ptd_vertex_group ptd_vertex_group_t;
 
@@ -339,9 +346,9 @@ typedef struct {
 ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph);
 
 ptd_phase_type_distribution_t *
-ptd_find_local_matrix(ptd_scc_vertex_t *in);
+ptd_find_local_matrix(ptd_ordered_scc_t *in);
 
-void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd);
+void ptd_phase_type_distribution_destroy(ptd_phase_type_distribution_t *ptd);
 
 int ptd_index_topological(ptd_graph_t *graph);
 
@@ -389,7 +396,22 @@ int ptd_covariance(
         double (*reward_1)(ptd_vertex_t *), double (*reward_2)(ptd_vertex_t *)
 );
 
+
+typedef struct {
+    ptd_vertex_t *vertex;
+    double multiplier;
+    bool external;
+} ptd_desc_multiplier_t;
+
+typedef struct {
+    size_t *desc_length;
+    ptd_desc_multiplier_t **desc_multipliers;
+    ptd_ordered_sccs_t *ordered;
+} ptd_desc_multipliers_t;
+
 double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));
-double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));
+
+ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(ptd_graph_t *graph);
+double *ptd_cyclic_desc(ptd_graph_t *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(ptd_vertex_t *));
 
 #endif //PTDALGORITHMS_PTD_H

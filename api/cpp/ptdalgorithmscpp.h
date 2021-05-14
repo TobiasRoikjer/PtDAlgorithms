@@ -243,7 +243,7 @@ namespace ptdalgorithms {
 
     public:
         ~PhaseTypeDistribution() {
-            ptd_phase_type_distribution_free(distribution);
+            ptd_phase_type_distribution_destroy(distribution);
         }
 
         size_t length;

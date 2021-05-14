@@ -12,6 +12,7 @@
 #include "ptdalgorithms.h"
 
 extern char *vertex_name(ptd_vertex_t *vertex);
+
 static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
 
 void print_graph_list(FILE *stream, vertex_t *graph,
@@ -2243,23 +2244,7 @@ ptd_graph_t *ptd_graph_create(size_t state_length) {
 }
 
 void ptd_graph_destroy(ptd_graph_t *graph) {
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
-
-    // TODO: Add failures
-
-    //if (q == NULL) {
-    // We have failed to allocate or push to a queue for all the vertices.
-    // This means that this freeing function cannot succeed. For now, we
-    // will just ignore this error.
-    //}
-
-    while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
-        q.pop();
-
-        ptd_vertex_destroy(vertex);
-    }
-
+    ptd_vertex_destroy(graph->start_vertex);
     memset(graph, 0, sizeof(*graph));
     free(graph);
 }
@@ -2957,22 +2942,22 @@ void ptd_strongly_connected_components_destroy(ptd_strongly_connected_components
     free(sccs);
 }
 
-ptd_scc_vertex_t **ptd_scc_index_topological(ptd_scc_vertex_t **in, size_t length) {
-    ptd_scc_vertex_t **res = (ptd_scc_vertex_t **) calloc(length, sizeof(*res));
-    queue<ptd_scc_vertex_t *> q;
+ptd_ordered_sccs_t *ptd_scc_index_topological(ptd_ordered_scc_t **in, size_t length) {
+    ptd_ordered_scc_t **res = (ptd_ordered_scc_t **) calloc(length, sizeof(*res));
+    queue<ptd_ordered_scc_t *> q;
 
 
     for (size_t i = 0; i < length; ++i) {
-        ptd_scc_vertex_t *vertex = in[i];
+        ptd_ordered_scc_t *vertex = in[i];
         vertex->topo = 0;
         vertex->visited = false;
     }
 
     for (size_t i = 0; i < length; ++i) {
-        ptd_scc_vertex_t *vertex = in[i];
+        ptd_ordered_scc_t *vertex = in[i];
 
         for (size_t j = 0; j < vertex->scc_edges_length; ++j) {
-            ptd_scc_vertex_t *child = vertex->scc_edges[j];
+            ptd_ordered_scc_t *child = vertex->scc_edges[j];
 
             child->topo++;
         }
@@ -2982,14 +2967,14 @@ ptd_scc_vertex_t **ptd_scc_index_topological(ptd_scc_vertex_t **in, size_t lengt
     size_t idx = 0;
 
     while (!q.empty()) {
-        ptd_scc_vertex_t *vertex = q.front();
+        ptd_ordered_scc_t *vertex = q.front();
         q.pop();
 
         res[idx] = vertex;
         idx++;
 
         for (size_t i = 0; i < vertex->scc_edges_length; ++i) {
-            ptd_scc_vertex_t *child = vertex->scc_edges[i];
+            ptd_ordered_scc_t *child = vertex->scc_edges[i];
 
             child->topo -= 1;
 
@@ -3000,10 +2985,14 @@ ptd_scc_vertex_t **ptd_scc_index_topological(ptd_scc_vertex_t **in, size_t lengt
         }
     }
 
-    return res;
+    ptd_ordered_sccs_t *r = (ptd_ordered_sccs_t *) malloc(sizeof(*r));
+    r->ordered_components = res;
+    r->ordered_components_length = length;
+
+    return r;
 }
 
-ptd_scc_vertex_t **
+ptd_ordered_sccs_t *
 ptd_order_strongly_connected_components(
         ptd_strongly_connected_components_t *sccs
 ) {
@@ -3014,11 +3003,11 @@ ptd_order_strongly_connected_components(
     }
 
     void **old_data = (void **) calloc(graph->vertices_length, sizeof(void *));
-    ptd_scc_vertex_t **res = (ptd_scc_vertex_t **) calloc(sccs->components_length, sizeof(*res));
+    ptd_ordered_scc_t **res = (ptd_ordered_scc_t **) calloc(sccs->components_length, sizeof(*res));
 
     for (size_t i = 0; i < sccs->components_length; ++i) {
         ptd_strongly_connected_component_t *scc = sccs->components[i];
-        res[i] = (ptd_scc_vertex_t *) malloc(sizeof(*(res[i])));
+        res[i] = (ptd_ordered_scc_t *) malloc(sizeof(*(res[i])));
         res[i]->scc = scc;
     }
 
@@ -3035,7 +3024,7 @@ ptd_order_strongly_connected_components(
     }
 
     for (size_t i = 0; i < sccs->components_length; ++i) {
-        set<ptd_scc_vertex_t *> scc_edges;
+        set<ptd_ordered_scc_t *> scc_edges;
         set<ptd_vertex_t *> local_edges;
         ptd_strongly_connected_component_t *scc = sccs->components[i];
 
@@ -3045,21 +3034,21 @@ ptd_order_strongly_connected_components(
             for (size_t k = 0; k < vertex->edges_length; ++k) {
                 ptd_vertex_t *child = vertex->edges[k].to;
 
-                if (((ptd_scc_vertex_t *) (child->data))->scc == scc) {
+                if (((ptd_ordered_scc_t *) (child->data))->scc == scc) {
                     continue;
                 }
 
-                scc_edges.insert((ptd_scc_vertex_t *) child->data);
+                scc_edges.insert((ptd_ordered_scc_t *) child->data);
                 local_edges.insert(child);
             }
         }
 
         res[i]->scc_edges_length = scc_edges.size();
-        res[i]->scc_edges = (ptd_scc_vertex_t **) calloc(sizeof(*(res[i]->scc_edges)), res[i]->scc_edges_length);
+        res[i]->scc_edges = (ptd_ordered_scc_t **) calloc(sizeof(*(res[i]->scc_edges)), res[i]->scc_edges_length);
 
         size_t l = 0;
         for (
-                set<ptd_scc_vertex_t *>::iterator itr = scc_edges.begin();
+                set<ptd_ordered_scc_t *>::iterator itr = scc_edges.begin();
                 itr != scc_edges.end();
                 itr++
                 ) {
@@ -3089,7 +3078,7 @@ ptd_order_strongly_connected_components(
         }
     }
 
-    ptd_scc_vertex_t **sorted = ptd_scc_index_topological(res, sccs->components_length);
+    ptd_ordered_sccs_t *sorted = ptd_scc_index_topological(res, sccs->components_length);
     free(res);
 
     p = 0;
@@ -3103,10 +3092,26 @@ ptd_order_strongly_connected_components(
         }
     }
 
+    free(old_data);
+
     return sorted;
 }
 
-ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_scc_vertex_t *in) {
+void ptd_ordered_sccs_destroy(ptd_ordered_sccs_t *ordered_strongly_connected_components) {
+    for (size_t i = 0;
+         i < ordered_strongly_connected_components->ordered_components_length;
+         ++i) {
+        ptd_ordered_scc_t *scc = ordered_strongly_connected_components->ordered_components[i];
+        free(scc->local_edges);
+        free(scc->scc_edges);
+        free(scc);
+    }
+
+    free(ordered_strongly_connected_components->ordered_components);
+    free(ordered_strongly_connected_components);
+}
+
+ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_ordered_scc_t *in) {
     ptd_phase_type_distribution_t *res = (ptd_phase_type_distribution_t *) malloc(sizeof(*res));
     size_t full_length = in->local_edges_length + in->scc->vertices_length;
 
@@ -3161,10 +3166,10 @@ ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_scc_vertex_t *in) {
     for (size_t i = 0; i < full_length; ++i) {
         free((vertices)[i]->data);
         (vertices)[i]->data = old_data[i];
-        fprintf(stderr, "Setting %s back to %zu\n", vertex_name(vertices[i]), old_indices[i]);
         (vertices)[i]->index = old_indices[i];
     }
 
+    free(old_indices);
     free(old_data);
 
     return res;
@@ -3431,7 +3436,7 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
     return 0;
 }
 
-void ptd_phase_type_distribution_free(ptd_phase_type_distribution_t *ptd) {
+void ptd_phase_type_distribution_destroy(ptd_phase_type_distribution_t *ptd) {
     for (size_t i = 0; i < ptd->memory_allocated; ++i) {
         free(ptd->sub_intensity_matrix[i]);
 
@@ -4243,11 +4248,12 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
             graph, keep_all
     );
 
-    ptd_scc_vertex_t **vertices = ptd_order_strongly_connected_components(sccs);
+    ptd_ordered_sccs_t *ordered_sccs = ptd_order_strongly_connected_components(sccs);
+    ptd_ordered_scc_t **vertices = ordered_sccs->ordered_components;
 
     for (size_t i = 0; i < sccs->components_length; ++i) {
         DEBUG_PRINT("At scc %zu size %zu\n", i, sccs->components[i]->vertices_length);
-        ptd_scc_vertex_t *v = vertices[i];
+        ptd_ordered_scc_t *v = vertices[i];
 
         long double **mat;
         ptd_vertex_t **vs;
@@ -4275,7 +4281,7 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
         if (length == 1) {
 
             fprintf(stderr, "F1\n");
-            ptd_phase_type_distribution_free(ptd);
+            ptd_phase_type_distribution_destroy(ptd);
             fprintf(stderr, "F2\n");
             continue;
         }
@@ -4302,7 +4308,7 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
         gsl_matrix_free(full);
         gsl_matrix_free(inv);
 
-        ptd_phase_type_distribution_free(ptd);
+        ptd_phase_type_distribution_destroy(ptd);
     }
 
     *((long double *) graph->start_vertex->data) = 0;
@@ -4339,27 +4345,12 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
     ptd_strongly_connected_components_destroy(sccs);
 }
 
-double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
+ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(ptd_graph_t *graph) {
     if (!graph->is_indexed) {
         ptd_label_vertices(graph);
     }
 
-    queue<ptd_vertex_t*>qq = ptd_enqueue_vertices(graph);
-
-    while (!qq.empty()) {
-        ptd_vertex_t *v = qq.front();
-        qq.pop();
-
-        fprintf(stderr, "Vertex %zu %s\n", v->index, vertex_name(v));
-    }
-
-    struct desc_multiplier {
-        ptd_vertex_t *vertex;
-        double multiplier;
-        bool external;
-    };
-
-    struct desc_multiplier **desc_multipliers = (struct desc_multiplier **) calloc(
+    ptd_desc_multiplier_t **desc_multipliers = (ptd_desc_multiplier_t **) calloc(
             graph->vertices_length,
             sizeof(*desc_multipliers)
     );
@@ -4374,32 +4365,11 @@ double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
             graph, keep_all
     );
 
-    ptd_scc_vertex_t **vertices = ptd_order_strongly_connected_components(sccs);
-
-    qq = ptd_enqueue_vertices(graph);
-
-    while (!qq.empty()) {
-        ptd_vertex_t *v = qq.front();
-        qq.pop();
-
-        fprintf(stderr, "Vertex %zu %s\n", v->index, vertex_name(v));
-    }
+    ptd_ordered_sccs_t *ordered = ptd_order_strongly_connected_components(sccs);
+    ptd_ordered_scc_t **vertices = ordered->ordered_components;
 
     for (size_t i = 0; i < sccs->components_length; ++i) {
-        ptd_scc_vertex_t *v = vertices[i];
-        fprintf(stderr, "\nComponents %p %zu:\n", (void *) v, i);
-
-        for (size_t j = 0; j < v->scc->vertices_length; ++j) {
-            fprintf(stderr, "Vertex %zu %s (index %zu)\n", j, vertex_name(v->scc->vertices[j]), v->scc->vertices[j]->index);
-        }
-
-        for (size_t k = 0; k < v->scc_edges_length; ++k) {
-            fprintf(stderr, "SCC edge to %p\n", (void *) v->scc_edges[k]);
-        }
-
-        for (size_t k = 0; k < v->local_edges_length; ++k) {
-            fprintf(stderr, "local edge to %s\n", vertex_name((v->local_edges[k])));
-        }
+        ptd_ordered_scc_t *v = vertices[i];
 
         long double **mat;
         ptd_vertex_t **vs;
@@ -4411,7 +4381,7 @@ double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
         length = ptd->length;
 
         if (length == 1) {
-            fprintf(stderr, "Length 1, returning...\n");
+            ptd_phase_type_distribution_destroy(ptd);
             continue;
         }
 
@@ -4424,71 +4394,60 @@ double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
         }
 
         gsl_matrix *inv = matrix_invert(full, length);
-        /*fprintf(stderr, "INVERTED:\n");
-
-        for (size_t k = 0; k < length; ++k) {
-            for (size_t j = 0; j < length; ++j) {
-                fprintf(stderr, "%.2f ", -gsl_matrix_get(inv, k, j));
-            }
-            fprintf(stderr, "\n");
-        }
-        fprintf(stderr, "\n");*/
 
         for (size_t k = 0; k < v->scc->vertices_length; ++k) {
-            fprintf(stderr, "mat vertex %s\n", vertex_name((vs[k])));
             if (vs[k]->index != 0) {
                 desc_length[vs[k]->index] = length;
-                desc_multipliers[vs[k]->index] = (struct desc_multiplier *) calloc(
+                desc_multipliers[vs[k]->index] = (ptd_desc_multiplier_t *) calloc(
                         length, sizeof(*(desc_multipliers[vs[k]->index]))
                 );
 
-                fprintf(stderr, "VERTEX %zu %s. Setting length to %zu \n", vs[k]->index, vertex_name(vs[k]),
-                        length);
-
-                size_t idx = 0;
-
                 for (size_t j = 0; j < length; ++j) {
-                    fprintf(stderr, "VERTEX %zu %s. Setting at %zu:\n", vs[k]->index, vertex_name(vs[k]), idx);
-                    desc_multipliers[vs[k]->index][idx].external = j >= v->scc->vertices_length;
-                    desc_multipliers[vs[k]->index][idx].vertex = vs[j];
-                    if (!desc_multipliers[vs[k]->index][idx].external) {
-                        desc_multipliers[vs[k]->index][idx].multiplier =
-                                -gsl_matrix_get(inv, k, j) / (double) desc_multipliers[vs[k]->index][idx].vertex->rate;
+                    desc_multipliers[vs[k]->index][j].external = j >= v->scc->vertices_length;
+                    desc_multipliers[vs[k]->index][j].vertex = vs[j];
+                    if (!desc_multipliers[vs[k]->index][j].external) {
+                        desc_multipliers[vs[k]->index][j].multiplier =
+                                -gsl_matrix_get(inv, k, j) / (double) desc_multipliers[vs[k]->index][j].vertex->rate;
                     } else {
-                        desc_multipliers[vs[k]->index][idx].multiplier =
+                        desc_multipliers[vs[k]->index][j].multiplier =
                                 -gsl_matrix_get(inv, k, j);
                     }
-                    fprintf(stderr, "\text %i, vertex %s, mul %f\n",
-                            desc_multipliers[vs[k]->index][idx].external,
-                            vertex_name(desc_multipliers[vs[k]->index][idx].vertex ),
-                            desc_multipliers[vs[k]->index][idx].multiplier);
-                    idx++;
                 }
             } else {
                 desc_length[vs[k]->index] = 0;
             }
         }
+
+        gsl_matrix_free(inv);
+        gsl_matrix_free(full);
+        ptd_phase_type_distribution_destroy(ptd);
     }
+
+    ptd_desc_multipliers_t *res = (ptd_desc_multipliers_t*) malloc(sizeof(*res));
+    res->desc_length = desc_length;
+    res->desc_multipliers = desc_multipliers;
+    res->ordered = ordered;
+
+    return res;
+}
+
+double *ptd_cyclic_desc(ptd_graph_t *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(ptd_vertex_t *)) {
+    ptd_desc_multiplier_t **desc_multipliers = multipliers->desc_multipliers;
+    size_t *desc_length = multipliers->desc_length;
+    ptd_ordered_sccs_t *ordered = multipliers->ordered;
 
     double *desc_value = (double *) calloc(graph->vertices_length, sizeof(*desc_value));
 
-    for (size_t i = 0; i < sccs->components_length; ++i) {
-        size_t length = sccs->components[i]->vertices_length;
-        ptd_vertex_t **vertices = sccs->components[i]->vertices;
-
+    for (size_t ii = 0; ii < ordered->ordered_components_length; ++ii) {
+        size_t i = ordered->ordered_components_length - 1 - ii;
+        size_t length = ordered->ordered_components[i]->scc->vertices_length;
+        ptd_vertex_t **vertices = ordered->ordered_components[i]->scc->vertices;
 
         for (size_t k = 0; k < length; ++k) {
             if (vertices[k]->index != 0) {
-                //desc_value[vertices[k]->index] += reward(vertices[k]) / vertices[k]->rate;
-
-
-                fprintf(stderr, "VERTEX %zu %s own %f\n", vertices[k]->index, vertex_name(vertices[k]), desc_value[vertices[k]->index]);
-
                 for (size_t j = 0; j < desc_length[vertices[k]->index]; ++j) {
-                    fprintf(stderr, "\tCHILD %zu %s\n", desc_multipliers[vertices[k]->index][j].vertex->index, vertex_name(desc_multipliers[vertices[k]->index][j].vertex));
 
                     if (desc_multipliers[vertices[k]->index][j].vertex->index == 0) {
-                        fprintf(stderr, "\tNOT Adding, is absorbing\n");
                         continue;
                     }
 
@@ -4496,14 +4455,11 @@ double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
                         double multiplier = desc_multipliers[vertices[k]->index][j].multiplier;
                         double reward_value = reward(desc_multipliers[vertices[k]->index][j].vertex);
                         double rate = (double) desc_multipliers[vertices[k]->index][j].vertex->rate;
-                        fprintf(stderr, "\tAdding %f * %f / %f = %f\n", multiplier, reward_value, rate, multiplier * reward_value / rate);
                         desc_value[vertices[k]->index] += multiplier * reward_value / rate;
                     } else {
                         double multiplier = desc_multipliers[vertices[k]->index][j].multiplier;
-                        fprintf(stderr, "\tAdding %f * %f = %f\n", multiplier,
-                                desc_value[desc_multipliers[vertices[k]->index][j].vertex->index],
-                                multiplier * desc_value[desc_multipliers[vertices[k]->index][j].vertex->index]);
-                        desc_value[vertices[k]->index] += multiplier * desc_value[desc_multipliers[vertices[k]->index][j].vertex->index];
+                        desc_value[vertices[k]->index] +=
+                                multiplier * desc_value[desc_multipliers[vertices[k]->index][j].vertex->index];
                     }
                 }
             }
@@ -4511,15 +4467,15 @@ double *ptd_cyclic_desc(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
     }
 
     desc_value[1] = 0;
-
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
-
-    while (!q.empty()) {
-        ptd_vertex_t *v = q.front();
-        q.pop();
-
-        fprintf(stderr, "Vertex %zu (%s) has %f\n", v->index, vertex_name(v), desc_value[v->index]);
+/*
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        free(desc_multipliers[i]);
     }
+
+    free(desc_multipliers);
+    ptd_ordered_sccs_destroy(ordered);
+    ptd_strongly_connected_components_destroy(sccs);
+    free(desc_length);*/
 
     return desc_value;
 }
