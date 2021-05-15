@@ -217,13 +217,13 @@ void test_can_find_scc() {
 
     draw_graph(graph);
 
-    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph, keep_all);
+    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph);
 
     for (size_t i = 0; i < sccs->components_length; ++i) {
         fprintf(stderr, "\nComponents %zu:\n", i);
 
-        for (size_t j = 0; j < sccs->components[i]->vertices_length; ++j) {
-            fprintf(stderr, "Vertex %zu %s\n", j, vertex_name((sccs->components[i]->vertices[j])));
+        for (size_t j = 0; j < sccs->components[i]->internal_vertices_length; ++j) {
+            fprintf(stderr, "Vertex %zu %s\n", j, vertex_name((sccs->components[i]->internal_vertices[j])));
         }
     }
 
@@ -263,14 +263,14 @@ void test_can_find_scc2() {
     draw_graph(graph);
 
     ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(
-            graph, remove_D_and_H_and_I
+            graph
     );
 
     for (size_t i = 0; i < sccs->components_length; ++i) {
         fprintf(stderr, "\nComponents %zu:\n", i);
 
-        for (size_t j = 0; j < sccs->components[i]->vertices_length; ++j) {
-            fprintf(stderr, "Vertex %zu %s\n", j, vertex_name((sccs->components[i]->vertices[j])));
+        for (size_t j = 0; j < sccs->components[i]->internal_vertices_length; ++j) {
+            fprintf(stderr, "Vertex %zu %s\n", j, vertex_name((sccs->components[i]->internal_vertices[j])));
         }
     }
 
@@ -287,6 +287,26 @@ int set_data_as_int(ptd_vertex_t *vertex) {
     *((double *) vertex->data) = 0;
 
     return 0;
+}
+
+void print_component(ptd_strongly_connected_component_t *scc) {
+    fprintf(stderr, "Component %p - %zu internal:\n", (void*)scc, scc->internal_vertices_length);
+
+    for (size_t i = 0; i < scc->internal_vertices_length; ++i) {
+        fprintf(stderr, "\t%s\n", vertex_name(scc->internal_vertices[i]));
+    }
+
+    fprintf(stderr, "\t %zu external:\n", scc->external_vertices_length);
+
+    for (size_t i = 0; i < scc->external_vertices_length; ++i) {
+        fprintf(stderr, "\t%s\n", vertex_name(scc->external_vertices[i]));
+    }
+
+    fprintf(stderr, "\t %zu external scc:\n", scc->external_sccs_length);
+
+    for (size_t i = 0; i < scc->external_sccs_length; ++i) {
+        fprintf(stderr, "\t%p\n", (void*)(scc->external_sccs[i]));
+    }
 }
 
 void test_can_find_scc2_graph() {
@@ -320,75 +340,24 @@ void test_can_find_scc2_graph() {
 
     ptd_add_edge(K, E, 1);
 
+    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph);
 
-
-    long double **mat;
-    ptd_vertex_t **vs;
-    size_t length;
-
-    ptd_phase_type_distribution_t *ptd = ptd_graph_as_phase_type_distribution(graph);
-    mat = ptd->sub_intensity_matrix;
-    vs = ptd->vertices;
-    length = ptd->length;
-
-
-
-    ptd_desc_multipliers_t *multipliers = ptd_cyclic_descendant_multipliers(graph);
-
-    ptd_cyclic_desc(graph, multipliers,  reward_identity);
-
-    draw_graph(graph);
-    for (size_t j = 0; j < length; ++j) {
-        fprintf(stderr, "%s ", vertex_name(vs[j]));
+    for (size_t i = 0; i < sccs->components_length; ++i) {
+        fprintf(stderr, "Scc %zu\n", i);
+        print_component(sccs->components[i]);
     }
 
-    fprintf(stderr, "\n");
-    fprintf(stderr, "MATRIX:\n");
-    gsl_matrix *full = gsl_matrix_alloc(length, length);
-
-    for (size_t k = 0; k < length; ++k) {
-        for (size_t j = 0; j < length; ++j) {
-            fprintf(stderr, "%.2Lf ", mat[k][j]);
-            gsl_matrix_set(full, k, j, (double) mat[k][j]);
-        }
-
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-
-    fprintf(stderr, "INVERTED:\n");
-    gsl_matrix *inv = matrix_invert(full, length);
-
-    for (size_t k = 0; k < length; ++k) {
-        for (size_t j = 0; j < length; ++j) {
-            fprintf(stderr, "%.2f ", -gsl_matrix_get(inv, k, j));
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-
-
-
-    for (size_t k = 0; k < length; ++k) {
-
-        double desc = 0;
-
-        for (size_t j = 0; j < length; ++j) {
-            desc += gsl_matrix_get(inv, k, j) / vs[j]->rate;
-        }
-        fprintf(stderr, "P: Vertex %zu (%s) has %f\n", vs[k]->index, vertex_name(vs[k]), desc);
-
-    }
+    ptd_strongly_connected_components_destroy(sccs);
 
     ptd_graph_destroy(graph);
 }
 
-void test_can_find_scc2_rand_graph() {
+void test_can_find_scc_cov_rand_graph() {
     ptd_graph_t *graph = ptd_graph_create(4);
     srand(1234);
 
-    ptd_vertex_t **vertices = (ptd_vertex_t**) calloc(50, sizeof(*vertices));
-    double *fulld = (double*) calloc(50, sizeof(*fulld));
+    ptd_vertex_t **vertices = (ptd_vertex_t **) calloc(50, sizeof(*vertices));
+    double *fulld = (double *) calloc(50, sizeof(*fulld));
 
     ptd_vertex_t *abs = ptd_vertex_create(graph);
 
@@ -422,11 +391,11 @@ void test_can_find_scc2_rand_graph() {
 
     ptd_desc_multipliers_t *multipliers = ptd_cyclic_descendant_multipliers(graph);
 
-    double *algod = ptd_cyclic_desc(graph, multipliers,  reward_identity);
+    double *algod = ptd_cyclic_desc(graph, multipliers, reward_identity);
 
     gsl_matrix *full = gsl_matrix_alloc(length, length);
 
-    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph, keep_all);
+    ptd_strongly_connected_components_t *sccs = ptd_find_strongly_connected_components(graph);
 
     fprintf(stderr, "Sccs: %zu\n", sccs->components_length);
 
@@ -728,7 +697,7 @@ int main(int argc, char **argv) {
 //    test_can_find_scc();
 //    test_can_find_scc2();
     //test_can_find_scc2_graph();
-    test_can_find_scc2_rand_graph();
+   test_can_find_scc_cov_rand_graph();
 
 //    test_it_can_insert_avl();
 //    test_avl_is_balanced();

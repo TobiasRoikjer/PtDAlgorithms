@@ -251,10 +251,18 @@ queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph);
 int ptd_label_vertices(ptd_graph_t *graph);
 
 // TODO: static
+typedef struct strongly_connected_component ptd_strongly_connected_component_t;
 
 typedef struct strongly_connected_component {
-    size_t vertices_length;
-    ptd_vertex_t **vertices;
+    size_t internal_vertices_length;
+    ptd_vertex_t **internal_vertices;
+    size_t external_sccs_length;
+    ptd_strongly_connected_component_t **external_sccs;
+    size_t external_vertices_length;
+    ptd_vertex_t **external_vertices;
+
+    bool visited;
+    size_t index;
 } ptd_strongly_connected_component_t;
 
 typedef struct strongly_connected_components {
@@ -262,7 +270,7 @@ typedef struct strongly_connected_components {
     ptd_strongly_connected_component_t **components;
 } ptd_strongly_connected_components_t;
 
-typedef struct scc_vertex {
+/*typedef struct scc_vertex {
     ptd_strongly_connected_component_t *scc;
     size_t scc_edges_length;
     scc_vertex **scc_edges;
@@ -275,19 +283,17 @@ typedef struct scc_vertex {
 typedef struct {
     size_t ordered_components_length;
     ptd_ordered_scc_t **ordered_components;
-} ptd_ordered_sccs_t;
+} ptd_ordered_sccs_t;*/
 
 ptd_strongly_connected_components_t *
-ptd_find_strongly_connected_components(ptd_graph_t *graph, bool (*is_included_func)(ptd_vertex_t *));
+ptd_find_strongly_connected_components(ptd_graph_t *graph);
 
 void ptd_strongly_connected_components_destroy(ptd_strongly_connected_components_t *sccs);
 
-ptd_ordered_sccs_t *
+int
 ptd_order_strongly_connected_components(
         ptd_strongly_connected_components_t *sccs
 );
-
-void ptd_ordered_sccs_destroy(ptd_ordered_sccs_t *ordered_strongly_connected_components);
 
 typedef struct ptd_vertex_group ptd_vertex_group_t;
 
@@ -346,7 +352,7 @@ typedef struct {
 ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph);
 
 ptd_phase_type_distribution_t *
-ptd_find_local_matrix(ptd_ordered_scc_t *in);
+ptd_find_local_matrix(ptd_strongly_connected_components_t *in);
 
 void ptd_phase_type_distribution_destroy(ptd_phase_type_distribution_t *ptd);
 
@@ -406,7 +412,7 @@ typedef struct {
 typedef struct {
     size_t *desc_length;
     ptd_desc_multiplier_t **desc_multipliers;
-    ptd_ordered_sccs_t *ordered;
+    ptd_strongly_connected_components_t *ordered;
 } ptd_desc_multipliers_t;
 
 double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *));

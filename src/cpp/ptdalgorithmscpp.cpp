@@ -185,7 +185,7 @@ void ptdalgorithms::Graph::visit_vertices(
     if (res != 0) {
         char msg[1024];
 
-        snprintf(msg, 1024, "Failed to visit vertices, visit function returned non-zero: %s \n", std::strerror(errno));
+        snprintf(msg, 1024, "Failed to visit internal_vertices, visit function returned non-zero: %s \n", std::strerror(errno));
 
         throw new std::runtime_error(
                 msg
@@ -239,7 +239,7 @@ SEXP start_vertex(SEXP phase_type_graph) {
 }
 
 // [[Rcpp::export]]
-List vertices(SEXP phase_type_graph) {
+List internal_vertices(SEXP phase_type_graph) {
     Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
 
     ptd_label_vertices(graph->graph);

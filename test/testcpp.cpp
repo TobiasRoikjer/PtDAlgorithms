@@ -160,20 +160,20 @@ int main(void) {
     ptd_strongly_connected_components_t *scc =
             ptd_find_strongly_connected_components(two_loci, always_true);
 
-    fprintf(stderr, "We have %zu scc with %zu vertices\n", scc->components_length, two_loci->vertices_length);
+    fprintf(stderr, "We have %zu scc with %zu internal_vertices\n", scc->components_length, two_loci->vertices_length);
 
     fprintf(stderr, "EXP %f\n", ptd_circular_exp(two_loci, reward_by_1));
-    fprintf(stderr, "We have %zu scc with %zu vertices\n", scc->components_length, two_loci->vertices_length);
+    fprintf(stderr, "We have %zu scc with %zu internal_vertices\n", scc->components_length, two_loci->vertices_length);
     return 0;
 
     for (size_t l = 0; l < scc->components_length; ++l) {
         ptd_strongly_connected_component_t *sc = scc->components[l];
-        fprintf(stderr, "Component %zu has %zu vertices\n", l, sc->vertices_length);
+        fprintf(stderr, "Component %zu has %zu internal_vertices\n", l, sc->internal_vertices_length);
 
-        for (size_t i = 0; i < sc->vertices_length; ++i) {
+        for (size_t i = 0; i < sc->internal_vertices_length; ++i) {
             char buffer[1024];
-            ptd_vertex_to_s(sc->vertices[i], buffer, 1024);
-            fprintf(stderr, "Entry idx %zu: %s\n",sc->vertices[i]->index,  buffer);
+            ptd_vertex_to_s(sc->internal_vertices[i], buffer, 1024);
+            fprintf(stderr, "Entry idx %zu: %s\n",sc->internal_vertices[i]->index,  buffer);
         }
     }
 
@@ -202,7 +202,7 @@ int main(void) {
     assert(vertex2 == vertex3);
     assert(vertex2 == e);
 
-    vector<ptdalgorithms::Vertex> list = graph.vertices();
+    vector<ptdalgorithms::Vertex> list = graph.internal_vertices();
 
     assert(list.size() == 2);
     assert(list[0].state() == state1);
