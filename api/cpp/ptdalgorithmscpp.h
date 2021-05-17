@@ -7,7 +7,7 @@
 
 struct rf_graph {
     ptd_avl_tree_t *tree;
-    ptd_graph_t *graph;
+    struct ptd_graph *graph;
     size_t *references;
 };
 
@@ -20,7 +20,7 @@ namespace ptdalgorithms {
 
     class Graph {
     public:
-        Graph(ptd_graph_t *graph) {
+        Graph(struct ptd_graph *graph) {
             this->rf_graph = (struct rf_graph *) malloc(sizeof(*this->rf_graph));
             this->rf_graph->references = (size_t *) malloc(sizeof(*this->rf_graph->references));
             *this->rf_graph->references = 1;
@@ -128,7 +128,7 @@ namespace ptdalgorithms {
             return *this;
         }
 
-        ptd_graph_t *c_graph() {
+        struct ptd_graph *c_graph() {
             return rf_graph->graph;
         }
 
@@ -149,7 +149,7 @@ namespace ptdalgorithms {
         }
 
     public:
-        Vertex(Graph &graph, ptd_vertex_t *vertex) : graph(graph) {
+        Vertex(Graph &graph, struct ptd_vertex *vertex) : graph(graph) {
             this->vertex = vertex;
         }
 
@@ -173,7 +173,7 @@ namespace ptdalgorithms {
             return *this;
         }
 
-        ptd_vertex_t *c_vertex() {
+        struct ptd_vertex *c_vertex() {
             return vertex;
         }
 
@@ -192,21 +192,21 @@ namespace ptdalgorithms {
     private:
         Graph &graph;
 
-        ptd_vertex_t *vertex;
+        struct ptd_vertex *vertex;
 
         friend class Graph;
     };
 
     struct Edge {
     private:
-        Edge(ptd_vertex_t *vertex, Graph &graph, long double weight) : graph(graph) {
+        Edge(struct ptd_vertex *vertex, Graph &graph, long double weight) : graph(graph) {
             this->_weight = weight;
             this->_vertex = vertex;
         }
 
     private:
         Graph &graph;
-        ptd_vertex_t *_vertex;
+        struct ptd_vertex *_vertex;
         long double _weight;
 
     public:
@@ -249,7 +249,7 @@ namespace ptdalgorithms {
         size_t length;
         long double **sub_intensity_matrix;
         long double *initial_probability_vector;
-        ptd_vertex_t **vertices;
+        struct ptd_vertex **vertices;
 
         friend class Graph;
     };
@@ -259,7 +259,7 @@ namespace ptdalgorithms {
         static Graph kingman(size_t n) {
             char msg[1024];
 
-            ptd_graph_t *kingman;
+            struct ptd_graph *kingman;
 
             if ((kingman = ptd_model_kingman(n)) == NULL) {
                 snprintf(

@@ -11,7 +11,7 @@
 #include <gsl/gsl_linalg.h>
 #include "ptdalgorithms.h"
 
-extern char *vertex_name(ptd_vertex_t *vertex);
+extern char *vertex_name(struct ptd_vertex *vertex);
 
 static int reward_transform_vertex(vertex_t *vertex, double (*reward_func)(vertex_t *));
 
@@ -228,9 +228,9 @@ static void reset_graph_visited(vertex_t *graph) {
 *  B: parent
 *  D: child_right
 */
-avl_node_t *rotate_left_right(avl_node_t *parent, avl_node_t *child) {
-    avl_node_t *child_right_left, *child_right_right;
-    avl_node_t *child_right = child->right;
+struct avl_node *rotate_left_right(struct avl_node *parent, struct avl_node *child) {
+    struct avl_node *child_right_left, *child_right_right;
+    struct avl_node *child_right = child->right;
     child_right_left = child_right->left;
     child->right = child_right_left;
 
@@ -276,9 +276,9 @@ avl_node_t *rotate_left_right(avl_node_t *parent, avl_node_t *child) {
 *  B: parent
 *  D: child_left
 */
-avl_node_t *rotate_right_left(avl_node_t *parent, avl_node_t *child) {
-    avl_node_t *child_left_right, *child_left_left;
-    avl_node_t *child_left = child->left;
+struct avl_node *rotate_right_left(struct avl_node *parent, struct avl_node *child) {
+    struct avl_node *child_left_right, *child_left_left;
+    struct avl_node *child_left = child->left;
 
     child_left_right = child_left->right;
 
@@ -323,8 +323,8 @@ avl_node_t *rotate_right_left(avl_node_t *parent, avl_node_t *child) {
 *    B   (left) A   C
 *      C   ->
 */
-avl_node_t *rotate_left(avl_node_t *parent, avl_node_t *child) {
-    avl_node_t *child_left;
+struct avl_node *rotate_left(struct avl_node *parent, struct avl_node *child) {
+    struct avl_node *child_left;
 
     child_left = child->left;
     parent->right = child_left;
@@ -353,8 +353,8 @@ avl_node_t *rotate_left(avl_node_t *parent, avl_node_t *child) {
 *    B    (right) C   A
 *  C        ->
 */
-avl_node_t *rotate_right(avl_node_t *parent, avl_node_t *child) {
-    avl_node_t *child_right;
+struct avl_node *rotate_right(struct avl_node *parent, struct avl_node *child) {
+    struct avl_node *child_right;
 
     child_right = child->right;
     parent->left = child_right;
@@ -377,10 +377,10 @@ avl_node_t *rotate_right(avl_node_t *parent, avl_node_t *child) {
     return child;
 }
 
-avl_node_t *avl_vec_vertex_create(char *key, void *entry, avl_node_t *parent) {
-    avl_node_t *vertex;
+struct avl_node *avl_vec_vertex_create(char *key, void *entry, struct avl_node *parent) {
+    struct avl_node *vertex;
 
-    if ((vertex = (avl_node_t *) malloc(sizeof(*vertex))) == NULL) {
+    if ((vertex = (struct avl_node *) malloc(sizeof(*vertex))) == NULL) {
         return NULL;
     }
 
@@ -394,7 +394,7 @@ avl_node_t *avl_vec_vertex_create(char *key, void *entry, avl_node_t *parent) {
     return vertex;
 }
 
-void avl_vec_vertex_destroy(avl_node_t *vertex) {
+void avl_vec_vertex_destroy(struct avl_node *vertex) {
     if (vertex == NULL) {
         return;
     }
@@ -405,7 +405,7 @@ void avl_vec_vertex_destroy(avl_node_t *vertex) {
     free(vertex);
 }
 
-static void avl_free(avl_node_t *vertex) {
+static void avl_free(struct avl_node *vertex) {
     if (vertex == NULL) {
         return;
     }
@@ -415,13 +415,13 @@ static void avl_free(avl_node_t *vertex) {
     free(vertex);
 }
 
-const avl_node_t *
-avl_vec_find(const avl_node_t *rootptr, const char *key, const size_t vec_length) {
+const struct avl_node *
+avl_vec_find(const struct avl_node *rootptr, const char *key, const size_t vec_length) {
     if (rootptr == NULL) {
         return NULL;
     }
 
-    const avl_node_t *vertex = rootptr;
+    const struct avl_node *vertex = rootptr;
 
     while (true) {
         int res = memcmp(key, vertex->key, vec_length);
@@ -444,7 +444,7 @@ avl_vec_find(const avl_node_t *rootptr, const char *key, const size_t vec_length
     }
 }
 
-int find_or_insert_vec(avl_node_t **out, avl_node_t *rootptr, char *key, void *entry,
+int find_or_insert_vec(struct avl_node **out, struct avl_node *rootptr, char *key, void *entry,
                        const size_t vec_length) {
     if ((*out = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
         return -1;
@@ -454,7 +454,7 @@ int find_or_insert_vec(avl_node_t **out, avl_node_t *rootptr, char *key, void *e
         return 1;
     }
 
-    avl_node_t *vertex = rootptr;
+    struct avl_node *vertex = rootptr;
 
     while (true) {
         int res = memcmp(key, vertex->key, vec_length);
@@ -484,10 +484,10 @@ int find_or_insert_vec(avl_node_t **out, avl_node_t *rootptr, char *key, void *e
     return 0;
 }
 
-int avl_rebalance_tree(avl_node_t **root, avl_node_t *child) {
-    avl_node_t *pivot, *rotated_parent;
+int avl_rebalance_tree(struct avl_node **root, struct avl_node *child) {
+    struct avl_node *pivot, *rotated_parent;
 
-    for (avl_node_t *parent = child->parent; parent != NULL; parent = child->parent) {
+    for (struct avl_node *parent = child->parent; parent != NULL; parent = child->parent) {
         if (child == parent->right) {
             if (parent->balance > 0) {
                 pivot = parent->parent;
@@ -549,8 +549,8 @@ int avl_rebalance_tree(avl_node_t **root, avl_node_t *child) {
     return 0;
 }
 
-int avl_vec_insert(avl_node_t **root, char *key, void *entry, const size_t vec_length) {
-    avl_node_t *child;
+int avl_vec_insert(struct avl_node **root, char *key, void *entry, const size_t vec_length) {
+    struct avl_node *child;
 
     if (*root == NULL) {
         if ((*root = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
@@ -576,7 +576,7 @@ int avl_vec_insert(avl_node_t **root, char *key, void *entry, const size_t vec_l
 }
 
 
-static size_t avl_vec_get_size(avl_node_t *vertex) {
+static size_t avl_vec_get_size(struct avl_node *vertex) {
     if (vertex == NULL) {
         return 0;
     }
@@ -664,7 +664,7 @@ vertex_t *generate_state_space(
 ) {
     DEBUG_PRINT("Start generate state space\n");
 
-    avl_node_t *bst = NULL;
+    struct avl_node *bst = NULL;
     queue<pair<vertex_t *, vector<pair<double, vector<size_t> > > > > vertices_to_visit;
     queue<vertex_t *> q;
     vertex_t *start_vertex = vertex_init(
@@ -701,7 +701,7 @@ vertex_t *generate_state_space(
         }
 
         vertex_t *child;
-        avl_node_t *bst_entry = (avl_node_t *) avl_vec_find(bst, (char *) &state[0],
+        struct avl_node *bst_entry = (struct avl_node *) avl_vec_find(bst, (char *) &state[0],
                                                             state_length * sizeof(vec_entry_t));
 
         if (bst_entry != NULL) {
@@ -782,7 +782,7 @@ vertex_t *generate_state_space(
             }
 
             vertex_t *child;
-            avl_node_t *bst_entry = (avl_node_t *) avl_vec_find(bst, (char *) &child_state[0],
+            struct avl_node *bst_entry = (struct avl_node *) avl_vec_find(bst, (char *) &child_state[0],
                                                                 state_length * sizeof(vec_entry_t));
 
             if (bst_entry == NULL) {
@@ -2120,14 +2120,14 @@ queue<vertex_t *> topological_queue(vertex_t *graph) {
     return topological_queue;
 }
 
-static void ptd_reset_graph_visited(ptd_graph_t *graph) {
-    queue<ptd_vertex_t *> to_reset;
-    queue<ptd_vertex_t *> to_visit;
+static void ptd_reset_graph_visited(struct ptd_graph *graph) {
+    queue<struct ptd_vertex *> to_reset;
+    queue<struct ptd_vertex *> to_visit;
 
     to_visit.push(graph->start_vertex);
 
     while (!to_visit.empty()) {
-        ptd_vertex_t *vertex = to_visit.front();
+        struct ptd_vertex *vertex = to_visit.front();
         to_visit.pop();
 
         if (!vertex->reset) {
@@ -2140,29 +2140,29 @@ static void ptd_reset_graph_visited(ptd_graph_t *graph) {
         vertex->visited = false;
 
         for (size_t i = 0; i < vertex->edges_length; ++i) {
-            ptd_vertex_t *child = vertex->edges[i].to;
+            struct ptd_vertex *child = vertex->edges[i].to;
             to_visit.push(child);
         }
     }
 
     while (!to_reset.empty()) {
-        ptd_vertex_t *vertex = to_reset.front();
+        struct ptd_vertex *vertex = to_reset.front();
         to_reset.pop();
 
         vertex->reset = true;
     }
 }
 
-queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
+queue<struct ptd_vertex *> ptd_enqueue_vertices(struct ptd_graph *graph) {
     ptd_reset_graph_visited(graph);
     // TODO: add failures to these
-    queue<ptd_vertex_t *> ret;
-    queue<ptd_vertex_t *> queue;
+    queue<struct ptd_vertex *> ret;
+    queue<struct ptd_vertex *> queue;
 
     queue.push(graph->start_vertex);
 
     while (!queue.empty()) {
-        ptd_vertex_t *vertex = queue.front();
+        struct ptd_vertex *vertex = queue.front();
         queue.pop();
 
         if (vertex->visited) {
@@ -2173,7 +2173,7 @@ queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
         ret.push(vertex);
 
         for (size_t i = 0; i < vertex->edges_length; ++i) {
-            ptd_edge_t edge = vertex->edges[i];
+            struct ptd_edge edge = vertex->edges[i];
             queue.push(edge.to);
         }
     }
@@ -2182,28 +2182,28 @@ queue<ptd_vertex_t *> ptd_enqueue_vertices(ptd_graph_t *graph) {
 }
 
 int cmp_vertex_index(const void *a, const void *b) {
-    if ((*((const ptd_vertex_t **) a))->index > (*((const ptd_vertex_t **) b))->index) {
+    if ((*((const struct ptd_vertex **) a))->index > (*((const struct ptd_vertex **) b))->index) {
         return 1;
-    } else if ((*((const ptd_vertex_t **) a))->index < (*((const ptd_vertex_t **) b))->index) {
+    } else if ((*((const struct ptd_vertex **) a))->index < (*((const struct ptd_vertex **) b))->index) {
         return -1;
     } else {
         return 0;
     }
 }
 
-queue<ptd_vertex_t *> ptd_enqueue_vertices_sorted(ptd_graph_t *graph) {
+queue<struct ptd_vertex *> ptd_enqueue_vertices_sorted(struct ptd_graph *graph) {
     if (!graph->is_indexed) {
         ptd_label_vertices(graph);
     }
 
-    queue<ptd_vertex_t *> unsorted = ptd_enqueue_vertices(graph);
-    queue<ptd_vertex_t *> sorted_queue;
+    queue<struct ptd_vertex *> unsorted = ptd_enqueue_vertices(graph);
+    queue<struct ptd_vertex *> sorted_queue;
     size_t len = unsorted.size();
-    ptd_vertex_t **sorted = (ptd_vertex_t **) calloc(len, sizeof(*sorted));
+    struct ptd_vertex **sorted = (struct ptd_vertex **) calloc(len, sizeof(*sorted));
     size_t index = 0;
 
     while (!unsorted.empty()) {
-        ptd_vertex_t *vertex = unsorted.front();
+        struct ptd_vertex *vertex = unsorted.front();
         unsorted.pop();
 
         sorted[index] = vertex;
@@ -2221,11 +2221,11 @@ queue<ptd_vertex_t *> ptd_enqueue_vertices_sorted(ptd_graph_t *graph) {
     return sorted_queue;
 }
 
-ptd_graph_t *ptd_graph_create(size_t state_length) {
-    ptd_graph_t *graph;
-    ptd_vertex_t *start;
+struct ptd_graph *ptd_graph_create(size_t state_length) {
+    struct ptd_graph *graph;
+    struct ptd_vertex *start;
 
-    if ((graph = (ptd_graph_t *) malloc(sizeof(ptd_graph_t))) == NULL) {
+    if ((graph = (struct ptd_graph *) malloc(sizeof(struct ptd_graph))) == NULL) {
         return NULL;
     }
 
@@ -2243,25 +2243,25 @@ ptd_graph_t *ptd_graph_create(size_t state_length) {
     return graph;
 }
 
-void ptd_graph_destroy(ptd_graph_t *graph) {
+void ptd_graph_destroy(struct ptd_graph *graph) {
     ptd_vertex_destroy(graph->start_vertex);
     memset(graph, 0, sizeof(*graph));
     free(graph);
 }
 
-queue<ptd_vertex_t *> *vertices_to_visit;
+queue<struct ptd_vertex *> *vertices_to_visit;
 
-ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state) {
-    ptd_vertex_t *vertex;
+struct ptd_vertex *ptd_vertex_create_state(struct ptd_graph *graph, vec_entry_t *state) {
+    struct ptd_vertex *vertex;
 
-    vertex = (ptd_vertex_t *) malloc(sizeof(*vertex));
+    vertex = (struct ptd_vertex *) malloc(sizeof(*vertex));
 
     if (vertex == NULL) {
         return NULL;
     }
 
     vertex->edges_limit = 8;
-    vertex->edges = (ptd_edge_t *) calloc(8, sizeof(*vertex->edges));
+    vertex->edges = (struct ptd_edge *) calloc(8, sizeof(*vertex->edges));
 
     if (vertex->edges == NULL) {
         return NULL;
@@ -2287,7 +2287,7 @@ ptd_vertex_t *ptd_vertex_create_state(ptd_graph_t *graph, vec_entry_t *state) {
     return vertex;
 }
 
-ptd_vertex_t *ptd_vertex_create(ptd_graph_t *graph) {
+struct ptd_vertex *ptd_vertex_create(struct ptd_graph *graph) {
     vec_entry_t *state = (vec_entry_t *) calloc(graph->state_length, sizeof(*state));
 
     if (state == NULL) {
@@ -2297,7 +2297,7 @@ ptd_vertex_t *ptd_vertex_create(ptd_graph_t *graph) {
     return ptd_vertex_create_state(graph, state);
 }
 
-void ptd_vertex_destroy(ptd_vertex_t *vertex) {
+void ptd_vertex_destroy(struct ptd_vertex *vertex) {
     free(vertex->edges);
     vertex->edges = NULL;
     free(vertex->state);
@@ -2327,7 +2327,7 @@ ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length) {
     return avl_tree;
 }
 
-void _ptd_avl_tree_vertex_destroy(avl_node_t *avl_vertex) {
+void _ptd_avl_tree_vertex_destroy(struct avl_node *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
@@ -2342,12 +2342,12 @@ void _ptd_avl_tree_vertex_destroy(avl_node_t *avl_vertex) {
 }
 
 void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_vertex_destroy((avl_node_t *) avl_tree->root);
+    _ptd_avl_tree_vertex_destroy((struct avl_node *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
 }
 
-void _ptd_avl_tree_vertex_destroy_free(avl_node_t *avl_vertex) {
+void _ptd_avl_tree_vertex_destroy_free(struct avl_node *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
@@ -2355,7 +2355,7 @@ void _ptd_avl_tree_vertex_destroy_free(avl_node_t *avl_vertex) {
     _ptd_avl_tree_vertex_destroy_free(avl_vertex->left);
     _ptd_avl_tree_vertex_destroy_free(avl_vertex->right);
 
-    ptd_vertex_destroy((ptd_vertex_t *) avl_vertex->entry);
+    ptd_vertex_destroy((struct ptd_vertex *) avl_vertex->entry);
     avl_vertex->left = NULL;
     avl_vertex->right = NULL;
     avl_vertex->entry = NULL;
@@ -2363,13 +2363,13 @@ void _ptd_avl_tree_vertex_destroy_free(avl_node_t *avl_vertex) {
 }
 
 void ptd_avl_tree_vertex_destroy_free(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_vertex_destroy_free((avl_node_t *) avl_tree->root);
+    _ptd_avl_tree_vertex_destroy_free((struct avl_node *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
 }
 
 
-void _ptd_avl_tree_edge_destroy(avl_node_t *avl_vertex) {
+void _ptd_avl_tree_edge_destroy(struct avl_node *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
@@ -2385,27 +2385,27 @@ void _ptd_avl_tree_edge_destroy(avl_node_t *avl_vertex) {
 }
 
 void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_edge_destroy((avl_node_t *) avl_tree->root);
+    _ptd_avl_tree_edge_destroy((struct avl_node *) avl_tree->root);
     avl_tree->root = NULL;
     free(avl_tree);
 }
 
 size_t ptd_avl_tree_max_depth(void *avl_vec_vertex) {
-    if ((avl_node_t *) avl_vec_vertex == NULL) {
+    if ((struct avl_node *) avl_vec_vertex == NULL) {
         return 0;
     }
 
     return max(
-            ptd_avl_tree_max_depth((void *) ((avl_node_t *) avl_vec_vertex)->left) + 1,
-            ptd_avl_tree_max_depth((void *) ((avl_node_t *) avl_vec_vertex)->left) + 1
+            ptd_avl_tree_max_depth((void *) ((struct avl_node *) avl_vec_vertex)->left) + 1,
+            ptd_avl_tree_max_depth((void *) ((struct avl_node *) avl_vec_vertex)->left) + 1
     );
 }
 
 
-int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, const ptd_vertex_t *vertex) {
+int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, const struct ptd_vertex *vertex) {
     int res;
 
-    avl_node_t *root = (avl_node_t *) avl_tree->root;
+    struct avl_node *root = (struct avl_node *) avl_tree->root;
     res = avl_vec_insert(&root, (char *) key, (void *) vertex, avl_tree->vec_length * sizeof(vec_entry_t));
 
     if (res != 0) {
@@ -2417,9 +2417,9 @@ int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const vec_entry_t *key,
     return 0;
 }
 
-ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
-    const avl_node_t *avl_vertex = avl_vec_find(
-            (avl_node_t *) avl_tree->root,
+struct ptd_vertex *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
+    const struct avl_node *avl_vertex = avl_vec_find(
+            (struct avl_node *) avl_tree->root,
             (char *) key,
             avl_tree->vec_length * sizeof(vec_entry_t)
     );
@@ -2440,16 +2440,16 @@ ptd_vertex_t *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const vec
 
     //fprintf(stderr, " EXISTS\n");
 
-    return (ptd_vertex_t *) avl_vertex->entry;
+    return (struct ptd_vertex *) avl_vertex->entry;
 }
 
-int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, ptd_vertex_t *vertex,
+int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_entry_t *key, struct ptd_vertex *vertex,
                                           long double weight) {
-    avl_node_t *root = (avl_node_t *) avl_tree->root;
-    avl_node_t *child;
+    struct avl_node *root = (struct avl_node *) avl_tree->root;
+    struct avl_node *child;
 
     if (root == NULL) {
-        ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
+        struct ptd_edge *edge = (struct ptd_edge *) malloc(sizeof(*edge));
         edge->weight = weight;
         edge->to = vertex;
 
@@ -2462,14 +2462,14 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
         return 0;
     }
 
-    avl_node_t *parent = root;
+    struct avl_node *parent = root;
 
     while (true) {
         int res = memcmp(parent->key, key, avl_tree->vec_length * sizeof(vec_entry_t));
 
         if (res < 0) {
             if (parent->left == NULL) {
-                ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
+                struct ptd_edge *edge = (struct ptd_edge *) malloc(sizeof(*edge));
                 edge->weight = weight;
                 edge->to = vertex;
 
@@ -2487,7 +2487,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
             }
         } else if (res > 0) {
             if (parent->right == NULL) {
-                ptd_edge_t *edge = (ptd_edge_t *) malloc(sizeof(*edge));
+                struct ptd_edge *edge = (struct ptd_edge *) malloc(sizeof(*edge));
                 edge->weight = weight;
                 edge->to = vertex;
 
@@ -2504,7 +2504,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
                 parent = parent->right;
             }
         } else {
-            ((ptd_edge_t *) parent->entry)->weight += weight;
+            ((struct ptd_edge *) parent->entry)->weight += weight;
 
             return 0;
         }
@@ -2519,7 +2519,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
     return 0;
 }
 
-/*avl_node_t * _ptd_avl_tree_edge_remove(avl_node_t *root, char *key, size_t length) {
+/*struct avl_node * _ptd_avl_tree_edge_remove(struct avl_node *root, char *key, size_t length) {
     if (root == NULL) {
         return root;
     }
@@ -2533,7 +2533,7 @@ int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const vec_en
     } else {
         // node with only one child or no child
         if (root->left == NULL || root->right == NULL){
-            avl_node_t *temp = NULL;
+            struct avl_node *temp = NULL;
 
             if (temp == root->left)
                 temp = root->right;
@@ -2606,13 +2606,13 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
 }
 */
 int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
-    avl_node_t *root = (avl_node_t *) avl_tree->root;
+    struct avl_node *root = (struct avl_node *) avl_tree->root;
 
     if (root == NULL) {
         return 0;
     }
 
-    avl_node_t *parent = root;
+    struct avl_node *parent = root;
 
     enum DIR {
         NONE, LEFT, RIGHT
@@ -2646,7 +2646,7 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
             parent->parent->left = NULL;
         }
 
-        avl_rebalance_tree((avl_node_t **) &avl_tree->root, parent->parent);
+        avl_rebalance_tree((struct avl_node **) &avl_tree->root, parent->parent);
     } else {
         if (parent->left != NULL) {
             avl_tree->root = parent->left;
@@ -2657,14 +2657,14 @@ int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
             return 0;
         }
 
-        avl_rebalance_tree((avl_node_t **) &avl_tree->root, (avl_node_t *) avl_tree->root);
+        avl_rebalance_tree((struct avl_node **) &avl_tree->root, (struct avl_node *) avl_tree->root);
     }
 
     return 0;
 }
 
-ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
-    avl_node_t *parent = (avl_node_t *) avl_tree->root;
+struct ptd_edge *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_entry_t *key) {
+    struct avl_node *parent = (struct avl_node *) avl_tree->root;
 
     while (true) {
         if (parent == NULL) {
@@ -2678,17 +2678,17 @@ ptd_edge_t *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const vec_ent
         } else if (res > 0) {
             parent = parent->right;
         } else {
-            return (ptd_edge_t *) parent->entry;
+            return (struct ptd_edge *) parent->entry;
         }
     }
 }
 
-int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *), bool include_start) {
-    vertices_to_visit = new queue<ptd_vertex_t *>;
+int ptd_visit_vertices(struct ptd_graph *graph, int (*visit_func)(struct ptd_vertex *), bool include_start) {
+    vertices_to_visit = new queue<struct ptd_vertex *>;
     *vertices_to_visit = ptd_enqueue_vertices_sorted(graph);
 
     while (!vertices_to_visit->empty()) {
-        ptd_vertex_t *vertex = vertices_to_visit->front();
+        struct ptd_vertex *vertex = vertices_to_visit->front();
         vertices_to_visit->pop();
 
         if (!include_start && vertex == graph->start_vertex) {
@@ -2711,7 +2711,7 @@ int ptd_visit_vertices(ptd_graph_t *graph, int (*visit_func)(ptd_vertex_t *), bo
     return 0;
 }
 
-int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
+int ptd_add_edge(struct ptd_vertex *from, struct ptd_vertex *to, long double weight) {
     /*fprintf(stderr, "Adding edge between ");
     fprintf(stderr, "%zu %zu %zu %zu ",
             from->state[0],
@@ -2739,9 +2739,9 @@ int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
 
     if (from->edges_length + 1 >= from->edges_limit) {
         from->edges_limit *= 2;
-        from->edges = (ptd_edge_t *) realloc(
+        from->edges = (struct ptd_edge *) realloc(
                 from->edges,
-                from->edges_limit * sizeof(ptd_edge_t)
+                from->edges_limit * sizeof(struct ptd_edge)
         );
 
         if (from->edges == NULL) {
@@ -2758,7 +2758,7 @@ int ptd_add_edge(ptd_vertex_t *from, ptd_vertex_t *to, long double weight) {
     return 0;
 }
 
-stack<ptd_vertex_t *> *scc_stack;
+stack<struct ptd_vertex *> *scc_stack;
 vector<ptd_strongly_connected_component_t *> *scc_components;
 size_t scc_index;
 size_t *scc_indices;
@@ -2766,7 +2766,7 @@ size_t *low_links;
 bool *scc_on_stack;
 ptd_strongly_connected_components_t *sccs;
 
-int strongconnect(ptd_vertex_t *vertex) {
+int strongconnect(struct ptd_vertex *vertex) {
     scc_indices[vertex->index] = scc_index;
     low_links[vertex->index] = scc_index;
     vertex->visited = true;
@@ -2775,7 +2775,7 @@ int strongconnect(ptd_vertex_t *vertex) {
     scc_on_stack[vertex->index] = true;
 
     for (size_t i = 0; i < vertex->edges_length; ++i) {
-        ptd_edge_t edge = vertex->edges[i];
+        struct ptd_edge edge = vertex->edges[i];
 
         if (!edge.to->visited) {
             int res = strongconnect(edge.to);
@@ -2797,8 +2797,8 @@ int strongconnect(ptd_vertex_t *vertex) {
     }
 
     if (low_links[vertex->index] == scc_indices[vertex->index]) {
-        ptd_vertex_t *w;
-        vector<ptd_vertex_t *> list;
+        struct ptd_vertex *w;
+        vector<struct ptd_vertex *> list;
 
         do {
             w = scc_stack->top();
@@ -2815,7 +2815,7 @@ int strongconnect(ptd_vertex_t *vertex) {
         }
 
         scc->internal_vertices_length = list.size();
-        scc->internal_vertices = (ptd_vertex_t **) calloc(scc->internal_vertices_length, sizeof(ptd_vertex_t *));
+        scc->internal_vertices = (struct ptd_vertex **) calloc(scc->internal_vertices_length, sizeof(struct ptd_vertex *));
 
         for (size_t i = 0; i < scc->internal_vertices_length; ++i) {
             scc->internal_vertices[i] = list.at(i);
@@ -2827,14 +2827,14 @@ int strongconnect(ptd_vertex_t *vertex) {
     return 0;
 }
 
-int ptd_label_vertices(ptd_graph_t *graph) {
+int ptd_label_vertices(struct ptd_graph *graph) {
     ptd_reset_graph_visited(graph);
 
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph);
     size_t index = 1;
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         if (vertex->edges_length == 0) {
@@ -2851,7 +2851,7 @@ int ptd_label_vertices(ptd_graph_t *graph) {
 }
 
 ptd_strongly_connected_components_t *
-ptd_find_strongly_connected_components(ptd_graph_t *graph) {
+ptd_find_strongly_connected_components(struct ptd_graph *graph) {
     ptd_strongly_connected_components_t *components = (ptd_strongly_connected_components_t *) malloc(
             sizeof(ptd_strongly_connected_components_t)
     );
@@ -2863,9 +2863,9 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph) {
     void **old_data = (void **) calloc(graph->vertices_length, sizeof(void *));
 
     ptd_label_vertices(graph);
-    scc_stack = new stack<ptd_vertex_t *>;
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
-    queue<ptd_vertex_t *> q_reset;
+    scc_stack = new stack<struct ptd_vertex *>;
+    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph);
+    queue<struct ptd_vertex *> q_reset;
     ptd_reset_graph_visited(graph);
     scc_index = 0;
     scc_indices = (size_t *) calloc(q.size() + 2, sizeof(size_t));
@@ -2878,7 +2878,7 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph) {
     vertex_order = 0;
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
         q_reset.push(vertex);
         old_data[vertex_order] = vertex->data;
@@ -2926,7 +2926,7 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph) {
         ptd_strongly_connected_component_t *scc = components->components[i];
 
         for (size_t j = 0; j < scc->internal_vertices_length; ++j) {
-            ptd_vertex_t *vertex = scc->internal_vertices[j];
+            struct ptd_vertex *vertex = scc->internal_vertices[j];
             vertex->data = (ptd_strongly_connected_component_t *) scc;
         }
     }
@@ -2934,13 +2934,13 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph) {
     for (size_t i = 0; i < components->components_length; ++i) {
         ptd_strongly_connected_component_t *scc = components->components[i];
         set<ptd_strongly_connected_component_t *> external_sccs;
-        set<ptd_vertex_t *> external_vertices;
+        set<struct ptd_vertex *> external_vertices;
 
         for (size_t j = 0; j < scc->internal_vertices_length; ++j) {
-            ptd_vertex_t *vertex = scc->internal_vertices[j];
+            struct ptd_vertex *vertex = scc->internal_vertices[j];
 
             for (size_t k = 0; k < vertex->edges_length; ++k) {
-                ptd_vertex_t *child = vertex->edges[k].to;
+                struct ptd_vertex *child = vertex->edges[k].to;
 
                 if ((ptd_strongly_connected_component_t *) child->data != scc) {
                     external_sccs.insert((ptd_strongly_connected_component_t *) child->data);
@@ -2954,7 +2954,7 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph) {
                                                                             sizeof(*scc->external_sccs));
 
         scc->external_vertices_length = external_vertices.size();
-        scc->external_vertices = (ptd_vertex_t **) calloc(scc->external_vertices_length,
+        scc->external_vertices = (struct ptd_vertex **) calloc(scc->external_vertices_length,
                                                           sizeof(*scc->external_vertices));
 
         size_t set_index;
@@ -2970,7 +2970,7 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph) {
 
         set_index = 0;
 
-        for (set<ptd_vertex_t *>::iterator itr = external_vertices.begin();
+        for (set<struct ptd_vertex *>::iterator itr = external_vertices.begin();
              itr != external_vertices.end();
              itr++) {
             scc->external_vertices[set_index] = *itr;
@@ -2981,7 +2981,7 @@ ptd_find_strongly_connected_components(ptd_graph_t *graph) {
     vertex_order = 0;
 
     while (!q_reset.empty()) {
-        ptd_vertex_t *vertex = q_reset.front();
+        struct ptd_vertex *vertex = q_reset.front();
         q_reset.pop();
 
         vertex->data = old_data[vertex_order];
@@ -3082,7 +3082,7 @@ int
 ptd_order_strongly_connected_components(
         ptd_strongly_connected_components_t *sccs
 ) {
-    ptd_graph_t *graph = sccs->components[0]->internal_vertices[0]->graph;
+    struct ptd_graph *graph = sccs->components[0]->internal_vertices[0]->graph;
 
     if (!graph->is_indexed) {
         ptd_label_vertices(graph);
@@ -3099,7 +3099,7 @@ ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_strongly_connected_comp
     size_t full_length = in->internal_vertices_length + in->external_vertices_length;
 
     long double **mat = (long double **) calloc(full_length, sizeof(long double *));
-    ptd_vertex_t **vertices = (ptd_vertex_t **) calloc(full_length, sizeof(ptd_vertex_t *));
+    struct ptd_vertex **vertices = (struct ptd_vertex **) calloc(full_length, sizeof(struct ptd_vertex *));
     void **old_data = (void **) calloc(full_length, sizeof(*old_data));
     size_t *old_indices = (size_t *) calloc(full_length, sizeof(*old_indices));
 
@@ -3126,7 +3126,7 @@ ptd_phase_type_distribution_t *ptd_find_local_matrix(ptd_strongly_connected_comp
     }
 
     for (size_t i = 0; i < in->internal_vertices_length; ++i) {
-        ptd_vertex_t *vertex = (vertices)[i];
+        struct ptd_vertex *vertex = (vertices)[i];
 
         for (size_t j = 0; j < vertex->edges_length; ++j) {
             size_t child_index = *((size_t *) vertex->edges[j].to->data);
@@ -3162,21 +3162,21 @@ ptd_vertex_group_t *ptd_convert_strongly_connected_component_to_group(ptd_strong
     DIE_ERROR(1, "Not implemented\n");
 }
 
-int ptd_remove_edge(ptd_vertex_t *from, ptd_vertex_t *to) {
+int ptd_remove_edge(struct ptd_vertex *from, struct ptd_vertex *to) {
     DIE_ERROR(1, "Not implemented\n");
 }
 
-ptd_graph_t *
-ptd_convert_strongly_connected_components_to_group(ptd_graph_t *graph, ptd_strongly_connected_components_t *sccs) {
+struct ptd_graph *
+ptd_convert_strongly_connected_components_to_group(struct ptd_graph *graph, ptd_strongly_connected_components_t *sccs) {
     ptd_label_vertices(graph);
-    ptd_graph_t *ret = ptd_graph_create(0);
+    struct ptd_graph *ret = ptd_graph_create(0);
 
     if (graph == NULL) {
         return NULL;
     }
 
-    ptd_vertex_t **vertices_scc;
-    vertices_scc = (ptd_vertex_t **) calloc(graph->vertices_length, sizeof(*vertices_scc));
+    struct ptd_vertex **vertices_scc;
+    vertices_scc = (struct ptd_vertex **) calloc(graph->vertices_length, sizeof(*vertices_scc));
 
     if (vertices_scc == NULL) {
         return NULL;
@@ -3186,23 +3186,23 @@ ptd_convert_strongly_connected_components_to_group(ptd_graph_t *graph, ptd_stron
         ptd_strongly_connected_component_t *scc = sccs->components[i];
 
         // Make the scc into a vertex
-        ptd_vertex_t *group = ptd_vertex_create(ret);
+        struct ptd_vertex *group = ptd_vertex_create(ret);
 
         if (group == NULL) {
             return NULL;
         }
 
         for (size_t j = 0; j < scc->internal_vertices_length; ++j) {
-            ptd_vertex_t *vertex = scc->internal_vertices[j];
+            struct ptd_vertex *vertex = scc->internal_vertices[j];
 
             vertices_scc[vertex->index] = group;
         }
     }
 
-    set<ptd_vertex_t *> edges;
+    set<struct ptd_vertex *> edges;
 /*
     for (size_t j = 0; j < scc->internal_vertices_length; ++j) {
-        ptd_vertex_t *vertex = scc->internal_vertices[j];
+        struct ptd_vertex *vertex = scc->internal_vertices[j];
 
         for (size_t k = 0; k < vertex->edges_length; ++k) {
             edges.insert(vertex->edges[k].to);
@@ -3222,33 +3222,33 @@ ptd_convert_strongly_connected_components_to_group(ptd_graph_t *graph, ptd_stron
     return NULL;
 }
 
-double (*reward_function)(ptd_vertex_t *);
+double (*reward_function)(struct ptd_vertex *);
 
-static bool keep_zero_rewarded(ptd_vertex_t *vertex) {
+static bool keep_zero_rewarded(struct ptd_vertex *vertex) {
     return (reward_function(vertex) == 0);
 }
 
 static ptd_avl_tree_t **edges;
 static ptd_avl_tree_t **parents;
-static ptd_vertex_t **vertices;
+static struct ptd_vertex **vertices;
 static vec_entry_t **states;
 static double *rewards;
 
-static inline vector<ptd_edge_t *> avl_tree_as_list(ptd_avl_tree_t *avl_tree) {
-    vector<ptd_edge_t *> vec;
-    stack<avl_node_t *> s;
+static inline vector<struct ptd_edge *> avl_tree_as_list(ptd_avl_tree_t *avl_tree) {
+    vector<struct ptd_edge *> vec;
+    stack<struct avl_node *> s;
 
-    s.push((avl_node_t *) avl_tree->root);
+    s.push((struct avl_node *) avl_tree->root);
 
     while (!s.empty()) {
-        avl_node_t *v = s.top();
+        struct avl_node *v = s.top();
         s.pop();
 
         if (v == NULL) {
             continue;
         }
 
-        vec.push_back((ptd_edge_t *) v->entry);
+        vec.push_back((struct ptd_edge *) v->entry);
         s.push(v->left);
         s.push(v->right);
     }
@@ -3256,13 +3256,13 @@ static inline vector<ptd_edge_t *> avl_tree_as_list(ptd_avl_tree_t *avl_tree) {
     return vec;
 }
 
-//extern int print_func(ptd_vertex_t *vertex);
+//extern int print_func(struct ptd_vertex *vertex);
 
 // TODO: We should always reset before doing anything else everywhere
 
-int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_vertex_t *)) {
+int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const struct ptd_vertex *)) {
     ptd_reset_graph_visited(graph);
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph);
 
     ptd_reset_graph_visited(graph);
     ptd_label_vertices(graph);
@@ -3275,12 +3275,12 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
     }
 
     parents = (ptd_avl_tree_t **) calloc(n, sizeof(*parents));
-    vertices = (ptd_vertex_t **) calloc(n, sizeof(*vertices));
+    vertices = (struct ptd_vertex **) calloc(n, sizeof(*vertices));
     states = (vec_entry_t **) calloc(n, sizeof(*states));
     rewards = (double *) calloc(n, sizeof(*rewards));
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         vertices[vertex->index] = vertex;
@@ -3312,14 +3312,14 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
     }
 
     for (size_t i = 0; i < n; ++i) {
-        ptd_vertex_t *vertex = vertices[i];
+        struct ptd_vertex *vertex = vertices[i];
 
         // We make the weight be the probability of transitioning.
         // Store the new reward for later
         rewards[i] /= vertex->rate;
 
         for (size_t j = 0; j < vertex->edges_length; ++j) {
-            ptd_vertex_t *child_vertex = vertex->edges[j].to;
+            struct ptd_vertex *child_vertex = vertex->edges[j].to;
             size_t child_index = child_vertex->index;
 
             ptd_avl_tree_edge_insert_or_increment(
@@ -3342,15 +3342,15 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
         double reward = rewards[i];
 
         if (reward == 0) {
-            vector<ptd_edge_t *> outgoing_edges = avl_tree_as_list(edges[i]);
-            vector<ptd_edge_t *> ingoing_edges = avl_tree_as_list(parents[i]);
+            vector<struct ptd_edge *> outgoing_edges = avl_tree_as_list(edges[i]);
+            vector<struct ptd_edge *> ingoing_edges = avl_tree_as_list(parents[i]);
 
             for (size_t p = 0; p < ingoing_edges.size(); ++p) {
-                ptd_edge_t *ingoing_edge = ingoing_edges[p];
+                struct ptd_edge *ingoing_edge = ingoing_edges[p];
                 size_t parent_index = ingoing_edge->to->index;
 
                 for (size_t c = 0; c < outgoing_edges.size(); ++c) {
-                    ptd_edge_t *outgoing_edge = outgoing_edges[c];
+                    struct ptd_edge *outgoing_edge = outgoing_edges[c];
                     size_t child_index = outgoing_edge->to->index;
 
                     if (child_index != parent_index) {
@@ -3376,7 +3376,7 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
             }
 
             for (size_t c = 0; c < outgoing_edges.size(); ++c) {
-                ptd_edge_t *outgoing_edge = outgoing_edges[c];
+                struct ptd_edge *outgoing_edge = outgoing_edges[c];
                 size_t child_index = outgoing_edge->to->index;
 
                 ptd_avl_tree_edge_remove(parents[child_index], states[i]);
@@ -3385,7 +3385,7 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
     }
 
     for (size_t i = 0; i < n; ++i) {
-        ptd_vertex_t *vertex = vertices[i];
+        struct ptd_vertex *vertex = vertices[i];
         vertex->rate = 0;
         vertex->edges_length = 0;
         double reward = rewards[i];
@@ -3394,7 +3394,7 @@ int ptd_reward_transform(ptd_graph_t *graph, double (*reward_func)(const ptd_ver
             continue;
         }
 
-        vector<ptd_edge_t *> outgoing_edges = avl_tree_as_list(edges[i]);
+        vector<struct ptd_edge *> outgoing_edges = avl_tree_as_list(edges[i]);
 
 
         fprintf(stderr, "\n=============\n\nGoing to vertex with %zu edges: ", outgoing_edges.size());
@@ -3440,12 +3440,12 @@ void ptd_phase_type_distribution_destroy(ptd_phase_type_distribution_t *ptd) {
     free(ptd);
 }
 
-ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t *graph) {
+ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(struct ptd_graph *graph) {
     if (!graph->is_indexed) {
         ptd_label_vertices(graph);
     }
 
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph);
 
     ptd_phase_type_distribution_t *res = (ptd_phase_type_distribution_t *) malloc(sizeof(*res));
 
@@ -3458,7 +3458,7 @@ ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t 
     size_t size = (size_t) q.size();
 
     res->memory_allocated = size;
-    res->vertices = (ptd_vertex_t **) calloc(size, sizeof(ptd_vertex_t *));
+    res->vertices = (struct ptd_vertex **) calloc(size, sizeof(struct ptd_vertex *));
 
     if (res->vertices == NULL) {
         free(res);
@@ -3500,7 +3500,7 @@ ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t 
     }
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         if (vertex->index == 0) {
@@ -3509,7 +3509,7 @@ ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t 
 
         if (vertex == graph->start_vertex) {
             for (size_t i = 0; i < vertex->edges_length; ++i) {
-                ptd_edge_t edge = vertex->edges[i];
+                struct ptd_edge edge = vertex->edges[i];
 
                 if (edge.to->index != 0) {
                     res->initial_probability_vector[edge.to->index - 1 - 1] = edge.weight;
@@ -3523,7 +3523,7 @@ ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t 
         res->length++;
 
         for (size_t i = 0; i < vertex->edges_length; ++i) {
-            ptd_edge_t edge = vertex->edges[i];
+            struct ptd_edge edge = vertex->edges[i];
 
             if (edge.to->index != 0) {
                 res->sub_intensity_matrix[vertex->index - 2][edge.to->index - 2] += edge.weight;
@@ -3538,9 +3538,9 @@ ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(ptd_graph_t 
 
 static int *topo_values;
 
-int ptd_index_topological(ptd_graph_t *graph) {
-    queue<ptd_vertex_t *> topological_queue;
-    queue<ptd_vertex_t *> q;
+int ptd_index_topological(struct ptd_graph *graph) {
+    queue<struct ptd_vertex *> topological_queue;
+    queue<struct ptd_vertex *> q;
 
     q = ptd_enqueue_vertices(graph);
     topo_values = (int *) calloc(q.size(), sizeof(*topo_values));
@@ -3552,7 +3552,7 @@ int ptd_index_topological(ptd_graph_t *graph) {
     size_t index = 0;
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         vertex->index = index;
@@ -3563,7 +3563,7 @@ int ptd_index_topological(ptd_graph_t *graph) {
     q = ptd_enqueue_vertices(graph);
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         for (size_t i = 0; i < vertex->edges_length; ++i) {
@@ -3576,13 +3576,13 @@ int ptd_index_topological(ptd_graph_t *graph) {
     q.push(graph->start_vertex);
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         topological_queue.push(vertex);
 
         for (size_t i = 0; i < vertex->edges_length; ++i) {
-            ptd_vertex_t *child = vertex->edges[i].to;
+            struct ptd_vertex *child = vertex->edges[i].to;
 
             topo_values[child->index] -= 1;
 
@@ -3596,7 +3596,7 @@ int ptd_index_topological(ptd_graph_t *graph) {
     index = 1;
 
     while (!topological_queue.empty()) {
-        ptd_vertex_t *vertex = topological_queue.front();
+        struct ptd_vertex *vertex = topological_queue.front();
         topological_queue.pop();
 
         if (vertex->edges_length == 0) {
@@ -3614,12 +3614,12 @@ int ptd_index_topological(ptd_graph_t *graph) {
     return 0;
 }
 
-int ptd_index_invert(ptd_graph_t *graph) {
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+int ptd_index_invert(struct ptd_graph *graph) {
+    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph);
     size_t largest_index = 0;
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         if (vertex->index > largest_index) {
@@ -3630,7 +3630,7 @@ int ptd_index_invert(ptd_graph_t *graph) {
     q = ptd_enqueue_vertices(graph);
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         if (vertex->edges_length == 0) {
@@ -3649,7 +3649,7 @@ int ptd_index_invert(ptd_graph_t *graph) {
     return 0;
 }
 
-int ptd_vertex_to_s(ptd_vertex_t *vertex, char *buffer, size_t buffer_length) {
+int ptd_vertex_to_s(struct ptd_vertex *vertex, char *buffer, size_t buffer_length) {
     memset(buffer, '\0', buffer_length);
 
     char *build = (char *) calloc(buffer_length, sizeof(char));
@@ -3675,9 +3675,9 @@ int ptd_vertex_to_s(ptd_vertex_t *vertex, char *buffer, size_t buffer_length) {
 
 
 static ptd_avl_tree_t *avl_tree = NULL;
-static ptd_graph_t *kingman_graph = NULL;
+static struct ptd_graph *kingman_graph = NULL;
 
-static int make_kingman(ptd_vertex_t *vertex) {
+static int make_kingman(struct ptd_vertex *vertex) {
     vec_entry_t *state = (vec_entry_t *) calloc(kingman_graph->state_length, sizeof(vec_entry_t));
     memcpy(state, vertex->state, kingman_graph->state_length * sizeof(vec_entry_t));
 
@@ -3703,7 +3703,7 @@ static int make_kingman(ptd_vertex_t *vertex) {
             state[j]--;
             state[(i + j + 2) - 1]++;
 
-            ptd_vertex_t *child = ptd_avl_tree_vertex_find(avl_tree, state);
+            struct ptd_vertex *child = ptd_avl_tree_vertex_find(avl_tree, state);
 
             if (child == NULL) {
                 vec_entry_t *child_state = (vec_entry_t *) calloc(kingman_graph->state_length, sizeof(vec_entry_t));
@@ -3734,7 +3734,7 @@ static int make_kingman(ptd_vertex_t *vertex) {
     return 0;
 }
 
-ptd_graph_t *ptd_model_kingman(size_t n) {
+struct ptd_graph *ptd_model_kingman(size_t n) {
     avl_tree = ptd_avl_tree_create(n);
 
     if (avl_tree == NULL) {
@@ -3748,7 +3748,7 @@ ptd_graph_t *ptd_model_kingman(size_t n) {
         return NULL;
     }
 
-    ptd_vertex_t *initial = ptd_vertex_create(kingman_graph);
+    struct ptd_vertex *initial = ptd_vertex_create(kingman_graph);
 
     if (initial == NULL) {
         ptd_graph_destroy(kingman_graph);
@@ -3785,7 +3785,7 @@ ptd_graph_t *ptd_model_kingman(size_t n) {
  * State 3,4,5: island 2
  */
 
-static ptd_graph_t *two_island_two_loci_recomb_graph;
+static struct ptd_graph *two_island_two_loci_recomb_graph;
 
 static double recomb_rate;
 static size_t N[2];
@@ -3795,8 +3795,8 @@ static double mig[2];
 #define IDX_L 1
 #define IDX_R 2
 
-static ptd_vertex_t *add_child(vec_entry_t *state) {
-    ptd_vertex_t *child = ptd_avl_tree_vertex_find(avl_tree, state);
+static struct ptd_vertex *add_child(vec_entry_t *state) {
+    struct ptd_vertex *child = ptd_avl_tree_vertex_find(avl_tree, state);
 
     if (child == NULL) {
         vec_entry_t *child_state = (vec_entry_t *) calloc(
@@ -3825,7 +3825,7 @@ static ptd_vertex_t *add_child(vec_entry_t *state) {
     return child;
 }
 
-static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
+static int visit_two_island_two_loci_recomb(struct ptd_vertex *vertex) {
     // If there is only one left
     if (vertex->state[0] + vertex->state[1] +
         vertex->state[2] + vertex->state[3] +
@@ -3854,7 +3854,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
                     state[pos]--;
                     state[other_pos]++;
 
-                    ptd_vertex_t *child = add_child(state);
+                    struct ptd_vertex *child = add_child(state);
 
                     state[pos]++;
                     state[other_pos]--;
@@ -3876,7 +3876,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
                 state[island * 3 + IDX_L]++;
                 state[island * 3 + IDX_R]++;
 
-                ptd_vertex_t *child = add_child(state);
+                struct ptd_vertex *child = add_child(state);
 
                 state[island * 3 + IDX_COMB]++;
                 state[island * 3 + IDX_L]--;
@@ -3892,7 +3892,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
                 state[island * 3 + IDX_L]--;
                 state[island * 3 + IDX_R]--;
 
-                ptd_vertex_t *child = add_child(state);
+                struct ptd_vertex *child = add_child(state);
 
                 state[island * 3 + IDX_COMB]--;
                 state[island * 3 + IDX_L]++;
@@ -3914,7 +3914,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
                 size_t combinations = state[island * 3 + IDX_COMB] * (state[island * 3 + IDX_COMB] - 1) / 2;
 
                 state[island * 3 + IDX_COMB]--;
-                ptd_vertex_t *child = add_child(state);
+                struct ptd_vertex *child = add_child(state);
                 state[island * 3 + IDX_COMB]++;
 
                 ptd_add_edge(vertex, child, combinations * N[island]);
@@ -3926,7 +3926,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
 
                 state[island * 3 + IDX_L]--;
 
-                ptd_vertex_t *child = add_child(state);
+                struct ptd_vertex *child = add_child(state);
 
                 state[island * 3 + IDX_L]++;
 
@@ -3938,7 +3938,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
                 size_t combinations = state[island * 3 + IDX_COMB] * state[island * 3 + IDX_R];
 
                 state[island * 3 + IDX_R]--;
-                ptd_vertex_t *child = add_child(state);
+                struct ptd_vertex *child = add_child(state);
                 state[island * 3 + IDX_R]++;
 
                 ptd_add_edge(vertex, child, combinations * N[island]);
@@ -3949,7 +3949,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
                 size_t combinations = state[island * 3 + IDX_L] * (state[island * 3 + IDX_L] - 1) / 2;
 
                 state[island * 3 + IDX_L]--;
-                ptd_vertex_t *child = add_child(state);
+                struct ptd_vertex *child = add_child(state);
                 state[island * 3 + IDX_L]++;
 
                 ptd_add_edge(vertex, child, combinations * N[island]);
@@ -3960,7 +3960,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
                 size_t combinations = state[island * 3 + IDX_R] * (state[island * 3 + IDX_R] - 1) / 2;
 
                 state[island * 3 + IDX_R]--;
-                ptd_vertex_t *child = add_child(state);
+                struct ptd_vertex *child = add_child(state);
                 state[island * 3 + IDX_R]++;
 
                 ptd_add_edge(vertex, child, combinations * N[island]);
@@ -3974,7 +3974,7 @@ static int visit_two_island_two_loci_recomb(ptd_vertex_t *vertex) {
 }
 
 
-ptd_graph_t *ptd_model_two_island_two_loci_recomb(
+struct ptd_graph *ptd_model_two_island_two_loci_recomb(
         size_t n1,
         size_t n2,
         size_t effective_population_size1,
@@ -3992,7 +3992,7 @@ ptd_graph_t *ptd_model_two_island_two_loci_recomb(
     two_island_two_loci_recomb_graph = ptd_graph_create(6);
     avl_tree = ptd_avl_tree_create(6);
 
-    ptd_vertex_t *initial = ptd_vertex_create(two_island_two_loci_recomb_graph);
+    struct ptd_vertex *initial = ptd_vertex_create(two_island_two_loci_recomb_graph);
     initial->state[0] = n1;
     initial->state[3] = n2;
 
@@ -4020,21 +4020,21 @@ ptd_graph_t *ptd_model_two_island_two_loci_recomb(
 size_t alloc_size;
 char *alloc_value;
 
-static int visit_alloc(ptd_vertex_t *vertex) {
+static int visit_alloc(struct ptd_vertex *vertex) {
     vertex->data = malloc(alloc_size);
     memcpy((char *) vertex->data, alloc_value, alloc_size);
 
     return (vertex->data == NULL);
 }
 
-int ptd_visit_alloc(ptd_graph_t *graph, size_t size, char *value) {
+int ptd_visit_alloc(struct ptd_graph *graph, size_t size, char *value) {
     alloc_size = size;
     alloc_value = value;
 
     return ptd_visit_vertices(graph, visit_alloc, true);
 }
 
-static int visit_probability(ptd_vertex_t *vertex) {
+static int visit_probability(struct ptd_vertex *vertex) {
     long double my_prob;
 
     if (vertex == vertex->graph->start_vertex) {
@@ -4043,10 +4043,10 @@ static int visit_probability(ptd_vertex_t *vertex) {
 
     my_prob = *((long double *) vertex->data);
 
-    ptd_edge_t *edges = vertex->edges;
+    struct ptd_edge *edges = vertex->edges;
 
     for (size_t i = 0; i < vertex->edges_length; ++i) {
-        ptd_edge_t edge = edges[i];
+        struct ptd_edge edge = edges[i];
 
         long double trans_prob = edge.weight / vertex->rate;
 
@@ -4056,14 +4056,14 @@ static int visit_probability(ptd_vertex_t *vertex) {
     return 0;
 }
 
-int ptd_visit_assign_probability(ptd_graph_t *graph) {
+int ptd_visit_assign_probability(struct ptd_graph *graph) {
     // TODO: do only if graph is acyclic
     ptd_index_topological(graph);
 
     return ptd_visit_vertices(graph, visit_probability, true);
 }
 
-static int compute_expected(ptd_vertex_t *vertex) {
+static int compute_expected(struct ptd_vertex *vertex) {
     long double my_prob = *((long double *) vertex->data);
 
     long double my_expected;
@@ -4079,21 +4079,21 @@ static int compute_expected(ptd_vertex_t *vertex) {
     return 0;
 }
 
-int ptd_visit_assign_expectation(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
+int ptd_visit_assign_expectation(struct ptd_graph *graph, double (*reward)(struct ptd_vertex *)) {
     reward_function = reward;
     return ptd_visit_vertices(graph, compute_expected, true);
 }
 
 long double reduce_ld_sum;
 
-static int reduce_ld(ptd_vertex_t *vertex) {
+static int reduce_ld(struct ptd_vertex *vertex) {
     long double data = *((long double *) vertex->data);
     reduce_ld_sum += data;
 
     return 0;
 }
 
-long double ptd_visit_reduce_sum_long_double(ptd_graph_t *graph) {
+long double ptd_visit_reduce_sum_long_double(struct ptd_graph *graph) {
     reduce_ld_sum = 0;
     ptd_visit_vertices(graph, reduce_ld, true);
 
@@ -4103,7 +4103,7 @@ long double ptd_visit_reduce_sum_long_double(ptd_graph_t *graph) {
 /*
  * Properties
  */
-int ptd_expected_value(long double *expected, ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
+int ptd_expected_value(long double *expected, struct ptd_graph *graph, double (*reward)(struct ptd_vertex *)) {
     long double *start_value = (long double *) malloc(sizeof(long double));
     *start_value = 0;
     ptd_visit_alloc(graph, sizeof(long double), (char *) start_value);
@@ -4119,13 +4119,13 @@ struct cov {
     long double desc;
 };
 
-static int visit_desc(ptd_vertex_t *vertex) {
+static int visit_desc(struct ptd_vertex *vertex) {
     long double desc = 0;
 
-    ptd_edge_t *edges = vertex->edges;
+    struct ptd_edge *edges = vertex->edges;
 
     for (size_t i = 0; i < vertex->edges_length; ++i) {
-        ptd_edge_t edge = edges[i];
+        struct ptd_edge edge = edges[i];
 
         long double trans_prob = edge.weight / vertex->rate;
 
@@ -4153,7 +4153,7 @@ static int visit_desc(ptd_vertex_t *vertex) {
 
 long double cov_sum;
 
-static int visit_cov(ptd_vertex_t *vertex) {
+static int visit_cov(struct ptd_vertex *vertex) {
     struct cov data = *((struct cov *) vertex->data);
     cov_sum += data.prob * reward_function(vertex) * data.desc;
 
@@ -4161,8 +4161,8 @@ static int visit_cov(ptd_vertex_t *vertex) {
 }
 
 int ptd_covariance(
-        long double *covariance, ptd_graph_t *graph,
-        double (*reward_1)(ptd_vertex_t *), double (*reward_2)(ptd_vertex_t *)
+        long double *covariance, struct ptd_graph *graph,
+        double (*reward_1)(struct ptd_vertex *), double (*reward_2)(struct ptd_vertex *)
 ) {
     struct cov *start_value = (struct cov *) malloc(sizeof(struct cov));
     start_value->prob = 0;
@@ -4194,14 +4194,14 @@ int ptd_covariance(
     return 0;
 }
 
-static int set_data_as_int(ptd_vertex_t *vertex) {
+static int set_data_as_int(struct ptd_vertex *vertex) {
     vertex->data = malloc(sizeof(long double));
     *((long double *) vertex->data) = 0;
 
     return 0;
 }
 
-static bool keep_all(ptd_vertex_t *vertex) {
+static bool keep_all(struct ptd_vertex *vertex) {
     return true;
 }
 
@@ -4222,7 +4222,7 @@ matrix_invert(gsl_matrix *matrix, size_t size) {
 }
 
 
-double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
+double ptd_circular_exp(struct ptd_graph *graph, double (*reward)(struct ptd_vertex *)) {
     ptd_visit_vertices(graph, set_data_as_int, true);
 
     *((long double *) graph->start_vertex->data) = 1;
@@ -4239,7 +4239,7 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
         ptd_strongly_connected_component_t *v = vertices[i];
 
         long double **mat;
-        ptd_vertex_t **vs;
+        struct ptd_vertex **vs;
         size_t length;
 
         DEBUG_PRINT("As ptd...\n");
@@ -4328,7 +4328,7 @@ double ptd_circular_exp(ptd_graph_t *graph, double (*reward)(ptd_vertex_t *)) {
     ptd_strongly_connected_components_destroy(sccs);
 }
 
-ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(ptd_graph_t *graph) {
+ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(struct ptd_graph *graph) {
     if (!graph->is_indexed) {
         ptd_label_vertices(graph);
     }
@@ -4355,7 +4355,7 @@ ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(ptd_graph_t *graph) {
         ptd_strongly_connected_component_t *v = vertices[i];
 
         long double **mat;
-        ptd_vertex_t **vs;
+        struct ptd_vertex **vs;
         size_t length;
 
         ptd_phase_type_distribution_t *ptd = ptd_find_local_matrix(v);
@@ -4414,7 +4414,7 @@ ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(ptd_graph_t *graph) {
     return res;
 }
 
-double *ptd_cyclic_desc(ptd_graph_t *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(ptd_vertex_t *)) {
+double *ptd_cyclic_desc(struct ptd_graph *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(struct ptd_vertex *)) {
     ptd_desc_multiplier_t **desc_multipliers = multipliers->desc_multipliers;
     size_t *desc_length = multipliers->desc_length;
     ptd_strongly_connected_components_t *ordered = multipliers->ordered;
@@ -4424,7 +4424,7 @@ double *ptd_cyclic_desc(ptd_graph_t *graph, ptd_desc_multipliers_t *multipliers,
     for (size_t ii = 0; ii < ordered->components_length; ++ii) {
         size_t i = ordered->components_length - 1 - ii;
         size_t length = ordered->components[i]->internal_vertices_length;
-        ptd_vertex_t **vertices = ordered->components[i]->internal_vertices;
+        struct ptd_vertex **vertices = ordered->components[i]->internal_vertices;
 
         for (size_t k = 0; k < length; ++k) {
             if (vertices[k]->index != 0) {

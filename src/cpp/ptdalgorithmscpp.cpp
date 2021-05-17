@@ -6,7 +6,7 @@
 #include "../c/io.h"
 #include "ptdalgorithmscpp.h"
 
-static void assert_same_length(vector<size_t> state, ptd_graph_t *graph) {
+static void assert_same_length(vector<size_t> state, struct ptd_graph *graph) {
     if (state.size() != graph->state_length) {
         stringstream message;
         message << "Vector `state` argument must have same size as graph state length. Was '";
@@ -56,7 +56,7 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<size_t> state) {
     size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     if (vertex == NULL) {
         throw runtime_error(
@@ -75,7 +75,7 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<size_t> state)
     size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     if (vertex == NULL) {
         throw runtime_error(
@@ -94,7 +94,7 @@ bool ptdalgorithms::Graph::vertex_exists(std::vector<size_t> state) {
     size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    ptd_vertex_t *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     free(c_state);
 
@@ -127,19 +127,19 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::start_vertex_p() {
 
 std::vector<ptdalgorithms::Vertex> ptdalgorithms::Graph::vertices() {
     std::vector<Vertex> vec;
-    std::stack<avl_node_t *> s;
+    std::stack<struct avl_node *> s;
 
-    s.push((avl_node_t *) rf_graph->tree->root);
+    s.push((struct avl_node *) rf_graph->tree->root);
 
     while (!s.empty()) {
-        avl_node_t *v = s.top();
+        struct avl_node *v = s.top();
         s.pop();
 
         if (v == NULL) {
             continue;
         }
 
-        vec.push_back(Vertex(*this, ((ptd_vertex_t *) v->entry)));
+        vec.push_back(Vertex(*this, ((struct ptd_vertex *) v->entry)));
         s.push(v->left);
         s.push(v->right);
     }
@@ -168,7 +168,7 @@ static int (*cpp_visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex 
 
 static ptdalgorithms::Graph *cpp_graph;
 
-static int visit_from_cpp(ptd_vertex_t *vertex) {
+static int visit_from_cpp(struct ptd_vertex *vertex) {
     ptdalgorithms::Vertex t(*cpp_graph, vertex);
 
     return cpp_visit_func(*cpp_graph, t);
@@ -243,7 +243,7 @@ List internal_vertices(SEXP phase_type_graph) {
     Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
 
     ptd_label_vertices(graph->graph);
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph->graph);
+    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph->graph);
 
     // Remove start vertex
     q.pop();
@@ -251,7 +251,7 @@ List internal_vertices(SEXP phase_type_graph) {
     List list(q.size());
 
     while (!q.empty()) {
-        ptd_vertex_t *vertex = q.front();
+        struct ptd_vertex *vertex = q.front();
         q.pop();
 
         list[vertex->index - 1] = Rcpp::XPtr<PTDVertex>(
@@ -266,7 +266,7 @@ List internal_vertices(SEXP phase_type_graph) {
 
 Rcpp::Function *custom_visit_function;
 
-int custom_visit(ptd_vertex_t *vertex) {
+int custom_visit(struct ptd_vertex *vertex) {
     fprintf(stderr, "foo\n");
     SEXP v = Rcpp::XPtr<PTDVertex>(
             new PTDVertex(
