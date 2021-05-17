@@ -193,6 +193,18 @@ size_t expanding_array_entry_size(const expanding_array_t *expanding_array);
 void *expanding_array_entries(const expanding_array_t *expanding_array);
  */
 
+struct ptd_vertex_linked_list_item {
+    struct ptd_vertex *vertex;
+    struct ptd_vertex_linked_list_item *previous;
+    struct ptd_vertex_linked_list_item *next;
+};
+
+struct ptd_vertex_linked_list {
+    size_t vertices_count;
+    struct ptd_vertex_linked_list_item *first;
+    struct ptd_vertex_linked_list_item *tail;
+};
+
 struct ptd_vertex {
     struct ptd_graph *graph;
     size_t edges_length;
@@ -204,6 +216,7 @@ struct ptd_vertex {
     bool visited;
     bool reset;
 
+    struct ptd_vertex_linked_list_item *item_in_graph_list;
     vec_entry_t *state;
     void *data;
 };
@@ -216,7 +229,7 @@ struct ptd_edge {
 struct ptd_graph {
     size_t state_length;
     struct ptd_vertex *start_vertex;
-    size_t vertices_length;
+    struct ptd_vertex_linked_list *vertices_list;
 
     bool is_indexed;
 };
@@ -224,6 +237,8 @@ struct ptd_graph {
 struct ptd_vertex *ptd_vertex_create_state(struct ptd_graph *graph, vec_entry_t *state);
 
 struct ptd_graph *ptd_graph_create(size_t state_length);
+
+void ptd_graph_vertices_destroy(struct ptd_graph *graph);
 
 void ptd_graph_destroy(struct ptd_graph *graph);
 

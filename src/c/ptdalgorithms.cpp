@@ -702,7 +702,7 @@ vertex_t *generate_state_space(
 
         vertex_t *child;
         struct avl_node *bst_entry = (struct avl_node *) avl_vec_find(bst, (char *) &state[0],
-                                                            state_length * sizeof(vec_entry_t));
+                                                                      state_length * sizeof(vec_entry_t));
 
         if (bst_entry != NULL) {
             fprintf(stderr, "Two edges with the same state have already been added to the initial state\n");
@@ -783,7 +783,7 @@ vertex_t *generate_state_space(
 
             vertex_t *child;
             struct avl_node *bst_entry = (struct avl_node *) avl_vec_find(bst, (char *) &child_state[0],
-                                                                state_length * sizeof(vec_entry_t));
+                                                                          state_length * sizeof(vec_entry_t));
 
             if (bst_entry == NULL) {
                 vector<pair<double, vector<size_t> > > children = visit_function(child_state);
@@ -2221,6 +2221,58 @@ queue<struct ptd_vertex *> ptd_enqueue_vertices_sorted(struct ptd_graph *graph) 
     return sorted_queue;
 }
 
+static struct ptd_vertex_linked_list_item *add_to_ll(
+        struct ptd_graph *graph,
+        struct ptd_vertex *vertex) {
+    struct ptd_vertex_linked_list_item *item = (struct ptd_vertex_linked_list_item *) malloc(
+            sizeof(*item)
+    );
+
+    if (item == NULL) {
+        return NULL;
+    }
+
+    item->next = NULL;
+    item->previous = graph->vertices_list->tail;
+    item->vertex = vertex;
+
+    if (graph->vertices_list->first == NULL) {
+        graph->vertices_list->first = item;
+        graph->vertices_list->tail = item;
+        graph->vertices_list->vertices_count = 1;
+    } else {
+        graph->vertices_list->tail->next = item;
+        graph->vertices_list->tail = item;
+        graph->vertices_list->vertices_count++;
+    }
+
+    return item;
+}
+
+static void remove_from_ll(
+        struct ptd_graph *graph,
+        struct ptd_vertex *vertex
+) {
+    if (vertex->item_in_graph_list->previous != NULL) {
+        vertex->item_in_graph_list->previous->next = vertex->item_in_graph_list->next;
+    }
+
+    if (vertex->item_in_graph_list->next != NULL) {
+        vertex->item_in_graph_list->next->previous = vertex->item_in_graph_list->previous;
+    }
+
+    if (graph->vertices_list->first == vertex->item_in_graph_list) {
+        graph->vertices_list->first = vertex->item_in_graph_list->next;
+    }
+
+    if (graph->vertices_list->tail == vertex->item_in_graph_list) {
+        graph->vertices_list->tail = vertex->item_in_graph_list->previous;
+    }
+
+    free(vertex->item_in_graph_list);
+    graph->vertices_list->vertices_count--;
+}
+
 struct ptd_graph *ptd_graph_create(size_t state_length) {
     struct ptd_graph *graph;
     struct ptd_vertex *start;
@@ -2231,20 +2283,50 @@ struct ptd_graph *ptd_graph_create(size_t state_length) {
 
     graph->state_length = state_length;
 
+    if ((graph->vertices_list = (struct ptd_vertex_linked_list *) malloc(
+            sizeof(*graph->vertices_list)
+    )) == NULL) {
+        // TODO: proper cleanup, e.g. call graph free allow for nulls
+        free(graph);
+        return NULL;
+    }
+
+    graph->vertices_list->first = NULL;
+    graph->vertices_list->tail = NULL;
+
     if ((start = ptd_vertex_create(graph)) == NULL) {
         free(graph);
         return NULL;
     }
 
     graph->start_vertex = start;
-    graph->vertices_length = 2;
+
     graph->is_indexed = true;
 
     return graph;
 }
 
+void ptd_graph_vertices_destroy(struct ptd_graph *graph) {
+    for (struct ptd_vertex_linked_list_item *item = graph->vertices_list->first;
+         item->next != NULL;) {
+        ptd_vertex_destroy(item->next->vertex);
+    }
+}
+
 void ptd_graph_destroy(struct ptd_graph *graph) {
     ptd_vertex_destroy(graph->start_vertex);
+
+    struct ptd_vertex_linked_list_item *item = graph->vertices_list->first;
+    struct ptd_vertex_linked_list_item *next;
+
+    while (item != NULL) {
+        next = item->next;
+        free(item);
+        item = next;
+    }
+
+    free(graph->vertices_list);
+
     memset(graph, 0, sizeof(*graph));
     free(graph);
 }
@@ -2278,7 +2360,7 @@ struct ptd_vertex *ptd_vertex_create_state(struct ptd_graph *graph, vec_entry_t 
     vertex->data = NULL;
     vertex->index = 0;
 
-    graph->vertices_length++;
+    vertex->item_in_graph_list = add_to_ll(graph, vertex);
 
     if (vertices_to_visit != NULL) {
         vertices_to_visit->push(vertex);
@@ -2306,10 +2388,7 @@ void ptd_vertex_destroy(struct ptd_vertex *vertex) {
     vertex->edges_limit = 0;
     free(vertex->data);
     vertex->data = NULL;
-
-    if (vertex->graph != NULL) {
-        vertex->graph->vertices_length--;
-    }
+    remove_from_ll(vertex->graph, vertex);
 
     free(vertex);
 }
@@ -2815,7 +2894,8 @@ int strongconnect(struct ptd_vertex *vertex) {
         }
 
         scc->internal_vertices_length = list.size();
-        scc->internal_vertices = (struct ptd_vertex **) calloc(scc->internal_vertices_length, sizeof(struct ptd_vertex *));
+        scc->internal_vertices = (struct ptd_vertex **) calloc(scc->internal_vertices_length,
+                                                               sizeof(struct ptd_vertex *));
 
         for (size_t i = 0; i < scc->internal_vertices_length; ++i) {
             scc->internal_vertices[i] = list.at(i);
@@ -2860,7 +2940,7 @@ ptd_find_strongly_connected_components(struct ptd_graph *graph) {
         return NULL;
     }
 
-    void **old_data = (void **) calloc(graph->vertices_length, sizeof(void *));
+    void **old_data = (void **) calloc(graph->vertices_list->vertices_count, sizeof(void *));
 
     ptd_label_vertices(graph);
     scc_stack = new stack<struct ptd_vertex *>;
@@ -2955,7 +3035,7 @@ ptd_find_strongly_connected_components(struct ptd_graph *graph) {
 
         scc->external_vertices_length = external_vertices.size();
         scc->external_vertices = (struct ptd_vertex **) calloc(scc->external_vertices_length,
-                                                          sizeof(*scc->external_vertices));
+                                                               sizeof(*scc->external_vertices));
 
         size_t set_index;
 
@@ -3176,7 +3256,7 @@ ptd_convert_strongly_connected_components_to_group(struct ptd_graph *graph, ptd_
     }
 
     struct ptd_vertex **vertices_scc;
-    vertices_scc = (struct ptd_vertex **) calloc(graph->vertices_length, sizeof(*vertices_scc));
+    vertices_scc = (struct ptd_vertex **) calloc(graph->vertices_list->vertices_count, sizeof(*vertices_scc));
 
     if (vertices_scc == NULL) {
         return NULL;
@@ -4334,11 +4414,11 @@ ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(struct ptd_graph *grap
     }
 
     ptd_desc_multiplier_t **desc_multipliers = (ptd_desc_multiplier_t **) calloc(
-            graph->vertices_length,
+            graph->vertices_list->vertices_count,
             sizeof(*desc_multipliers)
     );
 
-    size_t *desc_length = (size_t *) calloc(graph->vertices_length, sizeof(*desc_length));
+    size_t *desc_length = (size_t *) calloc(graph->vertices_list->vertices_count, sizeof(*desc_length));
 
     ptd_visit_vertices(graph, set_data_as_int, true);
 
@@ -4414,12 +4494,13 @@ ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(struct ptd_graph *grap
     return res;
 }
 
-double *ptd_cyclic_desc(struct ptd_graph *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(struct ptd_vertex *)) {
+double *
+ptd_cyclic_desc(struct ptd_graph *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(struct ptd_vertex *)) {
     ptd_desc_multiplier_t **desc_multipliers = multipliers->desc_multipliers;
     size_t *desc_length = multipliers->desc_length;
     ptd_strongly_connected_components_t *ordered = multipliers->ordered;
 
-    double *desc_value = (double *) calloc(graph->vertices_length, sizeof(*desc_value));
+    double *desc_value = (double *) calloc(graph->vertices_list->vertices_count, sizeof(*desc_value));
 
     for (size_t ii = 0; ii < ordered->components_length; ++ii) {
         size_t i = ordered->components_length - 1 - ii;

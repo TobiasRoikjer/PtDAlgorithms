@@ -112,13 +112,13 @@ int pi(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &v) {
     return 0;
 }
 
-int pc(ptd_vertex_t *v) {
+int pc(struct ptd_vertex *v) {
     char buffer[1024];
     ptd_vertex_to_s(v, buffer, 1024);
     fprintf(stderr, "I am vertex: %s\n", buffer);
 
     for (size_t i = 0; i < v->edges_length; ++i) {
-        ptd_vertex_t *c = v->edges[i].to;
+        struct ptd_vertex *c = v->edges[i].to;
 
         char buffer2[1024];
         ptd_vertex_to_s(c, buffer2, 1024);
@@ -131,20 +131,20 @@ int pc(ptd_vertex_t *v) {
 }
 
 
-double reward_by_index(ptd_vertex_t *vertex) {
+double reward_by_index(struct ptd_vertex *vertex) {
     return vertex->state[reward_index];
 }
 
-double reward_by_1(ptd_vertex_t *vertex) {
+double reward_by_1(struct ptd_vertex *vertex) {
     return 1;
 }
 
-bool always_true(ptd_vertex_t *v) {
+bool always_true(struct ptd_vertex *v) {
     return true;
 }
 
 int main(void) {
-    ptd_graph_t *two_loci = ptd_model_two_island_two_loci_recomb(
+    struct ptd_graph *two_loci = ptd_model_two_island_two_loci_recomb(
             5,
             5,
             1,

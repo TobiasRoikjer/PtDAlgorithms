@@ -31,9 +31,9 @@ void assert(bool a) {
     }
 }
 
-ptd_vertex_t *S, *A, *B, *C, *D, *E, *F, *G, *H, *I, *J, *K, *L, *T;
+struct ptd_vertex *S, *A, *B, *C, *D, *E, *F, *G, *H, *I, *J, *K, *L, *T;
 
-void create_vertices(ptd_graph_t *graph) {
+void create_vertices(struct ptd_graph *graph) {
     S = graph->start_vertex;
     T = ptd_vertex_create(graph);
 
@@ -88,7 +88,7 @@ void destroy_vertices() {
     L = NULL;
 }
 
-char *vertex_name(ptd_vertex_t *vertex) {
+char *vertex_name(struct ptd_vertex *vertex) {
     if (vertex == S) {
         return "S";
     }
@@ -150,7 +150,7 @@ char *vertex_name(ptd_vertex_t *vertex) {
 
 size_t vertex_len;
 
-void print_vertex_state(ptd_vertex_t *vertex) {
+void print_vertex_state(struct ptd_vertex *vertex) {
     fprintf(stderr, "(");
 
     for (size_t i = 0; i < vertex_len; ++i) {
@@ -160,7 +160,7 @@ void print_vertex_state(ptd_vertex_t *vertex) {
     fprintf(stderr, ")");
 }
 
-int print_func(ptd_vertex_t *vertex) {
+int print_func(struct ptd_vertex *vertex) {
     fprintf(stderr, "Vertex %s ", vertex_name(vertex));
 
     print_vertex_state(vertex);
@@ -178,21 +178,21 @@ int print_func(ptd_vertex_t *vertex) {
     return 0;
 }
 
-void draw_graph(ptd_graph_t *graph) {
+void draw_graph(struct ptd_graph *graph) {
     vertex_len = graph->state_length;
     ptd_visit_vertices(graph, print_func, true);
 }
 
-bool keep_all(ptd_vertex_t *vertex) {
+bool keep_all(struct ptd_vertex *vertex) {
     return true;
 }
 
-double reward_identity(ptd_vertex_t *vertex) {
+double reward_identity(struct ptd_vertex *vertex) {
     return 1;
 }
 
 void test_can_find_scc() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
 
     create_vertices(graph);
 
@@ -231,13 +231,13 @@ void test_can_find_scc() {
     ptd_graph_destroy(graph);
 }
 
-bool remove_D_and_H_and_I(ptd_vertex_t *vertex) {
+bool remove_D_and_H_and_I(struct ptd_vertex *vertex) {
     return !(vertex == D || vertex == H || vertex == I);
 
 }
 
 void test_can_find_scc2() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
 
     create_vertices(graph);
 
@@ -278,11 +278,11 @@ void test_can_find_scc2() {
     ptd_graph_destroy(graph);
 }
 
-double reward_one(ptd_vertex_t *vertex) {
+double reward_one(struct ptd_vertex *vertex) {
     return 1;
 }
 
-int set_data_as_int(ptd_vertex_t *vertex) {
+int set_data_as_int(struct ptd_vertex *vertex) {
     vertex->data = malloc(sizeof(double));
     *((double *) vertex->data) = 0;
 
@@ -290,7 +290,7 @@ int set_data_as_int(ptd_vertex_t *vertex) {
 }
 
 void print_component(ptd_strongly_connected_component_t *scc) {
-    fprintf(stderr, "Component %p - %zu internal:\n", (void*)scc, scc->internal_vertices_length);
+    fprintf(stderr, "Component %p - %zu internal:\n", (void *) scc, scc->internal_vertices_length);
 
     for (size_t i = 0; i < scc->internal_vertices_length; ++i) {
         fprintf(stderr, "\t%s\n", vertex_name(scc->internal_vertices[i]));
@@ -305,12 +305,12 @@ void print_component(ptd_strongly_connected_component_t *scc) {
     fprintf(stderr, "\t %zu external scc:\n", scc->external_sccs_length);
 
     for (size_t i = 0; i < scc->external_sccs_length; ++i) {
-        fprintf(stderr, "\t%p\n", (void*)(scc->external_sccs[i]));
+        fprintf(stderr, "\t%p\n", (void *) (scc->external_sccs[i]));
     }
 }
 
 void test_can_find_scc2_graph() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
 
     create_vertices(graph);
 
@@ -353,13 +353,13 @@ void test_can_find_scc2_graph() {
 }
 
 void test_can_find_scc_cov_rand_graph() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
     srand(1234);
 
-    ptd_vertex_t **vertices = (ptd_vertex_t **) calloc(50, sizeof(*vertices));
+    struct ptd_vertex **vertices = (struct ptd_vertex **) calloc(50, sizeof(*vertices));
     double *fulld = (double *) calloc(50, sizeof(*fulld));
 
-    ptd_vertex_t *abs = ptd_vertex_create(graph);
+    struct ptd_vertex *abs = ptd_vertex_create(graph);
 
     for (size_t i = 0; i < 50; ++i) {
         vertices[i] = ptd_vertex_create(graph);
@@ -381,7 +381,7 @@ void test_can_find_scc_cov_rand_graph() {
     }
 
     long double **mat;
-    ptd_vertex_t **vs;
+    struct ptd_vertex **vs;
     size_t length;
 
     ptd_phase_type_distribution_t *ptd = ptd_graph_as_phase_type_distribution(graph);
@@ -419,10 +419,10 @@ void test_can_find_scc_cov_rand_graph() {
         fulld[vs[k]->index] = desc;
     }
 
-    queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph);
+    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph);
 
     while (!q.empty()) {
-        ptd_vertex_t *v = q.front();
+        struct ptd_vertex *v = q.front();
         q.pop();
 
         fprintf(stdout, "Vertex %zu: %f vs %f\n", v->index, fulld[v->index], algod[v->index]);
@@ -448,7 +448,7 @@ void test_can_find_scc_cov_rand_graph() {
 }
 
 void test_it_can_insert_avl() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
     assert(graph != NULL);
     ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
     assert(tree != NULL);
@@ -489,12 +489,12 @@ void test_it_can_insert_avl() {
 
 
 void test_avl_is_balanced() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
     ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
-    vector<ptd_vertex_t *> vertices;
+    vector<struct ptd_vertex *> vertices;
 
     for (size_t i = 0; i < 1024; ++i) {
-        ptd_vertex_t *vertex = ptd_vertex_create(graph);
+        struct ptd_vertex *vertex = ptd_vertex_create(graph);
         assert(vertex != NULL);
         vertex->state[0] = (size_t) rand();
         ptd_avl_tree_vertex_insert(tree, vertex->state, vertex);
@@ -514,14 +514,14 @@ void test_avl_is_balanced() {
 }
 
 void test_avl_is_balanced_and_updated() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
     ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
 
-    vector<ptd_vertex_t *> vertices;
+    vector<struct ptd_vertex *> vertices;
 
     for (size_t i = 0; i < 100; ++i) {
         for (size_t j = 0; j < 100; ++j) {
-            ptd_vertex_t *vertex = ptd_vertex_create(graph);
+            struct ptd_vertex *vertex = ptd_vertex_create(graph);
             assert(vertex != NULL);
             vertex->state[0] = (size_t) j;
             assert(ptd_avl_tree_edge_insert_or_increment(tree, vertex->state, vertex, 1) == 0);
@@ -549,14 +549,14 @@ void test_avl_is_balanced_and_updated() {
 
 
 void test_avl_is_balanced_and_removed() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
     ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
 
-    vector<ptd_vertex_t *> vertices;
+    vector<struct ptd_vertex *> vertices;
 
 
     for (size_t i = 0; i < 100; ++i) {
-        ptd_vertex_t *vertex = ptd_vertex_create(graph);
+        struct ptd_vertex *vertex = ptd_vertex_create(graph);
         assert(vertex != NULL);
         vertex->state[0] = (size_t) i;
         assert(ptd_avl_tree_edge_insert_or_increment(tree, vertex->state, vertex, 1) == 0);
@@ -566,7 +566,7 @@ void test_avl_is_balanced_and_removed() {
         vertices.push_back(vertex);
     }
 
-    ptd_vertex_t *vertex[100];
+    struct ptd_vertex *vertex[100];
 
     for (size_t i = 0; i < 100; ++i) {
         vertex[i] = ptd_vertex_create(graph);
@@ -599,10 +599,10 @@ void test_avl_is_balanced_and_removed() {
     ptd_graph_destroy(graph);
 }
 
-static ptd_graph_t *kingman_graph;
+static struct ptd_graph *kingman_graph;
 static ptd_avl_tree_t *avl_tree;
 
-int make_kingman(ptd_vertex_t *vertex) {
+int make_kingman(struct ptd_vertex *vertex) {
     vec_entry_t *state = vertex->state;
 
     for (size_t i = 0; i < kingman_graph->state_length; ++i) {
@@ -634,7 +634,7 @@ int make_kingman(ptd_vertex_t *vertex) {
             child_state[j]--;
             child_state[(i + j + 2) - 1]++;
 
-            ptd_vertex_t *child = ptd_avl_tree_vertex_find(avl_tree, child_state);
+            struct ptd_vertex *child = ptd_avl_tree_vertex_find(avl_tree, child_state);
 
             if (child == NULL) {
                 child = ptd_vertex_create_state(kingman_graph, child_state);
@@ -656,7 +656,7 @@ int make_kingman(ptd_vertex_t *vertex) {
 void test_it_can_construct_kingman() {
     avl_tree = ptd_avl_tree_create(5);
     kingman_graph = ptd_graph_create(5);
-    ptd_vertex_t *initial = ptd_vertex_create(kingman_graph);
+    struct ptd_vertex *initial = ptd_vertex_create(kingman_graph);
     initial->state[0] = 5;
     ptd_add_edge(kingman_graph->start_vertex, initial, 1);
     ptd_visit_vertices(kingman_graph, make_kingman, false);
@@ -665,12 +665,76 @@ void test_it_can_construct_kingman() {
     ptd_graph_destroy(kingman_graph);
 }
 
-double reward_identity(const ptd_vertex_t *vertex) {
+void test_it_can_construct_kingman2() {
+    avl_tree = ptd_avl_tree_create(5);
+    kingman_graph = ptd_graph_create(5);
+
+    for (struct ptd_vertex_linked_list_item *item = kingman_graph->vertices_list->first;
+            item != NULL; item = item->next) {
+        struct ptd_vertex *visited = item->vertex;
+
+        if (visited == kingman_graph->start_vertex) {
+            struct ptd_vertex *initial = ptd_vertex_create(kingman_graph);
+            initial->state[0] = 5;
+            ptd_add_edge(visited, initial, 1);
+            continue;
+        }
+
+        vec_entry_t *state = visited->state;
+
+        for (size_t i = 0; i < kingman_graph->state_length; ++i) {
+            for (size_t j = i; j < kingman_graph->state_length; ++j) {
+                double weight;
+
+                if (i == j) {
+                    if (state[i] < 2) {
+                        continue;
+                    }
+
+                    weight = state[i] * (state[i] - 1) / 2;
+                } else {
+                    if (state[i] < 1 || state[j] < 1) {
+                        continue;
+                    }
+
+                    weight = state[i] * state[j];
+                }
+
+                vec_entry_t *child_state = (vec_entry_t *) calloc(kingman_graph->state_length, sizeof(vec_entry_t));
+
+                memcpy(child_state, state, kingman_graph->state_length * sizeof(vec_entry_t));
+                child_state[i]--;
+                child_state[j]--;
+                child_state[(i + j + 2) - 1]++;
+
+                struct ptd_vertex *child = ptd_avl_tree_vertex_find(avl_tree, child_state);
+
+                if (child == NULL) {
+                    child = ptd_vertex_create_state(kingman_graph, child_state);
+
+                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child);
+                } else {
+                    free(child_state);
+                }
+
+                ptd_add_edge(visited, child, weight);
+            }
+        }
+    }
+
+
+    draw_graph(kingman_graph);
+    ptd_avl_tree_vertex_destroy(avl_tree);
+    ptd_graph_vertices_destroy(kingman_graph);
+    ptd_graph_destroy(kingman_graph);
+}
+
+double reward_identity(const struct ptd_vertex *vertex) {
     return 1;
 }
 
 void test_it_can_reward_transform() {
-    ptd_graph_t *graph = ptd_graph_create(4);
+    struct ptd_graph *graph = ptd_graph_create(4);
 
     create_vertices(graph);
 
@@ -697,8 +761,8 @@ int main(int argc, char **argv) {
 //    test_can_find_scc();
 //    test_can_find_scc2();
     //test_can_find_scc2_graph();
-   test_can_find_scc_cov_rand_graph();
-
+    //test_can_find_scc_cov_rand_graph();
+    test_it_can_construct_kingman2();
 //    test_it_can_insert_avl();
 //    test_avl_is_balanced();
     //   test_avl_is_balanced_and_updated();

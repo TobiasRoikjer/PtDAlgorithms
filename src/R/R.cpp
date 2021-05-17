@@ -128,7 +128,7 @@ List vertex_as_list(Vertex *vertex) {
   );
 }
 
-List vertex_as_list(Graph &graph, ptd_vertex_t *c_vertex) {
+List vertex_as_list(Graph &graph, struct ptd_vertex *c_vertex) {
   Vertex *vertex = new Vertex(graph, c_vertex);
   
   return vertex_as_list(vertex);
@@ -304,7 +304,7 @@ List vertices(SEXP phase_type_graph) {
 Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
 
 ptd_label_vertices(graph->graph);
-queue<ptd_vertex_t *> q = ptd_enqueue_vertices(graph->graph);
+queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph->graph);
 
 // Remove start vertex
 q.pop();
@@ -312,7 +312,7 @@ q.pop();
 List list(q.size());
 
 while (!q.empty()) {
-ptd_vertex_t *vertex = q.front();
+struct ptd_vertex *vertex = q.front();
 q.pop();
 
 list[vertex->index - 1] = Rcpp::XPtr<PTDVertex>(
@@ -327,7 +327,7 @@ return list;
 
 Rcpp::Function *custom_visit_function;
 
-int custom_visit(ptd_vertex_t *vertex) {
+int custom_visit(struct ptd_vertex *vertex) {
 fprintf(stderr, "foo\n");
 SEXP v = Rcpp::XPtr<PTDVertex>(
   new PTDVertex(
