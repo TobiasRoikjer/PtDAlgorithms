@@ -9,24 +9,12 @@ create_graph <- function(state_length) {
     .Call(`_ptdalgorithms_create_graph`, state_length)
 }
 
-edges <- function(phase_type_vertex) {
-    .Call(`_ptdalgorithms_edges`, phase_type_vertex)
-}
-
 add_edge <- function(phase_type_vertex_from, phase_type_vertex_to, weight) {
     invisible(.Call(`_ptdalgorithms_add_edge`, phase_type_vertex_from, phase_type_vertex_to, weight))
 }
 
 create_vertex <- function(phase_type_graph, state) {
     .Call(`_ptdalgorithms_create_vertex`, phase_type_graph, state)
-}
-
-index_topological <- function(phase_type_graph) {
-    invisible(.Call(`_ptdalgorithms_index_topological`, phase_type_graph))
-}
-
-index_invert <- function(phase_type_graph) {
-    invisible(.Call(`_ptdalgorithms_index_invert`, phase_type_graph))
 }
 
 vertex_exists <- function(phase_type_graph, state) {
@@ -39,10 +27,6 @@ find_vertex <- function(phase_type_graph, state) {
 
 find_or_create_vertex <- function(phase_type_graph, state) {
     .Call(`_ptdalgorithms_find_or_create_vertex`, phase_type_graph, state)
-}
-
-visit_vertices <- function(phase_type_graph, visit_function, include_start_vertex = FALSE) {
-    invisible(.Call(`_ptdalgorithms_visit_vertices`, phase_type_graph, visit_function, include_start_vertex))
 }
 
 graph_as_matrix <- function(phase_type_graph) {

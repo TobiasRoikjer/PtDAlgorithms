@@ -27,17 +27,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// edges
-List edges(SEXP phase_type_vertex);
-RcppExport SEXP _ptdalgorithms_edges(SEXP phase_type_vertexSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< SEXP >::type phase_type_vertex(phase_type_vertexSEXP);
-    rcpp_result_gen = Rcpp::wrap(edges(phase_type_vertex));
-    return rcpp_result_gen;
-END_RCPP
-}
 // add_edge
 void add_edge(Vertex phase_type_vertex_from, Vertex phase_type_vertex_to, double weight);
 RcppExport SEXP _ptdalgorithms_add_edge(SEXP phase_type_vertex_fromSEXP, SEXP phase_type_vertex_toSEXP, SEXP weightSEXP) {
@@ -60,26 +49,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
     rcpp_result_gen = Rcpp::wrap(create_vertex(phase_type_graph, state));
     return rcpp_result_gen;
-END_RCPP
-}
-// index_topological
-void index_topological(SEXP phase_type_graph);
-RcppExport SEXP _ptdalgorithms_index_topological(SEXP phase_type_graphSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    index_topological(phase_type_graph);
-    return R_NilValue;
-END_RCPP
-}
-// index_invert
-void index_invert(SEXP phase_type_graph);
-RcppExport SEXP _ptdalgorithms_index_invert(SEXP phase_type_graphSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    index_invert(phase_type_graph);
-    return R_NilValue;
 END_RCPP
 }
 // vertex_exists
@@ -118,18 +87,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// visit_vertices
-void visit_vertices(SEXP phase_type_graph, Rcpp::Function visit_function, bool include_start_vertex);
-RcppExport SEXP _ptdalgorithms_visit_vertices(SEXP phase_type_graphSEXP, SEXP visit_functionSEXP, SEXP include_start_vertexSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Rcpp::Function >::type visit_function(visit_functionSEXP);
-    Rcpp::traits::input_parameter< bool >::type include_start_vertex(include_start_vertexSEXP);
-    visit_vertices(phase_type_graph, visit_function, include_start_vertex);
-    return R_NilValue;
-END_RCPP
-}
 // graph_as_matrix
 List graph_as_matrix(Graph phase_type_graph);
 RcppExport SEXP _ptdalgorithms_graph_as_matrix(SEXP phase_type_graphSEXP) {
@@ -147,15 +104,11 @@ RcppExport SEXP _rcpp_module_boot_ptdalgorithms();
 static const R_CallMethodDef CallEntries[] = {
     {"_ptdalgorithms_state", (DL_FUNC) &_ptdalgorithms_state, 1},
     {"_ptdalgorithms_create_graph", (DL_FUNC) &_ptdalgorithms_create_graph, 1},
-    {"_ptdalgorithms_edges", (DL_FUNC) &_ptdalgorithms_edges, 1},
     {"_ptdalgorithms_add_edge", (DL_FUNC) &_ptdalgorithms_add_edge, 3},
     {"_ptdalgorithms_create_vertex", (DL_FUNC) &_ptdalgorithms_create_vertex, 2},
-    {"_ptdalgorithms_index_topological", (DL_FUNC) &_ptdalgorithms_index_topological, 1},
-    {"_ptdalgorithms_index_invert", (DL_FUNC) &_ptdalgorithms_index_invert, 1},
     {"_ptdalgorithms_vertex_exists", (DL_FUNC) &_ptdalgorithms_vertex_exists, 2},
     {"_ptdalgorithms_find_vertex", (DL_FUNC) &_ptdalgorithms_find_vertex, 2},
     {"_ptdalgorithms_find_or_create_vertex", (DL_FUNC) &_ptdalgorithms_find_or_create_vertex, 2},
-    {"_ptdalgorithms_visit_vertices", (DL_FUNC) &_ptdalgorithms_visit_vertices, 3},
     {"_ptdalgorithms_graph_as_matrix", (DL_FUNC) &_ptdalgorithms_graph_as_matrix, 1},
     {"_rcpp_module_boot_ptdalgorithms", (DL_FUNC) &_rcpp_module_boot_ptdalgorithms, 0},
     {NULL, NULL, 0}
