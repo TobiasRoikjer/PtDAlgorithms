@@ -18,72 +18,72 @@ BEGIN_RCPP
 END_RCPP
 }
 // add_edge
-void add_edge(Vertex phase_type_vertex_from, Vertex phase_type_vertex_to, double weight);
+void add_edge(ptdalgorithms::Vertex phase_type_vertex_from, ptdalgorithms::Vertex phase_type_vertex_to, double weight);
 RcppExport SEXP _ptdalgorithms_add_edge(SEXP phase_type_vertex_fromSEXP, SEXP phase_type_vertex_toSEXP, SEXP weightSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Vertex >::type phase_type_vertex_from(phase_type_vertex_fromSEXP);
-    Rcpp::traits::input_parameter< Vertex >::type phase_type_vertex_to(phase_type_vertex_toSEXP);
+    Rcpp::traits::input_parameter< ptdalgorithms::Vertex >::type phase_type_vertex_from(phase_type_vertex_fromSEXP);
+    Rcpp::traits::input_parameter< ptdalgorithms::Vertex >::type phase_type_vertex_to(phase_type_vertex_toSEXP);
     Rcpp::traits::input_parameter< double >::type weight(weightSEXP);
     add_edge(phase_type_vertex_from, phase_type_vertex_to, weight);
     return R_NilValue;
 END_RCPP
 }
 // create_vertex
-Vertex create_vertex(Graph phase_type_graph, IntegerVector state);
+ptdalgorithms::Vertex create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
 RcppExport SEXP _ptdalgorithms_create_vertex(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Graph >::type phase_type_graph(phase_type_graphSEXP);
+    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
     rcpp_result_gen = Rcpp::wrap(create_vertex(phase_type_graph, state));
     return rcpp_result_gen;
 END_RCPP
 }
 // vertex_exists
-bool vertex_exists(Graph phase_type_graph, IntegerVector state);
+bool vertex_exists(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
 RcppExport SEXP _ptdalgorithms_vertex_exists(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Graph >::type phase_type_graph(phase_type_graphSEXP);
+    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
     rcpp_result_gen = Rcpp::wrap(vertex_exists(phase_type_graph, state));
     return rcpp_result_gen;
 END_RCPP
 }
 // find_vertex
-Vertex find_vertex(Graph phase_type_graph, IntegerVector state);
+ptdalgorithms::Vertex find_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
 RcppExport SEXP _ptdalgorithms_find_vertex(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Graph >::type phase_type_graph(phase_type_graphSEXP);
+    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
     rcpp_result_gen = Rcpp::wrap(find_vertex(phase_type_graph, state));
     return rcpp_result_gen;
 END_RCPP
 }
 // find_or_create_vertex
-Vertex find_or_create_vertex(Graph phase_type_graph, IntegerVector state);
+ptdalgorithms::Vertex find_or_create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
 RcppExport SEXP _ptdalgorithms_find_or_create_vertex(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Graph >::type phase_type_graph(phase_type_graphSEXP);
+    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
     rcpp_result_gen = Rcpp::wrap(find_or_create_vertex(phase_type_graph, state));
     return rcpp_result_gen;
 END_RCPP
 }
 // graph_as_matrix
-List graph_as_matrix(Graph phase_type_graph);
+List graph_as_matrix(ptdalgorithms::Graph phase_type_graph);
 RcppExport SEXP _ptdalgorithms_graph_as_matrix(SEXP phase_type_graphSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Graph >::type phase_type_graph(phase_type_graphSEXP);
+    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
     rcpp_result_gen = Rcpp::wrap(graph_as_matrix(phase_type_graph));
     return rcpp_result_gen;
 END_RCPP

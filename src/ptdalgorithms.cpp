@@ -1,8 +1,8 @@
 #define PTD_RCPP 1
 #include <Rcpp.h>
+#include "ptdalgorithms_types.h"
 
 using namespace Rcpp;
-using namespace ptdalgorithms;
 
 // TODO: Make all functions exists as Cpp method calls
 
@@ -79,7 +79,7 @@ double matrix_get(void *matrix, size_t i, size_t j) {
 
 // [[Rcpp::export]]
 ptdalgorithms::Graph create_graph(size_t state_length) {
-  return Graph(
+  return ptdalgorithms::Graph(
       state_length
   );
 }
@@ -89,17 +89,17 @@ RCPP_EXPOSED_CLASS(ptdalgorithms::Vertex)
 RCPP_EXPOSED_CLASS(ptdalgorithms::Graph)
   
 RCPP_MODULE(ptdalgorithms) {
-  class_<VertexLinkedList>("VertexLinkedList")
+  class_<ptdalgorithms::VertexLinkedList>("VertexLinkedList")
     .method("has_next", &ptdalgorithms::VertexLinkedList::has_next, "Does the list have a next value?")
     .method("get_next", &ptdalgorithms::VertexLinkedList::next, "Obtain the next vertex in list. Updates the list iterator.")
   ;
   
-  class_<Vertex>("Vertex")
+  class_<ptdalgorithms::Vertex>("Vertex")
     .method("state", &ptdalgorithms::Vertex::state, "Obtain vertex state")
     .method("equals", &ptdalgorithms::Vertex::operator==, "Does this vertex equal another vertex?")
   ;
   
-  class_<Graph>("Graph")
+  class_<ptdalgorithms::Graph>("Graph")
     .method("start_vertex", &ptdalgorithms::Graph::start_vertex, "Obtain graph start vertex")
     .method("vertices_list", &ptdalgorithms::Graph::vertices_list, "Obtain graph vertices list")
   ;
@@ -108,34 +108,32 @@ RCPP_MODULE(ptdalgorithms) {
 // TODO: add BEGIN_RCPP inside all functions
 
 // [[Rcpp::export]]
-void add_edge(Vertex phase_type_vertex_from, Vertex phase_type_vertex_to, double weight) {
+void add_edge(ptdalgorithms::Vertex phase_type_vertex_from, ptdalgorithms::Vertex phase_type_vertex_to, double weight) {
   phase_type_vertex_from.add_edge(phase_type_vertex_to, weight);
 }
 
 // [[Rcpp::export]]
-Vertex create_vertex(Graph phase_type_graph, IntegerVector state) {
-  Vertex vertex = phase_type_graph.create_vertex(as<std::vector<size_t> >(state));
-  
-  return vertex;
+ptdalgorithms::Vertex create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
+  return phase_type_graph.create_vertex(as<std::vector<size_t> >(state));
 }
 
 // [[Rcpp::export]]
-bool vertex_exists(Graph phase_type_graph, IntegerVector state) {
+bool vertex_exists(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
   return phase_type_graph.vertex_exists(as<std::vector<size_t> >(state));
 }
 
 // [[Rcpp::export]]
-Vertex find_vertex(Graph phase_type_graph, IntegerVector state) {
+ptdalgorithms::Vertex find_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
   return phase_type_graph.find_vertex(as<std::vector<size_t> >(state));
 }
 
 // [[Rcpp::export]]
-Vertex find_or_create_vertex(Graph phase_type_graph, IntegerVector state) {
+ptdalgorithms::Vertex find_or_create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
   return phase_type_graph.find_or_create_vertex(as<std::vector<size_t> >(state));
 }
 
-List _graph_as_matrix(Graph graph) {
-  PhaseTypeDistribution dist = graph.phase_type_distribution();
+List _graph_as_matrix(ptdalgorithms::Graph graph) {
+  ptdalgorithms::PhaseTypeDistribution dist = graph.phase_type_distribution();
   
   NumericMatrix SIM(dist.length, dist.length);
   NumericVector IPV(dist.length);
@@ -152,7 +150,7 @@ List _graph_as_matrix(Graph graph) {
 }
 
 // [[Rcpp::export]]
-List graph_as_matrix(Graph phase_type_graph) {
+List graph_as_matrix(ptdalgorithms::Graph phase_type_graph) {
   return(_graph_as_matrix(phase_type_graph));
 }
 
