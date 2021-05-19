@@ -1,5 +1,6 @@
 #define PTD_RCPP 1
 #include <Rcpp.h>
+
 #include "c/ptdalgorithms.h"
 #include "cpp/ptdalgorithmscpp.h"
 
@@ -80,7 +81,7 @@ double matrix_get(void *matrix, size_t i, size_t j) {
 }
 
 // [[Rcpp::export]]
-Graph create_graph(size_t state_length) {
+ptdalgorithms::Graph create_graph(size_t state_length) {
   return Graph(
       state_length
   );
