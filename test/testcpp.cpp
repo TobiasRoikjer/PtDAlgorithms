@@ -143,7 +143,97 @@ bool always_true(struct ptd_vertex *v) {
     return true;
 }
 
+using namespace ptdalgorithms;
+
+size_t vertex_len;
+
+void print_vertex_state(struct ptd_vertex *vertex) {
+    fprintf(stderr, "(");
+
+    for (size_t i = 0; i < vertex_len; ++i) {
+        fprintf(stderr, "%zu, ", vertex->state[i]);
+    }
+
+    fprintf(stderr, ")");
+}
+
+int print_func(struct ptd_vertex *vertex) {
+    fprintf(stderr, "Vertex %p (", (void*)vertex);
+
+    print_vertex_state(vertex);
+
+    fprintf(stderr, ")\n");
+
+    for (size_t i = 0; i < vertex->edges_length; ++i) {
+        fprintf(stderr, "\t %p %Lf  (", (void*)vertex->edges[i].to, vertex->edges[i].weight);
+        print_vertex_state(vertex->edges[i].to);
+        fprintf(stderr, ")\n");
+    }
+
+    fprintf(stderr, "\n");
+
+    return 0;
+}
+
+void draw_graph(struct ptd_graph *graph) {
+    vertex_len = graph->state_length;
+    ptd_visit_vertices(graph, print_func, true);
+}
+
+void test_it_can_construct_kingman2() {
+    Graph kingman_graph(5);
+    VertexLinkedList list = kingman_graph.vertices_list();
+
+    while (list.has_next()) {
+        Vertex visited = list.next();
+
+        if (visited == kingman_graph.start_vertex()) {
+            vector<size_t> state(5);
+            state[0] = 5;
+            Vertex initial = kingman_graph.create_vertex(state);
+            visited.add_edge(initial, 1);
+            continue;
+        }
+
+        vector<size_t> state(visited.state());
+
+        for (size_t i = 0; i < kingman_graph.state_length(); ++i) {
+            for (size_t j = i; j < kingman_graph.state_length(); ++j) {
+                double weight;
+
+                if (i == j) {
+                    if (state[i] < 2) {
+                        continue;
+                    }
+
+                    weight = state[i] * (state[i] - 1) / 2;
+                } else {
+                    if (state[i] < 1 || state[j] < 1) {
+                        continue;
+                    }
+
+                    weight = state[i] * state[j];
+                }
+
+                vector<size_t> child_state(state);
+
+                child_state[i]--;
+                child_state[j]--;
+                child_state[(i + j + 2) - 1]++;
+                Vertex child = kingman_graph.find_or_create_vertex(child_state);
+
+                visited.add_edge(child, weight);
+            }
+        }
+    }
+
+
+    draw_graph(kingman_graph.c_graph());
+}
 int main(void) {
+test_it_can_construct_kingman2();
+
+    return 0;
     struct ptd_graph *two_loci = ptd_model_two_island_two_loci_recomb(
             5,
             5,
@@ -158,12 +248,12 @@ int main(void) {
 
 
     ptd_strongly_connected_components_t *scc =
-            ptd_find_strongly_connected_components(two_loci, always_true);
+            ptd_find_strongly_connected_components(two_loci);
 
-    fprintf(stderr, "We have %zu scc with %zu internal_vertices\n", scc->components_length, two_loci->vertices_length);
+    fprintf(stderr, "We have %zu scc with %zu internal_vertices\n", scc->components_length, two_loci->vertices_list->vertices_count);
 
     fprintf(stderr, "EXP %f\n", ptd_circular_exp(two_loci, reward_by_1));
-    fprintf(stderr, "We have %zu scc with %zu internal_vertices\n", scc->components_length, two_loci->vertices_length);
+    fprintf(stderr, "We have %zu scc with %zu internal_vertices\n", scc->components_length, two_loci->vertices_list->vertices_count);
     return 0;
 
     for (size_t l = 0; l < scc->components_length; ++l) {
@@ -229,7 +319,7 @@ int main(void) {
 
     reward_index = 0;
 
-    fprintf(stderr, "%zu Vertices: %zu\n", seconds2 - seconds, kingman.c_graph()->vertices_length);
+    fprintf(stderr, "%zu Vertices: %zu\n", seconds2 - seconds, kingman.c_graph()->vertices_list->vertices_count);
     time(&seconds3);
     kingman.index_topological();
     kingman.visit_vertices(pi);

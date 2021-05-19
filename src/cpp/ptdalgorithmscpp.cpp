@@ -16,6 +16,34 @@ static void assert_same_length(vector<size_t> state, struct ptd_graph *graph) {
     }
 }
 
+ptdalgorithms::Vertex ptdalgorithms::VertexLinkedList::next(void) {
+    if (this->is_first) {
+        if (this->current == NULL || this->current->vertex == NULL) {
+            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
+        }
+
+        Vertex res(graph, this->current->vertex);
+
+        this->is_first = false;
+
+        return res;
+    } else {
+        if (this->current == NULL) {
+            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
+        }
+
+        if (this->current->next == NULL || this->current->next->vertex == NULL) {
+            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
+        }
+
+        this->current = this->current->next;
+
+        Vertex res(graph, this->current->vertex);
+
+        return res;
+    }
+}
+
 ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<size_t> state) {
     assert_same_length(state, this->rf_graph->graph);
 
@@ -161,7 +189,7 @@ ptdalgorithms::PhaseTypeDistribution ptdalgorithms::Graph::phase_type_distributi
         );
     }
 
-    return PhaseTypeDistribution(matrix);
+    return PhaseTypeDistribution(*this, matrix);
 }
 
 static int (*cpp_visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &vertex);

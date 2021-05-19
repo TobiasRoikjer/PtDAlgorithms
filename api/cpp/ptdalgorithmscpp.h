@@ -18,6 +18,43 @@ namespace ptdalgorithms {
 
     class PhaseTypeDistribution;
 
+    class Graph;
+
+    class VertexLinkedList;
+
+    class VertexLinkedList {
+    public:
+        bool has_next(void) {
+            if (is_first) {
+                return (this->current != NULL);
+            } else {
+                return (this->current != NULL && this->current->next != NULL);
+            }
+        }
+
+        Vertex next(void);
+
+        VertexLinkedList &operator=(const VertexLinkedList &o) {
+            current = o.current;
+
+            return *this;
+        }
+
+    private:
+        VertexLinkedList(Graph &graph, ptd_vertex_linked_list *c_list) : graph(graph) {
+            this->current = c_list->first;
+            this->is_first = true;
+        }
+
+        bool is_first;
+        ptd_vertex_linked_list_item *current;
+        Graph &graph;
+
+        friend class Vertex;
+
+        friend class Graph;
+    };
+
     class Graph {
     public:
         Graph(struct ptd_graph *graph) {
@@ -60,12 +97,13 @@ namespace ptdalgorithms {
         }
 
         ~Graph() {
-            fprintf(stderr, "Destroying graph %zu \n", *(this->rf_graph->references));
             *(this->rf_graph->references) -= 1;
 
 
             if (*this->rf_graph->references == 0) {
+                fprintf(stderr, "Destroying graph %zu \n", *(this->rf_graph->references));
                 ptd_avl_tree_vertex_destroy(this->rf_graph->tree);
+                ptd_graph_vertices_destroy(this->rf_graph->graph);
                 ptd_graph_destroy(this->rf_graph->graph);
                 free(this->rf_graph->references);
             }
@@ -93,6 +131,10 @@ namespace ptdalgorithms {
 
         std::vector<Vertex> vertices();
 
+        size_t state_length() {
+            return c_graph()->state_length;
+        }
+
         void index_topological() {
             ptd_index_topological(rf_graph->graph);
         }
@@ -103,6 +145,10 @@ namespace ptdalgorithms {
 
         void visit_vertices(int (*visit_func)(Graph &graph, Vertex &vertex),
                             bool include_start = false);
+
+        VertexLinkedList vertices_list() {
+            return VertexLinkedList(*this, this->c_graph()->vertices_list);
+        }
 
         PhaseTypeDistribution phase_type_distribution();
 
@@ -134,6 +180,8 @@ namespace ptdalgorithms {
 
     private:
         struct rf_graph *rf_graph;
+
+        friend class VertexLinkedList;
 
         friend class Vertex;
     };
@@ -231,11 +279,15 @@ namespace ptdalgorithms {
 
     class PhaseTypeDistribution {
     private:
-        PhaseTypeDistribution(ptd_phase_type_distribution_t *matrix) {
+        PhaseTypeDistribution(Graph &graph, ptd_phase_type_distribution_t *matrix) {
             this->length = matrix->length;
             this->sub_intensity_matrix = matrix->sub_intensity_matrix;
             this->initial_probability_vector = matrix->initial_probability_vector;
-            this->vertices = matrix->vertices;
+
+            for (size_t i = 0; i < matrix->length; ++i) {
+                this->vertices.push_back(Vertex(graph, matrix->vertices[i]));
+            }
+
             this->distribution = matrix;
         }
 
@@ -249,7 +301,7 @@ namespace ptdalgorithms {
         size_t length;
         long double **sub_intensity_matrix;
         long double *initial_probability_vector;
-        struct ptd_vertex **vertices;
+        vector<Vertex> vertices;
 
         friend class Graph;
     };

@@ -7,9 +7,52 @@
 #include <stddef.h>
 #include <math.h>
 #include <set>
+
+extern void *create_matrix(long double **mat, size_t length);
+extern void *matrix_invert(void *matrix, size_t size);
+extern double matrix_get(void *matrix, size_t i, size_t j);
+
+#ifdef PTD_USE_GSL
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_linalg.h>
+void *create_matrix(long double **mat, size_t length) {
+    gsl_matrix *full = gsl_matrix_alloc(length, length);
+
+    for (size_t k = 0; k < length; ++k) {
+        for (size_t j = 0; j < length; ++j) {
+            gsl_matrix_set(full, k, j, (double) mat[k][j]);
+        }
+    }
+
+    return full;
+}
+
+void *matrix_invert(void *matrix, size_t size) {
+    gsl_matrix *gsl_mat = (gsl_matrix*) matrix;
+    gsl_matrix *inverse = gsl_matrix_alloc(size, size);
+
+    int sign;
+    gsl_permutation *p = gsl_permutation_alloc(size);
+
+    gsl_linalg_LU_decomp(gsl_mat, p, &sign);
+
+    gsl_linalg_LU_invert(gsl_mat, p, inverse);
+
+    gsl_permutation_free(p);
+
+    return inverse;
+}
+
+double matrix_get(void *matrix, size_t i, size_t j) {
+    gsl_matrix *gsl_mat = (gsl_matrix*) matrix;
+
+    return gsl_matrix_get(gsl_mat, i, j);
+}
+#else // PTD_USE_GSL
+
+#endif // PTD_USE_GSL
 #include "ptdalgorithms.h"
+
 
 extern char *vertex_name(struct ptd_vertex *vertex);
 
@@ -4285,23 +4328,6 @@ static bool keep_all(struct ptd_vertex *vertex) {
     return true;
 }
 
-static gsl_matrix *
-matrix_invert(gsl_matrix *matrix, size_t size) {
-    gsl_matrix *inverse = gsl_matrix_alloc(size, size);
-
-    int sign;
-    gsl_permutation *p = gsl_permutation_alloc(size);
-
-    gsl_linalg_LU_decomp(matrix, p, &sign);
-
-    gsl_linalg_LU_invert(matrix, p, inverse);
-
-    gsl_permutation_free(p);
-
-    return inverse;
-}
-
-
 double ptd_circular_exp(struct ptd_graph *graph, double (*reward)(struct ptd_vertex *)) {
     ptd_visit_vertices(graph, set_data_as_int, true);
 
@@ -4350,26 +4376,20 @@ double ptd_circular_exp(struct ptd_graph *graph, double (*reward)(struct ptd_ver
         }
 
         DEBUG_PRINT("Making mat...\n");
-        gsl_matrix *full = gsl_matrix_alloc(length, length);
-
-        for (size_t k = 0; k < length; ++k) {
-            for (size_t j = 0; j < length; ++j) {
-                gsl_matrix_set(full, k, j, (double) mat[k][j]);
-            }
-        }
+        void *full = create_matrix(mat, length);
 
         DEBUG_PRINT("Making mat %zu\n", length);
         DEBUG_PRINT("Making inv...\n");
-        gsl_matrix *inv = matrix_invert(full, length);
+        void *inv = matrix_invert(full, length);
         DEBUG_PRINT("inv\n");
 
         for (size_t k = 0; k < length; ++k) {
             for (size_t j = 0; j < length; ++j) {
-                *((long double *) vs[j]->data) += ipv[k] * -gsl_matrix_get(inv, k, j);
+                *((long double *) vs[j]->data) += ipv[k] * -matrix_get(inv, k, j);
             }
         }
-        gsl_matrix_free(full);
-        gsl_matrix_free(inv);
+        //gsl_matrix_free(full);
+        //gsl_matrix_free(inv);
 
         ptd_phase_type_distribution_destroy(ptd);
     }
@@ -4396,7 +4416,7 @@ double ptd_circular_exp(struct ptd_graph *graph, double (*reward)(struct ptd_ver
         double e = 0;
 
         for (size_t k = 0; k < ptd->length; ++k) {
-            e += -gsl_matrix_get(inv, 0, k);
+            e += -matrix_get(inv, 0, k);
         }
         fprintf(stderr, "%f", e);
         fprintf(stderr, "\n");
@@ -4448,15 +4468,9 @@ ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(struct ptd_graph *grap
             continue;
         }
 
-        gsl_matrix *full = gsl_matrix_alloc(length, length);
+        void *full = create_matrix(mat, length);
 
-        for (size_t k = 0; k < length; ++k) {
-            for (size_t j = 0; j < length; ++j) {
-                gsl_matrix_set(full, k, j, (double) mat[k][j]);
-            }
-        }
-
-        gsl_matrix *inv = matrix_invert(full, length);
+        void *inv = matrix_invert(full, length);
 
         for (size_t k = 0; k < v->internal_vertices_length; ++k) {
             if (vs[k]->index != 0) {
@@ -4470,10 +4484,10 @@ ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(struct ptd_graph *grap
                     desc_multipliers[vs[k]->index][j].vertex = vs[j];
                     if (!desc_multipliers[vs[k]->index][j].external) {
                         desc_multipliers[vs[k]->index][j].multiplier =
-                                -gsl_matrix_get(inv, k, j) / (double) desc_multipliers[vs[k]->index][j].vertex->rate;
+                                -matrix_get(inv, k, j) / (double) desc_multipliers[vs[k]->index][j].vertex->rate;
                     } else {
                         desc_multipliers[vs[k]->index][j].multiplier =
-                                -gsl_matrix_get(inv, k, j);
+                                -matrix_get(inv, k, j);
                     }
                 }
             } else {
@@ -4481,8 +4495,8 @@ ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(struct ptd_graph *grap
             }
         }
 
-        gsl_matrix_free(inv);
-        gsl_matrix_free(full);
+        //gsl_matrix_free(inv);
+        //gsl_matrix_free(full);
         ptd_phase_type_distribution_destroy(ptd);
     }
 
