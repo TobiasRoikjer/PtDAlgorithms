@@ -1,7 +1,7 @@
 #define PTD_RCPP 1
 #include <Rcpp.h>
-#include "../../src/c/ptdalgorithms.h"
-#include "../../src/cpp/ptdalgorithmscpp.h"
+#include "c/ptdalgorithms.h"
+#include "cpp/ptdalgorithmscpp.h"
 
 using namespace Rcpp;
 using namespace ptdalgorithms;
@@ -77,17 +77,6 @@ double matrix_get(void *matrix, size_t i, size_t j) {
   );
   
   return 0;
-}
-
-// [[Rcpp::export]]
-IntegerVector state(SEXP phase_type_vertex) {
-  phase_type_vertex = get_first_list_entry(phase_type_vertex, (char*)"state");
-  Rcpp::XPtr<Vertex> vertex(phase_type_vertex);
-  
-  vector<size_t> state = vertex->state();
-  IntegerVector vec(state.begin(), state.end());
-  
-  return vec;
 }
 
 // [[Rcpp::export]]

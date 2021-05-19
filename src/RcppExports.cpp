@@ -5,17 +5,6 @@
 
 using namespace Rcpp;
 
-// state
-IntegerVector state(SEXP phase_type_vertex);
-RcppExport SEXP _ptdalgorithms_state(SEXP phase_type_vertexSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< SEXP >::type phase_type_vertex(phase_type_vertexSEXP);
-    rcpp_result_gen = Rcpp::wrap(state(phase_type_vertex));
-    return rcpp_result_gen;
-END_RCPP
-}
 // create_graph
 Graph create_graph(size_t state_length);
 RcppExport SEXP _ptdalgorithms_create_graph(SEXP state_lengthSEXP) {
@@ -102,7 +91,6 @@ END_RCPP
 RcppExport SEXP _rcpp_module_boot_ptdalgorithms();
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_ptdalgorithms_state", (DL_FUNC) &_ptdalgorithms_state, 1},
     {"_ptdalgorithms_create_graph", (DL_FUNC) &_ptdalgorithms_create_graph, 1},
     {"_ptdalgorithms_add_edge", (DL_FUNC) &_ptdalgorithms_add_edge, 3},
     {"_ptdalgorithms_create_vertex", (DL_FUNC) &_ptdalgorithms_create_vertex, 2},
