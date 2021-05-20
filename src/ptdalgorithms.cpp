@@ -1,8 +1,71 @@
 #define PTD_RCPP 1
-#include <Rcpp.h>
-#include "ptdalgorithms_types.h"
 
+#include "ptdalgorithms_types.h"
+#include "../api/c/ptdalgorithms.h"
+#include "../api/cpp/ptdalgorithmscpp.h"
+#include "c/ptdalgorithms.cpp"
+#include "cpp/ptdalgorithmscpp.cpp"
+
+#include <Rcpp.h>
 using namespace Rcpp;
+
+
+void *create_matrix(long double **mat, size_t length) {
+  throw std::runtime_error(
+      "Not implemented"
+  );
+  
+  return NULL;
+}
+void *matrix_invert(void *matrix, size_t size) {
+  throw std::runtime_error(
+      "Not implemented"
+  );
+  
+  return NULL;
+}
+
+double matrix_get(void *matrix, size_t i, size_t j) {
+  throw std::runtime_error(
+      "Not implemented"
+  );
+  
+  return 0;
+}
+  
+
+
+//RCPP_EXPOSED_CLASS(ptdalgorithms::VertexLinkedList)
+  //RCPP_EXPOSED_CLASS(ptdalgorithms::Vertex)
+  //RCPP_EXPOSED_CLASS(ptdalgorithms::Graph)
+
+  
+/*
+ptdalgorithms::Graph create_graph(size_t state_length) {
+  return ptdalgorithms::Graph(
+    state_length
+  );
+}*/
+
+/*RCPP_MODULE(ptdalgorithms) {
+  class_<ptdalgorithms::VertexLinkedList>("VertexLinkedList")
+  .method("has_next", &ptdalgorithms::VertexLinkedList::has_next, "Does the list have a next value?")
+  .method("get_next", &ptdalgorithms::VertexLinkedList::next, "Obtain the next vertex in list. Updates the list iterator.")
+  ;
+  
+  class_<ptdalgorithms::Vertex>("Vertex")
+    .method("state", &ptdalgorithms::Vertex::state, "Obtain vertex state")
+    .method("equals", &ptdalgorithms::Vertex::operator==, "Does this vertex equal another vertex?")
+  ;
+  
+  class_<ptdalgorithms::Graph>("Graph")
+    .method("start_vertex", &ptdalgorithms::Graph::start_vertex, "Obtain graph start vertex")
+    .method("vertices_list", &ptdalgorithms::Graph::vertices_list, "Obtain graph vertices list")
+  ;
+  
+  //Rcpp::function("create_graph", &create_graph);
+}
+*/
 
 // TODO: Make all functions exists as Cpp method calls
 
@@ -54,80 +117,28 @@ while (vertices_list$has_next()) {
 print(graph_as_matrix(graph))
 */
 
-void *create_matrix(long double **mat, size_t length) {
-  throw std::runtime_error(
-      "Not implemented"
-  );
-  
-  return NULL;
-}
-void *matrix_invert(void *matrix, size_t size) {
-  throw std::runtime_error(
-      "Not implemented"
-  );
-  
-  return NULL;
-}
 
-double matrix_get(void *matrix, size_t i, size_t j) {
-  throw std::runtime_error(
-      "Not implemented"
-  );
-  
-  return 0;
-}
 
-// [[Rcpp::export]]
-ptdalgorithms::Graph create_graph(size_t state_length) {
-  return ptdalgorithms::Graph(
-      state_length
-  );
-}
-
-RCPP_EXPOSED_CLASS(ptdalgorithms::VertexLinkedList)
-RCPP_EXPOSED_CLASS(ptdalgorithms::Vertex)
-RCPP_EXPOSED_CLASS(ptdalgorithms::Graph)
-  
-RCPP_MODULE(ptdalgorithms) {
-  class_<ptdalgorithms::VertexLinkedList>("VertexLinkedList")
-    .method("has_next", &ptdalgorithms::VertexLinkedList::has_next, "Does the list have a next value?")
-    .method("get_next", &ptdalgorithms::VertexLinkedList::next, "Obtain the next vertex in list. Updates the list iterator.")
-  ;
-  
-  class_<ptdalgorithms::Vertex>("Vertex")
-    .method("state", &ptdalgorithms::Vertex::state, "Obtain vertex state")
-    .method("equals", &ptdalgorithms::Vertex::operator==, "Does this vertex equal another vertex?")
-  ;
-  
-  class_<ptdalgorithms::Graph>("Graph")
-    .method("start_vertex", &ptdalgorithms::Graph::start_vertex, "Obtain graph start vertex")
-    .method("vertices_list", &ptdalgorithms::Graph::vertices_list, "Obtain graph vertices list")
-  ;
-}
-
-// TODO: add BEGIN_RCPP inside all functions
-
-// [[Rcpp::export]]
 void add_edge(ptdalgorithms::Vertex phase_type_vertex_from, ptdalgorithms::Vertex phase_type_vertex_to, double weight) {
   phase_type_vertex_from.add_edge(phase_type_vertex_to, weight);
 }
 
-// [[Rcpp::export]]
+
 ptdalgorithms::Vertex create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
   return phase_type_graph.create_vertex(as<std::vector<size_t> >(state));
 }
 
-// [[Rcpp::export]]
+
 bool vertex_exists(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
   return phase_type_graph.vertex_exists(as<std::vector<size_t> >(state));
 }
 
-// [[Rcpp::export]]
+
 ptdalgorithms::Vertex find_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
   return phase_type_graph.find_vertex(as<std::vector<size_t> >(state));
 }
 
-// [[Rcpp::export]]
+
 ptdalgorithms::Vertex find_or_create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
   return phase_type_graph.find_or_create_vertex(as<std::vector<size_t> >(state));
 }
@@ -146,7 +157,9 @@ List _graph_as_matrix(ptdalgorithms::Graph graph) {
     }
   }
   
-  return List::create(Named("vertices") = dist.vertices , _["SIM"] = SIM, _["IPV"] = IPV);
+  //TODO: return list of real vertices
+  //return List::create(Named("vertices") = dist.vertices , _["SIM"] = SIM, _["IPV"] = IPV);
+  return List::create(Named("vertices") = IPV , _["SIM"] = SIM, _["IPV"] = IPV);
 }
 
 // [[Rcpp::export]]
@@ -154,3 +167,12 @@ List graph_as_matrix(ptdalgorithms::Graph phase_type_graph) {
   return(_graph_as_matrix(phase_type_graph));
 }
 
+
+// [[Rcpp::export]]
+SEXP create_graph2(int state_length) {
+  ptdalgorithms::Graph *g = new ptdalgorithms::Graph(
+    state_length
+  );
+  
+  return Rcpp::XPtr<ptdalgorithms::Graph>(g);
+}

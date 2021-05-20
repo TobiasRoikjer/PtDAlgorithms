@@ -4,6 +4,9 @@
 #include <cstring>
 #include <errno.h>
 #include "../c/ptdalgorithms.h"
+#ifdef PTD_RCPP
+#include <Rcpp.h>
+#endif // PTD_RCPP
 
 struct rf_graph {
     ptd_avl_tree_t *tree;
@@ -24,6 +27,11 @@ namespace ptdalgorithms {
 
     class VertexLinkedList {
     public:
+#ifdef PTD_RCPPXXX
+        VertexLinkedList(SEXP rcpp_vertexsexp) : graph((Rcpp::XPtr<VertexLinkedList>(rcpp_vertexsexp))->graph) {
+            throw std::runtime_error("SEXP constructor not implemented. Please report this bug.\n");
+        }
+#endif // PTD_RCPPXXX
         bool has_next(void) {
             if (is_first) {
                 return (this->current != NULL);
@@ -57,6 +65,11 @@ namespace ptdalgorithms {
 
     class Graph {
     public:
+#ifdef PTD_RCPP
+        Graph(SEXP rcpp_graph_sexp) {
+            throw std::runtime_error("SEXP constructor not implemented. Please report this bug.\n");
+        }
+#endif // PTD_RCPP
         Graph(struct ptd_graph *graph) {
             this->rf_graph = (struct rf_graph *) malloc(sizeof(*this->rf_graph));
             this->rf_graph->references = (size_t *) malloc(sizeof(*this->rf_graph->references));
@@ -101,7 +114,7 @@ namespace ptdalgorithms {
 
 
             if (*this->rf_graph->references == 0) {
-                fprintf(stderr, "Destroying graph %zu \n", *(this->rf_graph->references));
+                fprintf(stderr, "Destroying graph %i \n", (int)( *(this->rf_graph->references)));
                 ptd_avl_tree_vertex_destroy(this->rf_graph->tree);
                 ptd_graph_vertices_destroy(this->rf_graph->graph);
                 ptd_graph_destroy(this->rf_graph->graph);
@@ -197,6 +210,11 @@ namespace ptdalgorithms {
         }
 
     public:
+#ifdef PTD_RCPPXXX
+        Vertex(SEXP rcpp_vertexsexp) : graph((Rcpp::XPtr<Vertex>(rcpp_vertexsexp))->graph) {
+            throw std::runtime_error("SEXP constructor not implemented. Please report this bug.\n");
+        }
+#endif // PTD_RCPPXXX
         Vertex(Graph &graph, struct ptd_vertex *vertex) : graph(graph) {
             this->vertex = vertex;
         }

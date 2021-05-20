@@ -6,77 +6,6 @@
 
 using namespace Rcpp;
 
-// create_graph
-ptdalgorithms::Graph create_graph(size_t state_length);
-RcppExport SEXP _ptdalgorithms_create_graph(SEXP state_lengthSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< size_t >::type state_length(state_lengthSEXP);
-    rcpp_result_gen = Rcpp::wrap(create_graph(state_length));
-    return rcpp_result_gen;
-END_RCPP
-}
-// add_edge
-void add_edge(ptdalgorithms::Vertex phase_type_vertex_from, ptdalgorithms::Vertex phase_type_vertex_to, double weight);
-RcppExport SEXP _ptdalgorithms_add_edge(SEXP phase_type_vertex_fromSEXP, SEXP phase_type_vertex_toSEXP, SEXP weightSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< ptdalgorithms::Vertex >::type phase_type_vertex_from(phase_type_vertex_fromSEXP);
-    Rcpp::traits::input_parameter< ptdalgorithms::Vertex >::type phase_type_vertex_to(phase_type_vertex_toSEXP);
-    Rcpp::traits::input_parameter< double >::type weight(weightSEXP);
-    add_edge(phase_type_vertex_from, phase_type_vertex_to, weight);
-    return R_NilValue;
-END_RCPP
-}
-// create_vertex
-ptdalgorithms::Vertex create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
-RcppExport SEXP _ptdalgorithms_create_vertex(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
-    rcpp_result_gen = Rcpp::wrap(create_vertex(phase_type_graph, state));
-    return rcpp_result_gen;
-END_RCPP
-}
-// vertex_exists
-bool vertex_exists(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
-RcppExport SEXP _ptdalgorithms_vertex_exists(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
-    rcpp_result_gen = Rcpp::wrap(vertex_exists(phase_type_graph, state));
-    return rcpp_result_gen;
-END_RCPP
-}
-// find_vertex
-ptdalgorithms::Vertex find_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
-RcppExport SEXP _ptdalgorithms_find_vertex(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
-    rcpp_result_gen = Rcpp::wrap(find_vertex(phase_type_graph, state));
-    return rcpp_result_gen;
-END_RCPP
-}
-// find_or_create_vertex
-ptdalgorithms::Vertex find_or_create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state);
-RcppExport SEXP _ptdalgorithms_find_or_create_vertex(SEXP phase_type_graphSEXP, SEXP stateSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< ptdalgorithms::Graph >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
-    rcpp_result_gen = Rcpp::wrap(find_or_create_vertex(phase_type_graph, state));
-    return rcpp_result_gen;
-END_RCPP
-}
 // graph_as_matrix
 List graph_as_matrix(ptdalgorithms::Graph phase_type_graph);
 RcppExport SEXP _ptdalgorithms_graph_as_matrix(SEXP phase_type_graphSEXP) {
@@ -88,18 +17,21 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-
-RcppExport SEXP _rcpp_module_boot_ptdalgorithms();
+// create_graph2
+SEXP create_graph2(int state_length);
+RcppExport SEXP _ptdalgorithms_create_graph2(SEXP state_lengthSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    int r = Rcpp::as<int >(state_lengthSEXP);
+    rcpp_result_gen = Rcpp::wrap(create_graph2(r));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_ptdalgorithms_create_graph", (DL_FUNC) &_ptdalgorithms_create_graph, 1},
-    {"_ptdalgorithms_add_edge", (DL_FUNC) &_ptdalgorithms_add_edge, 3},
-    {"_ptdalgorithms_create_vertex", (DL_FUNC) &_ptdalgorithms_create_vertex, 2},
-    {"_ptdalgorithms_vertex_exists", (DL_FUNC) &_ptdalgorithms_vertex_exists, 2},
-    {"_ptdalgorithms_find_vertex", (DL_FUNC) &_ptdalgorithms_find_vertex, 2},
-    {"_ptdalgorithms_find_or_create_vertex", (DL_FUNC) &_ptdalgorithms_find_or_create_vertex, 2},
     {"_ptdalgorithms_graph_as_matrix", (DL_FUNC) &_ptdalgorithms_graph_as_matrix, 1},
-    {"_rcpp_module_boot_ptdalgorithms", (DL_FUNC) &_rcpp_module_boot_ptdalgorithms, 0},
+    {"_ptdalgorithms_create_graph2", (DL_FUNC) &_ptdalgorithms_create_graph2, 1},
     {NULL, NULL, 0}
 };
 
