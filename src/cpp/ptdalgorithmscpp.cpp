@@ -44,6 +44,34 @@ ptdalgorithms::Vertex ptdalgorithms::VertexLinkedList::next(void) {
     }
 }
 
+ptdalgorithms::Vertex *ptdalgorithms::VertexLinkedList::next_p(void) {
+    if (this->is_first) {
+        if (this->current == NULL || this->current->vertex == NULL) {
+            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
+        }
+
+        Vertex *res = new Vertex(graph, this->current->vertex);
+
+        this->is_first = false;
+
+        return res;
+    } else {
+        if (this->current == NULL) {
+            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
+        }
+
+        if (this->current->next == NULL || this->current->next->vertex == NULL) {
+            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
+        }
+
+        this->current = this->current->next;
+
+        Vertex *res = new Vertex(graph, this->current->vertex);
+
+        return res;
+    }
+}
+
 ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<size_t> state) {
     assert_same_length(state, this->rf_graph->graph);
 

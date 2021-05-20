@@ -8,6 +8,7 @@
 
 #include <Rcpp.h>
 using namespace Rcpp;
+using namespace ptdalgorithms;
 
 
 void *create_matrix(long double **mat, size_t length) {
@@ -33,40 +34,6 @@ double matrix_get(void *matrix, size_t i, size_t j) {
   return 0;
 }
   
-
-
-//RCPP_EXPOSED_CLASS(ptdalgorithms::VertexLinkedList)
-  //RCPP_EXPOSED_CLASS(ptdalgorithms::Vertex)
-  //RCPP_EXPOSED_CLASS(ptdalgorithms::Graph)
-
-  
-/*
-ptdalgorithms::Graph create_graph(size_t state_length) {
-  return ptdalgorithms::Graph(
-    state_length
-  );
-}*/
-
-/*RCPP_MODULE(ptdalgorithms) {
-  class_<ptdalgorithms::VertexLinkedList>("VertexLinkedList")
-  .method("has_next", &ptdalgorithms::VertexLinkedList::has_next, "Does the list have a next value?")
-  .method("get_next", &ptdalgorithms::VertexLinkedList::next, "Obtain the next vertex in list. Updates the list iterator.")
-  ;
-  
-  class_<ptdalgorithms::Vertex>("Vertex")
-    .method("state", &ptdalgorithms::Vertex::state, "Obtain vertex state")
-    .method("equals", &ptdalgorithms::Vertex::operator==, "Does this vertex equal another vertex?")
-  ;
-  
-  class_<ptdalgorithms::Graph>("Graph")
-    .method("start_vertex", &ptdalgorithms::Graph::start_vertex, "Obtain graph start vertex")
-    .method("vertices_list", &ptdalgorithms::Graph::vertices_list, "Obtain graph vertices list")
-  ;
-  
-  //Rcpp::function("create_graph", &create_graph);
-}
-*/
-
 // TODO: Make all functions exists as Cpp method calls
 
 /*** R
@@ -118,33 +85,166 @@ print(graph_as_matrix(graph))
 */
 
 
+SEXP get_first_list_entry(SEXP e, std::string message) {
+  if (Rf_isList(e) || Rf_isNewList(e)) {
+    List list = Rcpp::as<List>(e);
+    
+    if (list.size() != 1) {
+      char message[1024];
+      
+      snprintf(
+        message,
+        1024, 
+        "Failed: When finding %s of a list-type of vertices, list can only contain 1 vertex, it contained %zu. Did you use [] as lookup instead of [[]]?",
+        message,
+        (size_t)list.size()
+      );
+      
+      throw std::runtime_error(
+          message
+      );
+    }
+    
+    e = list[0];
+  }
+  
+  return e;
+}
 
-void add_edge(ptdalgorithms::Vertex phase_type_vertex_from, ptdalgorithms::Vertex phase_type_vertex_to, double weight) {
-  phase_type_vertex_from.add_edge(phase_type_vertex_to, weight);
+List vertex_as_list(Vertex *vertex) {
+  vector<size_t> state = vertex->state();
+  IntegerVector state_vec(state.begin(), state.end());
+  
+  return List::create(
+    Named("state") = state_vec,
+    _["vertex"] = (size_t)vertex->c_vertex(),
+    _["xptr_vertex"] = Rcpp::XPtr<Vertex>(vertex)
+  );
+}
+
+List vertex_as_list(Graph &graph, struct ptd_vertex *c_vertex) {
+  Vertex *vertex = new Vertex(graph, c_vertex);
+  
+  return vertex_as_list(vertex);
 }
 
 
-ptdalgorithms::Vertex create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
-  return phase_type_graph.create_vertex(as<std::vector<size_t> >(state));
+SEXP list_as_vertex(SEXP list) {
+  if (!Rf_isList(list) && !Rf_isNewList(list)) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: child entries in children list must be a list, the datatype was '%i' (R internal type description)",
+      (int)TYPEOF(list)
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  Rcpp::List child = Rcpp::as<Rcpp::List>(list);
+  
+  return child["xptr_vertex"];
+}
+
+// [[Rcpp::export]]
+List edges(SEXP phase_type_vertex) {
+  phase_type_vertex = get_first_list_entry(phase_type_vertex, (char*)"edges");
+  
+  Rcpp::XPtr<Vertex> vertex(phase_type_vertex);
+  vector<Edge> edges = vertex->edges();
+  List r_edges(edges.size());
+  
+  for (size_t i = 0; i < edges.size(); i++) {
+    Vertex child = edges[i].to();
+    
+    r_edges[i] = List::create(
+      Named("weight") = edges[i].weight(),
+      _["child"] = vertex_as_list(&child)
+    );
+  }
+  
+  return r_edges;
+}
+
+// [[Rcpp::export]]
+SEXP create_graph(size_t state_length) {
+  return Rcpp::XPtr<Graph>(
+    new Graph(
+        state_length
+    )
+  );
+}
+
+// [[Rcpp::export]]
+void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double weight) {
+  phase_type_vertex_from = get_first_list_entry(phase_type_vertex_from, (char*)"edge from");
+  phase_type_vertex_to = get_first_list_entry(phase_type_vertex_to, (char*)"edge to");
+  
+  Rcpp::XPtr<Vertex> from(phase_type_vertex_from);
+  Rcpp::XPtr<Vertex> to(phase_type_vertex_to);
+  
+  from->add_edge(*to.get(), weight);
+}
+
+// [[Rcpp::export]]
+SEXP create_vertex(SEXP phase_type_graph, IntegerVector state) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  Vertex *vertex = graph->create_vertex_p(as<std::vector<size_t> >(state));
+  
+  return vertex_as_list(vertex);
+}
+
+// [[Rcpp::export]]
+void index_topological(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  graph->index_topological();
+}
+
+// [[Rcpp::export]]
+void index_invert(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  graph->index_invert();
+}
+
+// [[Rcpp::export]]
+SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  if (!graph->vertex_exists(as<std::vector<size_t> >(state))) {
+    return List::get_na();
+  }
+  
+  Vertex *found = graph->find_vertex_p(as<std::vector<size_t> >(state));
+  
+  return vertex_as_list(found);
 }
 
 
-bool vertex_exists(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
-  return phase_type_graph.vertex_exists(as<std::vector<size_t> >(state));
+// [[Rcpp::export]]
+List find_or_create_vertex(SEXP phase_type_graph, IntegerVector state) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  Vertex *found = graph->find_or_create_vertex_p(as<std::vector<size_t> >(state));
+  
+  return vertex_as_list(found);
 }
 
-
-ptdalgorithms::Vertex find_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
-  return phase_type_graph.find_vertex(as<std::vector<size_t> >(state));
+// [[Rcpp::export]]
+List start_vertex(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  Vertex *vertex = graph->start_vertex_p();
+  
+  return vertex_as_list(vertex);
 }
 
-
-ptdalgorithms::Vertex find_or_create_vertex(ptdalgorithms::Graph phase_type_graph, IntegerVector state) {
-  return phase_type_graph.find_or_create_vertex(as<std::vector<size_t> >(state));
-}
-
-List _graph_as_matrix(ptdalgorithms::Graph graph) {
-  ptdalgorithms::PhaseTypeDistribution dist = graph.phase_type_distribution();
+List _graph_as_matrix(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  PhaseTypeDistribution dist = graph->phase_type_distribution();
   
   NumericMatrix SIM(dist.length, dist.length);
   NumericVector IPV(dist.length);
@@ -157,22 +257,40 @@ List _graph_as_matrix(ptdalgorithms::Graph graph) {
     }
   }
   
-  //TODO: return list of real vertices
-  //return List::create(Named("vertices") = dist.vertices , _["SIM"] = SIM, _["IPV"] = IPV);
-  return List::create(Named("vertices") = IPV , _["SIM"] = SIM, _["IPV"] = IPV);
+  List vertices(dist.length);
+  Graph g = *graph;
+  for (size_t i = 0; i < dist.length; i++) {
+    vertices[i] = vertex_as_list(&dist.vertices[i]);
+  }
+  
+  return List::create(Named("vertices") = vertices , _["SIM"] = SIM, _["IPV"] = IPV);
 }
 
 // [[Rcpp::export]]
-List graph_as_matrix(ptdalgorithms::Graph phase_type_graph) {
+List graph_as_matrix(SEXP phase_type_graph) {
   return(_graph_as_matrix(phase_type_graph));
 }
 
 
 // [[Rcpp::export]]
-SEXP create_graph2(int state_length) {
-  ptdalgorithms::Graph *g = new ptdalgorithms::Graph(
-    state_length
-  );
+SEXP vertices_list(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
   
-  return Rcpp::XPtr<ptdalgorithms::Graph>(g);
+  return Rcpp::XPtr<VertexLinkedList>(
+      graph->vertices_list_p()
+  );
+}
+
+// [[Rcpp::export]]
+bool list_has_next(SEXP vertex_list) {
+  Rcpp::XPtr<VertexLinkedList> list(vertex_list);
+  
+  return list->has_next();
+}
+
+// [[Rcpp::export]]
+List list_next(SEXP vertex_list) {
+  Rcpp::XPtr<VertexLinkedList> list(vertex_list);
+  
+  return vertex_as_list(list->next_p());
 }

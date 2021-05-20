@@ -41,6 +41,7 @@ namespace ptdalgorithms {
         }
 
         Vertex next(void);
+        Vertex *next_p(void);
 
         VertexLinkedList &operator=(const VertexLinkedList &o) {
             current = o.current;
@@ -161,6 +162,10 @@ namespace ptdalgorithms {
 
         VertexLinkedList vertices_list() {
             return VertexLinkedList(*this, this->c_graph()->vertices_list);
+        }
+
+        VertexLinkedList *vertices_list_p() {
+            return new VertexLinkedList(*this, this->c_graph()->vertices_list);
         }
 
         PhaseTypeDistribution phase_type_distribution();

@@ -3351,7 +3351,7 @@ static bool keep_zero_rewarded(struct ptd_vertex *vertex) {
     return (reward_function(vertex) == 0);
 }
 
-static ptd_avl_tree_t **edges;
+static ptd_avl_tree_t **avl_edges;
 static ptd_avl_tree_t **parents;
 static struct ptd_vertex **vertices;
 static vec_entry_t **states;
@@ -3391,9 +3391,9 @@ int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const st
     ptd_label_vertices(graph);
     size_t n = q.size();
 
-    edges = (ptd_avl_tree_t **) calloc(n, sizeof(*edges));
+    avl_edges = (ptd_avl_tree_t **) calloc(n, sizeof(*avl_edges));
 
-    if (edges == NULL) {
+    if (avl_edges == NULL) {
         return 1;
     }
 
@@ -3407,9 +3407,9 @@ int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const st
         q.pop();
 
         vertices[vertex->index] = vertex;
-        edges[vertex->index] = ptd_avl_tree_create(1);
+        avl_edges[vertex->index] = ptd_avl_tree_create(1);
 
-        if (edges[vertex->index] == NULL) {
+        if (avl_edges[vertex->index] == NULL) {
             return -1;
         }
 
@@ -3446,7 +3446,7 @@ int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const st
             size_t child_index = child_vertex->index;
 
             ptd_avl_tree_edge_insert_or_increment(
-                    edges[i],
+                    avl_edges[i],
                     states[child_index],
                     child_vertex,
                     vertex->edges[j].weight / vertex->rate
@@ -3465,7 +3465,7 @@ int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const st
         double reward = rewards[i];
 
         if (reward == 0) {
-            vector<struct ptd_edge *> outgoing_edges = avl_tree_as_list(edges[i]);
+            vector<struct ptd_edge *> outgoing_edges = avl_tree_as_list(avl_edges[i]);
             vector<struct ptd_edge *> ingoing_edges = avl_tree_as_list(parents[i]);
 
             for (size_t p = 0; p < ingoing_edges.size(); ++p) {
@@ -3480,7 +3480,7 @@ int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const st
                         // Add new child to parent
                         // Weight has been set to probability earlier
                         ptd_avl_tree_edge_insert_or_increment(
-                                edges[parent_index],
+                                avl_edges[parent_index],
                                 states[child_index],
                                 outgoing_edge->to,
                                 ingoing_edge->weight * outgoing_edge->weight
@@ -3495,7 +3495,7 @@ int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const st
                     }
                 }
 
-                ptd_avl_tree_edge_remove(edges[parent_index], states[i]);
+                ptd_avl_tree_edge_remove(avl_edges[parent_index], states[i]);
             }
 
             for (size_t c = 0; c < outgoing_edges.size(); ++c) {
@@ -3517,7 +3517,7 @@ int ptd_reward_transform(struct ptd_graph *graph, double (*reward_func)(const st
             continue;
         }
 
-        vector<struct ptd_edge *> outgoing_edges = avl_tree_as_list(edges[i]);
+        vector<struct ptd_edge *> outgoing_edges = avl_tree_as_list(avl_edges[i]);
 
 
         fprintf(stderr, "\n=============\n\nGoing to vertex with %zu edges: ", outgoing_edges.size());
