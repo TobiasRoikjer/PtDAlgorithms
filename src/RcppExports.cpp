@@ -23,8 +23,8 @@ RcppExport SEXP _ptdalgorithms_create_graph2(SEXP state_lengthSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    int r = Rcpp::as<int >(state_lengthSEXP);
-    rcpp_result_gen = Rcpp::wrap(create_graph2(r));
+    Rcpp::traits::input_parameter< int >::type state_length(state_lengthSEXP);
+    rcpp_result_gen = Rcpp::wrap(create_graph2(state_length));
     return rcpp_result_gen;
 END_RCPP
 }
