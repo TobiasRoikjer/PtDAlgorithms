@@ -16,60 +16,44 @@ static void assert_same_length(vector<size_t> state, struct ptd_graph *graph) {
     }
 }
 
-ptdalgorithms::Vertex ptdalgorithms::VertexLinkedList::next(void) {
-    if (this->is_first) {
-        if (this->current == NULL || this->current->vertex == NULL) {
-            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-        }
-
-        Vertex res(graph, this->current->vertex);
-
-        this->is_first = false;
-
-        return res;
-    } else {
-        if (this->current == NULL) {
-            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-        }
-
-        if (this->current->next == NULL || this->current->next->vertex == NULL) {
-            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-        }
-
-        this->current = this->current->next;
-
-        Vertex res(graph, this->current->vertex);
-
-        return res;
+ptdalgorithms::VertexLinkedList ptdalgorithms::VertexLinkedList::next(void) {
+    if (this->current == NULL) {
+        throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
     }
+
+    if (this->current->next == NULL || this->current->next->vertex == NULL) {
+        throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
+    }
+
+    return ptdalgorithms::VertexLinkedList(graph, this->current->next);
 }
 
-ptdalgorithms::Vertex *ptdalgorithms::VertexLinkedList::next_p(void) {
-    if (this->is_first) {
-        if (this->current == NULL || this->current->vertex == NULL) {
-            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-        }
-
-        Vertex *res = new Vertex(graph, this->current->vertex);
-
-        this->is_first = false;
-
-        return res;
-    } else {
-        if (this->current == NULL) {
-            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-        }
-
-        if (this->current->next == NULL || this->current->next->vertex == NULL) {
-            throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-        }
-
-        this->current = this->current->next;
-
-        Vertex *res = new Vertex(graph, this->current->vertex);
-
-        return res;
+ptdalgorithms::VertexLinkedList *ptdalgorithms::VertexLinkedList::next_p(void) {
+    if (this->current == NULL) {
+        return NULL;
     }
+
+    if (this->current->next == NULL || this->current->next->vertex == NULL) {
+        return NULL;
+    }
+
+    return new ptdalgorithms::VertexLinkedList(graph, this->current->next);
+}
+
+ptdalgorithms::Vertex ptdalgorithms::VertexLinkedList::vertex(void) {
+    if (this->current == NULL || this->current->vertex == NULL) {
+        throw std::runtime_error("No vertex (is NULL). Did has_next return true?");
+    }
+
+    return ptdalgorithms::Vertex(graph, this->current->vertex);
+}
+
+ptdalgorithms::Vertex *ptdalgorithms::VertexLinkedList::vertex_p(void) {
+    if (this->current == NULL || this->current->vertex == NULL) {
+        return NULL;
+    }
+
+    return new ptdalgorithms::Vertex(graph, this->current->vertex);
 }
 
 ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<size_t> state) {

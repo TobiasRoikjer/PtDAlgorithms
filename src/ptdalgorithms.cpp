@@ -3,8 +3,8 @@
 #include "ptdalgorithms_types.h"
 #include "../api/c/ptdalgorithms.h"
 #include "../api/cpp/ptdalgorithmscpp.h"
-#include "c/ptdalgorithms.cpp"
-#include "cpp/ptdalgorithmscpp.cpp"
+//#include "c/ptdalgorithms.cpp"
+//#include "cpp/ptdalgorithmscpp.cpp"
 
 #include <Rcpp.h>
 using namespace Rcpp;
@@ -37,23 +37,25 @@ double matrix_get(void *matrix, size_t i, size_t j) {
 // TODO: Make all functions exists as Cpp method calls
 
 /*** R
-n <- 5
+n <- 15
 graph <- create_graph(n)
-vertices_list <- graph$vertices_list()
 
-while (vertices_list$has_next()) {
-  vertex <- vertices_list$get_next()
+vertices_list <- list_vertices(graph)
+
+while (!is.null(vertices_list)) {
+  vertex <- list_vertex(vertices_list)
   
-    if (vertex$equals(graph$start_vertex())) {
+    if (vertex$vertex == start_vertex(graph)$vertex) {
       start <- create_vertex(graph, c(n, rep(0, n-1)))
-      add_edge(graph$start_vertex(), start, 1)
+      add_edge(start_vertex(graph), start, 1)
+      vertices_list <- list_next(vertices_list)
       next()
     }
     
     for (i in 1:n) {
       for (j in i:n) {
         rate <- 0
-        state <- vertex$state()
+        state <- vertex$state
 
         if (i == j) {
           if (state[i] < 2) {
@@ -79,6 +81,8 @@ while (vertices_list$has_next()) {
         add_edge(vertex, child, rate)
       }
     }
+  
+  vertices_list <- list_next(vertices_list)
 }
 
 print(graph_as_matrix(graph))
@@ -95,9 +99,9 @@ SEXP get_first_list_entry(SEXP e, std::string message) {
       snprintf(
         message,
         1024, 
-        "Failed: When finding %s of a list-type of vertices, list can only contain 1 vertex, it contained %zu. Did you use [] as lookup instead of [[]]?",
+        "Failed: When finding %s of a list-type of vertices, list can only contain 1 vertex, it contained %i. Did you use [] as lookup instead of [[]]?",
         message,
-        (size_t)list.size()
+        (int)list.size()
       );
       
       throw std::runtime_error(
@@ -136,7 +140,7 @@ SEXP list_as_vertex(SEXP list) {
     snprintf(
       message,
       1024, 
-      "Failed: child entries in children list must be a list, the datatype was '%i' (R internal type description)",
+      "Failed: vertex must be given as the returned lists, the datatype was '%i' (R internal type description)",
       (int)TYPEOF(list)
     );
     
@@ -181,8 +185,8 @@ SEXP create_graph(size_t state_length) {
 
 // [[Rcpp::export]]
 void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double weight) {
-  phase_type_vertex_from = get_first_list_entry(phase_type_vertex_from, (char*)"edge from");
-  phase_type_vertex_to = get_first_list_entry(phase_type_vertex_to, (char*)"edge to");
+  phase_type_vertex_from = list_as_vertex(phase_type_vertex_from);
+  phase_type_vertex_to = list_as_vertex(phase_type_vertex_to);
   
   Rcpp::XPtr<Vertex> from(phase_type_vertex_from);
   Rcpp::XPtr<Vertex> to(phase_type_vertex_to);
@@ -273,7 +277,7 @@ List graph_as_matrix(SEXP phase_type_graph) {
 
 
 // [[Rcpp::export]]
-SEXP vertices_list(SEXP phase_type_graph) {
+SEXP list_vertices(SEXP phase_type_graph) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
   
   return Rcpp::XPtr<VertexLinkedList>(
@@ -289,8 +293,23 @@ bool list_has_next(SEXP vertex_list) {
 }
 
 // [[Rcpp::export]]
-List list_next(SEXP vertex_list) {
+List list_vertex(SEXP vertex_list) {
+  Rcpp::XPtr<VertexLinkedList> list(vertex_list);
+  return vertex_as_list(list->vertex_p());
+}
+
+
+// [[Rcpp::export]]
+SEXP list_next(SEXP vertex_list) {
   Rcpp::XPtr<VertexLinkedList> list(vertex_list);
   
-  return vertex_as_list(list->next_p());
+  VertexLinkedList *next = list->next_p();
+  
+  if (next == NULL) {
+    return List::get_na();
+  }
+  
+  return Rcpp::XPtr<VertexLinkedList>(
+      next
+  );
 }
