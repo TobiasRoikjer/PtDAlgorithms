@@ -670,7 +670,7 @@ void test_it_can_construct_kingman2() {
     kingman_graph = ptd_graph_create(5);
 
     for (struct ptd_vertex_linked_list_item *item = kingman_graph->vertices_list->first;
-            item != NULL; item = item->next) {
+         item != NULL; item = item->next) {
         struct ptd_vertex *visited = item->vertex;
 
         if (visited == kingman_graph->start_vertex) {
@@ -757,12 +757,182 @@ void test_it_can_reward_transform() {
     ptd_graph_destroy(graph);
 }
 
+void test_basic_graph() {
+    struct ptd_directed_graph *g = (struct ptd_directed_graph *) calloc(1, sizeof(*g));
+    struct ptd_directed_vertex *v1 = (struct ptd_directed_vertex *) calloc(1, sizeof(*v1));
+    struct ptd_directed_vertex *v2 = (struct ptd_directed_vertex *) calloc(1, sizeof(*v2));
+    struct ptd_directed_vertex *v3 = (struct ptd_directed_vertex *) calloc(1, sizeof(*v3));
+    struct ptd_directed_vertex *v4 = (struct ptd_directed_vertex *) calloc(1, sizeof(*v4));
+    struct ptd_directed_vertex *v5 = (struct ptd_directed_vertex *) calloc(1, sizeof(*v5));
+
+    ptd_directed_vertex_add(g, v1);
+    ptd_directed_vertex_add(g, v2);
+    ptd_directed_vertex_add(g, v3);
+    ptd_directed_vertex_add(g, v4);
+    ptd_directed_vertex_add(g, v5);
+
+    assert(g->vertices_length == 5);
+    assert(g->vertices[0] == v1);
+    assert(g->vertices[1] == v2);
+    assert(g->vertices[2] == v3);
+    assert(g->vertices[3] == v4);
+    assert(g->vertices[4] == v5);
+
+    ptd_directed_graph_destroy(g);
+}
+
+void test_basic_ptd_graph() {
+    struct ptd_ph_graph *g = ptd_ph_graph_create(4);
+    struct ptd_ph_vertex *v1 = ptd_ph_vertex_create(g);
+    struct ptd_ph_vertex *v2 = ptd_ph_vertex_create(g);
+    struct ptd_ph_vertex *v3 = ptd_ph_vertex_create(g);
+    struct ptd_ph_vertex *v4 = ptd_ph_vertex_create(g);
+    struct ptd_ph_vertex *v5 = ptd_ph_vertex_create(g);
+
+    assert(g->vertices_length == 5 + 1);
+    assert(g->state_length == 4);
+    assert(g->vertices[0] == g->starting_vertex);
+    assert(g->vertices[1] == v1);
+    assert(g->vertices[2] == v2);
+    assert(g->vertices[3] == v3);
+    assert(g->vertices[4] == v4);
+    assert(g->vertices[5] == v5);
+
+    ptd_ph_graph_destroy(g);
+}
+
+void test_basic_ptd_graph_edges() {
+    struct ptd_ph_graph *g = ptd_ph_graph_create(4);
+    struct ptd_ph_vertex *v1 = ptd_ph_vertex_create(g);
+    struct ptd_ph_vertex *v2 = ptd_ph_vertex_create(g);
+    struct ptd_ph_vertex *v3 = ptd_ph_vertex_create(g);
+    struct ptd_ph_vertex *v4 = ptd_ph_vertex_create(g);
+
+    ptd_ph_graph_add_edge(g->starting_vertex, v1, 0.4);
+    ptd_ph_graph_add_edge(g->starting_vertex, v2, 0.6);
+    ptd_ph_graph_add_edge(v3, v2, 1.0);
+    ptd_ph_graph_add_edge(v3, v1, 2.0);
+    ptd_ph_graph_add_edge(v3, v4, 2.0);
+
+    assert(g->starting_vertex->edges_length == 2);
+    assert(g->starting_vertex->edges[0]->weight == 0.4);
+    assert(g->starting_vertex->edges[1]->weight == 0.6);
+    assert(v3->edges_length == 3);
+    assert(v3->edges[0]->weight == 1.0);
+    assert(v3->edges[0]->to == v2);
+    assert(v3->edges[1]->weight == 2.0);
+    assert(v3->edges[1]->to == v1);
+    assert(v3->edges[2]->weight == 2.0);
+    assert(v3->edges[2]->to == v4);
+
+
+    ptd_ph_graph_destroy(g);
+}
+
+void test_basic_ptd_graph_scc() {
+    struct ptd_ph_graph *graph = ptd_ph_graph_create(4);
+
+    struct ptd_ph_vertex *S = graph->starting_vertex;
+    fprintf(stderr, "S: %p\n", (void*) S);
+    struct ptd_ph_vertex *T = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "T: %p\n", (void*) T);
+
+    struct ptd_ph_vertex *A = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "A: %p\n", (void*) A);
+    struct ptd_ph_vertex *B = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "B: %p\n", (void*) B);
+    struct ptd_ph_vertex *C = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "C: %p\n", (void*) C);
+    struct ptd_ph_vertex *D = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "D: %p\n", (void*) D);
+    struct ptd_ph_vertex *E = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "E: %p\n", (void*) E);
+    struct ptd_ph_vertex *F = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "F: %p\n", (void*) F);
+    struct ptd_ph_vertex *G = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "G: %p\n", (void*) G);
+    struct ptd_ph_vertex *H = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "H: %p\n", (void*) H);
+    struct ptd_ph_vertex *I = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "I: %p\n", (void*) I);
+    struct ptd_ph_vertex *J = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "J %p\n", (void*) J);
+    struct ptd_ph_vertex *K = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "K %p\n", (void*) K);
+    struct ptd_ph_vertex *L = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "L %p\n", (void*) L);
+
+
+    ptd_ph_graph_add_edge(A, B, 3);
+    ptd_ph_graph_add_edge(B, C, 4);
+    ptd_ph_graph_add_edge(C, A, 4);
+    ptd_ph_graph_add_edge(B, D, 2);
+    ptd_ph_graph_add_edge(D, E, 5);
+    ptd_ph_graph_add_edge(E, F, 5);
+    ptd_ph_graph_add_edge(E, I, 15);
+    ptd_ph_graph_add_edge(F, E, 1);
+    ptd_ph_graph_add_edge(F, G, 1);
+    ptd_ph_graph_add_edge(G, H, 1);
+    ptd_ph_graph_add_edge(H, F, 1);
+    ptd_ph_graph_add_edge(H, G, 1);
+
+    ptd_ph_graph_add_edge(H, T, 1);
+    ptd_ph_graph_add_edge(I, L, 1);
+    ptd_ph_graph_add_edge(L, T, 1);
+
+    ptd_ph_graph_add_edge(C, J, 1);
+
+    ptd_ph_graph_add_edge(J, K, 1);
+    ptd_ph_graph_add_edge(K, J, 1);
+
+    ptd_ph_graph_add_edge(K, E, 1);
+
+    assert(A->edges[0]->to == B);
+    assert(graph->vertices[0] == S);
+    assert(graph->vertices[1] == T);
+    assert(graph->vertices[2] == A);
+
+    struct ptd_ph_scc_graph *scc_graph = ptd_ph_find_strongly_connected_components(
+            graph
+    );
+
+    for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
+        fprintf(stderr, "\nComponents %zu %p:\n", i, (void*)scc_graph->vertices[i]);
+
+        for (size_t j = 0; j < scc_graph->vertices[i]->internal_edges_length; ++j) {
+            fprintf(stderr, "\tVertex %zu %p\n", j, (void *) (scc_graph->vertices[i]->internal_edges[j]->to));
+        }
+
+        for (size_t j = 0; j < scc_graph->vertices[i]->edges_length; ++j) {
+            fprintf(stderr, "\tEdge to scc %zu %p\n", j, (void *) (scc_graph->vertices[i]->edges[j]->to));
+        }
+
+        for (size_t j = 0; j < scc_graph->vertices[i]->external_edges_length; ++j) {
+            fprintf(stderr, "\tEdge to vertex %zu %p\n", j, (void *) (scc_graph->vertices[i]->external_edges[j]->to));
+        }
+    }
+
+    ptd_ph_scc_graph_destroy(scc_graph);
+
+    assert(A->edges[0]->to == B);
+    assert(graph->vertices[0] == S);
+    assert(graph->vertices[1] == T);
+    assert(graph->vertices[2] == A);
+
+    ptd_ph_graph_destroy(graph);
+}
+
+
 int main(int argc, char **argv) {
 //    test_can_find_scc();
 //    test_can_find_scc2();
     //test_can_find_scc2_graph();
     //test_can_find_scc_cov_rand_graph();
-    test_it_can_construct_kingman2();
+//    test_it_can_construct_kingman2();
+    //test_basic_graph();
+    //test_basic_ptd_graph();
+    //test_basic_ptd_graph_edges();
+    test_basic_ptd_graph_scc();
 //    test_it_can_insert_avl();
 //    test_avl_is_balanced();
     //   test_avl_is_balanced_and_updated();

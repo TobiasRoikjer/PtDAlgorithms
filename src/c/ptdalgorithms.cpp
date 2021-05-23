@@ -9,12 +9,16 @@
 #include <set>
 
 extern void *create_matrix(long double **mat, size_t length);
+
 extern void *matrix_invert(void *matrix, size_t size);
+
 extern double matrix_get(void *matrix, size_t i, size_t j);
 
 #ifdef PTD_USE_GSL
+
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_linalg.h>
+
 void *create_matrix(long double **mat, size_t length) {
     gsl_matrix *full = gsl_matrix_alloc(length, length);
 
@@ -28,7 +32,7 @@ void *create_matrix(long double **mat, size_t length) {
 }
 
 void *matrix_invert(void *matrix, size_t size) {
-    gsl_matrix *gsl_mat = (gsl_matrix*) matrix;
+    gsl_matrix *gsl_mat = (gsl_matrix *) matrix;
     gsl_matrix *inverse = gsl_matrix_alloc(size, size);
 
     int sign;
@@ -44,13 +48,15 @@ void *matrix_invert(void *matrix, size_t size) {
 }
 
 double matrix_get(void *matrix, size_t i, size_t j) {
-    gsl_matrix *gsl_mat = (gsl_matrix*) matrix;
+    gsl_matrix *gsl_mat = (gsl_matrix *) matrix;
 
     return gsl_matrix_get(gsl_mat, i, j);
 }
+
 #else // PTD_USE_GSL
 
 #endif // PTD_USE_GSL
+
 #include "ptdalgorithms.h"
 
 
@@ -2880,6 +2886,251 @@ int ptd_add_edge(struct ptd_vertex *from, struct ptd_vertex *to, long double wei
     return 0;
 }
 
+
+stack<struct ptd_ph_vertex *> *scc_stack2;
+vector<struct ptd_ph_scc_vertex *> *scc_components2;
+size_t scc_index2;
+size_t *scc_indices2;
+size_t *low_links2;
+bool *scc_on_stack2;
+static bool *visited;
+ptd_strongly_connected_components_t *sccs2;
+
+int strongconnect2(struct ptd_ph_vertex *vertex) {
+    scc_indices2[vertex->index] = scc_index2;
+    low_links2[vertex->index] = scc_index2;
+    visited[vertex->index] = true;
+    scc_index2++;
+    scc_stack2->push(vertex);
+    scc_on_stack2[vertex->index] = true;
+
+    for (size_t i = 0; i < vertex->edges_length; ++i) {
+        struct ptd_ph_edge *edge = vertex->edges[i];
+
+        if (!visited[edge->to->index]) {
+            int res = strongconnect2(edge->to);
+
+            if (res != 0) {
+                return res;
+            }
+
+            low_links2[vertex->index] = min(
+                    low_links2[vertex->index],
+                    low_links2[edge->to->index]
+            );
+        } else if (scc_on_stack2[edge->to->index]) {
+            low_links2[vertex->index] = min(
+                    low_links2[vertex->index],
+                    scc_indices2[edge->to->index]
+            );
+        }
+    }
+
+    if (low_links2[vertex->index] == scc_indices2[vertex->index]) {
+        struct ptd_ph_vertex *w;
+        vector<struct ptd_ph_vertex *> list;
+
+        do {
+            w = scc_stack2->top();
+            scc_stack2->pop();
+            scc_on_stack2[w->index] = false;
+
+            list.push_back(w);
+        } while (w != vertex);
+
+        ptd_ph_scc_vertex *scc = (ptd_ph_scc_vertex *) malloc(sizeof(*scc));
+
+        if (scc == NULL) {
+            return -1;
+        }
+
+        scc->internal_edges_length = list.size();
+        scc->internal_edges = (struct ptd_ph_edge **) calloc(
+                scc->internal_edges_length,
+                sizeof(*(scc->internal_edges))
+        );
+
+        for (size_t i = 0; i < scc->internal_edges_length; ++i) {
+            scc->internal_edges[i] = (struct ptd_ph_edge *) malloc(sizeof(*(scc->internal_edges[i])));
+            scc->internal_edges[i]->to = list.at(i);
+        }
+
+        scc_components2->push_back(scc);
+    }
+
+    return 0;
+}
+
+struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph_graph *graph) {
+    struct ptd_ph_scc_graph *scc_graph = (struct ptd_ph_scc_graph *) malloc(
+            sizeof(*scc_graph)
+    );
+
+    scc_stack2 = new stack<struct ptd_ph_vertex *>;
+
+    scc_index2 = 0;
+    scc_indices2 = (size_t *) calloc(graph->vertices_length, sizeof(size_t));
+    low_links2 = (size_t *) calloc(graph->vertices_length, sizeof(size_t));
+    scc_on_stack2 = (bool *) calloc(graph->vertices_length, sizeof(bool));
+    visited = (bool *) calloc(graph->vertices_length, sizeof(bool));
+    scc_components2 = new vector<ptd_ph_scc_vertex *>();
+
+    size_t vertex_order;
+
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        struct ptd_ph_vertex *vertex = graph->vertices[i];
+
+        if (!visited[i]) {
+            if (strongconnect2(vertex) != 0) {
+                return NULL;
+            }
+        }
+    }
+
+    size_t non_empty_components = 0;
+
+    for (size_t i = 0; i < scc_components2->size(); ++i) {
+        struct ptd_ph_scc_vertex *c = scc_components2->at(i);
+
+        if (c->internal_edges_length != 0) {
+            non_empty_components++;
+        }
+    }
+
+    scc_graph->vertices_length = non_empty_components;
+    scc_graph->vertices = (struct ptd_ph_scc_vertex **) calloc(
+            scc_graph->vertices_length,
+            sizeof(*(scc_graph->vertices))
+    );
+
+    size_t index = 0;
+
+    for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
+        struct ptd_ph_scc_vertex *scc = scc_components2->at(i);
+
+        if (scc->internal_edges_length != 0) {
+            scc_graph->vertices[index] = scc_components2->at(i);
+            index++;
+        } else {
+            free(scc->internal_edges);
+            free(scc);
+        }
+    }
+
+    struct ptd_ph_scc_vertex **sccs_for_vertices = (struct ptd_ph_scc_vertex **) calloc(
+            graph->vertices_length,
+            sizeof(*sccs_for_vertices)
+    );
+
+    for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
+        struct ptd_ph_scc_vertex *scc = scc_graph->vertices[i];
+        scc->index = i;
+        set<struct ptd_ph_scc_vertex *> external_sccs;
+        set<struct ptd_ph_vertex *> external_vertices;
+
+        for (size_t j = 0; j < scc->internal_edges_length; ++j) {
+            struct ptd_ph_edge *edge = scc->internal_edges[j];
+            struct ptd_ph_vertex *vertex = edge->to;
+
+            sccs_for_vertices[vertex->index] = scc;
+        }
+    }
+
+    for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
+        struct ptd_ph_scc_vertex *scc = scc_graph->vertices[i];
+        set<struct ptd_ph_scc_vertex *> external_sccs;
+        set<struct ptd_ph_vertex *> external_vertices;
+
+        for (size_t j = 0; j < scc->internal_edges_length; ++j) {
+            struct ptd_ph_edge *edge = scc->internal_edges[j];
+            struct ptd_ph_vertex *vertex = edge->to;
+
+            for (size_t k = 0; k < vertex->edges_length; ++k) {
+                struct ptd_ph_vertex *child = vertex->edges[k]->to;
+                struct ptd_ph_scc_vertex *child_scc = sccs_for_vertices[child->index];
+
+                if (child_scc != scc) {
+                    external_sccs.insert(child_scc);
+                    external_vertices.insert(child);
+                }
+            }
+        }
+
+        scc->edges_length = external_sccs.size();
+        scc->edges = (struct ptd_ph_scc_edge **) calloc(
+                scc->edges_length,
+                sizeof(*(scc->edges))
+        );
+
+        scc->external_edges_length = external_vertices.size();
+        scc->external_edges = (struct ptd_ph_edge **) calloc(
+                scc->external_edges_length,
+                sizeof(*scc->external_edges)
+        );
+
+        size_t set_index;
+
+        set_index = 0;
+
+        for (set<struct ptd_ph_scc_vertex *>::iterator itr = external_sccs.begin();
+             itr != external_sccs.end();
+             itr++) {
+            scc->edges[set_index] = (struct ptd_ph_scc_edge*) malloc(sizeof(*(scc->edges[set_index])));
+            scc->edges[set_index]->to = *itr;
+            set_index++;
+        }
+
+        set_index = 0;
+
+        for (set<struct ptd_ph_vertex *>::iterator itr = external_vertices.begin();
+             itr != external_vertices.end();
+             itr++) {
+            scc->external_edges[set_index] = (struct ptd_ph_edge*) malloc(sizeof(*(scc->external_edges[set_index])));
+            scc->external_edges[set_index]->to = *itr;
+            set_index++;
+        }
+    }
+
+    free(scc_indices2);
+    free(low_links2);
+    free(scc_on_stack2);
+    free(visited);
+    delete scc_components2;
+
+    free(sccs_for_vertices);
+
+    return scc_graph;
+}
+
+void ptd_ph_scc_graph_destroy(struct ptd_ph_scc_graph *scc_graph) {
+    for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
+        struct ptd_ph_scc_vertex *scc = scc_graph->vertices[i];
+
+        for (size_t j = 0; j < scc->edges_length; ++j) {
+            free(scc->edges[j]);
+        }
+
+        free(scc->edges);
+
+        for (size_t j = 0; j < scc->internal_edges_length; ++j) {
+            free(scc->internal_edges[j]);
+        }
+
+        free(scc->internal_edges);
+
+        for (size_t j = 0; j < scc->external_edges_length; ++j) {
+            free(scc->external_edges[j]);
+        }
+
+        free(scc->external_edges);
+
+        free(scc);
+    }
+
+    free(scc_graph->vertices);
+    free(scc_graph);
+}
+
 stack<struct ptd_vertex *> *scc_stack;
 vector<ptd_strongly_connected_component_t *> *scc_components;
 size_t scc_index;
@@ -4556,4 +4807,151 @@ ptd_cyclic_desc(struct ptd_graph *graph, ptd_desc_multipliers_t *multipliers, do
     free(desc_length);*/
 
     return desc_value;
+}
+
+
+/*** NEW ***/
+
+void ptd_directed_graph_destroy(struct ptd_directed_graph *graph) {
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        ptd_directed_vertex_destroy(graph->vertices[i]);
+    }
+
+    free(graph->vertices);
+    graph->vertices = NULL;
+    free(graph);
+}
+
+int ptd_directed_vertex_add(struct ptd_directed_graph *graph, struct ptd_directed_vertex *vertex) {
+    bool is_power_of_2 = (graph->vertices_length & (graph->vertices_length - 1)) == 0;
+
+    if (is_power_of_2) {
+        size_t new_length = graph->vertices_length == 0 ? 1 : graph->vertices_length * 2;
+
+        if ((graph->vertices = (struct ptd_directed_vertex **) realloc(
+                graph->vertices, new_length *
+                                 sizeof(struct ptd_directed_vertex *))
+            ) == NULL) {
+            return -1;
+        }
+    }
+
+    vertex->graph = graph;
+
+    graph->vertices[graph->vertices_length] = vertex;
+    vertex->index = graph->vertices_length;
+    graph->vertices_length++;
+
+    return 0;
+}
+
+int ptd_directed_graph_add_edge(struct ptd_directed_vertex *vertex, struct ptd_directed_edge *edge) {
+    /*bool is_power_of_2 = (vertex->edges_length & (vertex->edges_length - 1)) == 0;
+
+    if (is_power_of_2) {
+        size_t new_length = vertex->edges_length == 0 ? 1 : vertex->edges_length * 2;
+
+        if ((vertex->edges = realloc(vertex->edges, new_length * edge_size)) == NULL) {
+            return -1;
+        }
+    }
+
+    size_t ptr_location = vertex->edges_length * edge_size;
+    ((char*)(vertex->edges))[ptr_location] = edge;*/
+    bool is_power_of_2 = (vertex->edges_length & (vertex->edges_length - 1)) == 0;
+
+    if (is_power_of_2) {
+        size_t new_length = vertex->edges_length == 0 ? 1 : vertex->edges_length * 2;
+
+        if ((vertex->edges = (struct ptd_directed_edge **) realloc(
+                vertex->edges,
+                new_length * sizeof(struct ptd_directed_edge *))
+            ) == NULL) {
+            return -1;
+        }
+    }
+
+    vertex->edges[vertex->edges_length] = edge;
+    vertex->edges_length++;
+
+    return 0;
+}
+
+void ptd_directed_vertex_destroy(struct ptd_directed_vertex *vertex) {
+    for (size_t i = 0; i < vertex->edges_length; ++i) {
+        free(vertex->edges[i]);
+    }
+
+    free(vertex->edges);
+    vertex->edges = NULL;
+    free(vertex);
+}
+
+struct ptd_ph_graph *ptd_ph_graph_create(size_t state_length) {
+    struct ptd_ph_graph *graph = (struct ptd_ph_graph *) malloc(sizeof(*graph));
+    graph->vertices_length = 0;
+    graph->state_length = state_length;
+    graph->vertices = NULL;
+    graph->starting_vertex = ptd_ph_vertex_create(graph);
+
+    return graph;
+}
+
+void ptd_ph_graph_destroy(struct ptd_ph_graph *graph) {
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        ptd_ph_vertex_destroy(graph->vertices[i]);
+    }
+
+    free(graph->vertices);
+    memset(graph, 0, sizeof(*graph));
+    free(graph);
+}
+
+struct ptd_ph_vertex *ptd_ph_vertex_create(struct ptd_ph_graph *graph) {
+    int *state = (int *) calloc(graph->state_length, sizeof(*state));
+
+    return ptd_ph_vertex_create_state(graph, state);
+}
+
+struct ptd_ph_vertex *ptd_ph_vertex_create_state(struct ptd_ph_graph *graph, int *state) {
+    struct ptd_ph_vertex *vertex = (struct ptd_ph_vertex *) malloc(sizeof(*vertex));
+    vertex->graph = graph;
+    vertex->edges_length = 0;
+    vertex->state = state;
+    vertex->edges = NULL;
+    ptd_directed_vertex_add(
+            (struct ptd_directed_graph *) graph,
+            (struct ptd_directed_vertex *) vertex
+    );
+
+    return vertex;
+}
+
+void ptd_ph_vertex_destroy(struct ptd_ph_vertex *vertex) {
+    for (size_t i = 0; i < vertex->edges_length; ++i) {
+        free(vertex->edges[i]);
+    }
+
+    free(vertex->edges);
+    free(vertex->state);
+    memset(vertex, 0, sizeof(*vertex));
+    free(vertex);
+}
+
+struct ptd_ph_edge *ptd_ph_graph_add_edge(
+        struct ptd_ph_vertex *from,
+        struct ptd_ph_vertex *to,
+        double weight
+) {
+    struct ptd_ph_edge *edge = (struct ptd_ph_edge *) malloc(sizeof(*edge));
+
+    edge->to = to;
+    edge->weight = weight;
+
+    ptd_directed_graph_add_edge(
+            (struct ptd_directed_vertex *) from,
+            (struct ptd_directed_edge *) edge
+    );
+
+    return edge;
 }

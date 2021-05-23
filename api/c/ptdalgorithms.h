@@ -193,6 +193,113 @@ size_t expanding_array_entry_size(const expanding_array_t *expanding_array);
 void *expanding_array_entries(const expanding_array_t *expanding_array);
  */
 
+
+/* Data types */
+struct ptd_directed_graph;
+struct ptd_directed_edge;
+struct ptd_directed_vertex;
+
+struct ptd_directed_graph {
+    size_t vertices_length;
+    struct ptd_directed_vertex **vertices;
+};
+
+struct ptd_directed_edge {
+    struct ptd_directed_vertex *to;
+};
+
+struct ptd_directed_vertex {
+    size_t edges_length;
+    struct ptd_directed_edge **edges;
+    struct ptd_directed_graph *graph;
+    size_t index;
+};
+
+int ptd_directed_graph_add_edge(struct ptd_directed_vertex *vertex, struct ptd_directed_edge *edge);
+void ptd_directed_graph_destroy(struct ptd_directed_graph *graph);
+
+int ptd_directed_vertex_add(struct ptd_directed_graph *graph, struct ptd_directed_vertex *vertex);
+
+void ptd_directed_vertex_destroy(struct ptd_directed_vertex *vertex);
+
+struct ptd_ph_graph;
+struct ptd_ph_edge;
+struct ptd_ph_vertex;
+
+struct ptd_ph_graph {
+    size_t vertices_length;
+    struct ptd_ph_vertex **vertices;
+    struct ptd_ph_vertex *starting_vertex;
+    size_t state_length;
+};
+
+struct ptd_ph_edge {
+    struct ptd_ph_vertex *to;
+    double weight;
+};
+
+struct ptd_ph_vertex {
+    size_t edges_length;
+    struct ptd_ph_edge **edges;
+    struct ptd_ph_graph *graph;
+    size_t index;
+    int *state;
+};
+
+struct ptd_ph_graph *ptd_ph_graph_create(size_t state_length);
+
+void ptd_ph_graph_destroy(struct ptd_ph_graph *graph);
+
+struct ptd_ph_vertex *ptd_ph_vertex_create(struct ptd_ph_graph *graph);
+
+struct ptd_ph_vertex *ptd_ph_vertex_create_state(
+        struct ptd_ph_graph *graph,
+        int *state
+);
+
+void ptd_ph_vertex_destroy(struct ptd_ph_vertex *vertex);
+
+struct ptd_ph_edge *ptd_ph_graph_add_edge(
+        struct ptd_ph_vertex *from,
+        struct ptd_ph_vertex *to,
+        double weight
+);
+
+struct ptd_ph_scc_graph;
+struct ptd_ph_scc_edge;
+struct ptd_ph_scc_vertex;
+
+struct ptd_ph_scc_graph {
+    size_t vertices_length;
+    struct ptd_ph_scc_vertex **vertices;
+};
+
+struct ptd_ph_scc_edge {
+    struct ptd_ph_scc_vertex *to;
+};
+
+struct ptd_ph_scc_vertex {
+    size_t edges_length;
+    struct ptd_ph_scc_edge **edges;
+    struct ptd_ph_scc_graph *graph;
+    size_t index;
+    size_t internal_edges_length;
+    struct ptd_ph_edge **internal_edges;
+    size_t external_edges_length;
+    struct ptd_ph_edge **external_edges;
+};
+
+struct ptd_ph_scc_graph* ptd_ph_find_strongly_connected_components(struct ptd_ph_graph* graph);
+
+void ptd_ph_scc_graph_destroy(struct ptd_ph_scc_graph *scc_graph);
+
+
+
+
+
+
+
+
 struct ptd_vertex_linked_list_item {
     struct ptd_vertex *vertex;
     struct ptd_vertex_linked_list_item *previous;
@@ -427,6 +534,8 @@ typedef struct {
 double ptd_circular_exp(struct ptd_graph *graph, double (*reward)(struct ptd_vertex *));
 
 ptd_desc_multipliers_t *ptd_cyclic_descendant_multipliers(struct ptd_graph *graph);
-double *ptd_cyclic_desc(struct ptd_graph *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(struct ptd_vertex *));
+
+double *
+ptd_cyclic_desc(struct ptd_graph *graph, ptd_desc_multipliers_t *multipliers, double (*reward)(struct ptd_vertex *));
 
 #endif //PTDALGORITHMS_PTD_H

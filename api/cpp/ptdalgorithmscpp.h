@@ -33,15 +33,14 @@ namespace ptdalgorithms {
         }
 #endif // PTD_RCPPXXX
         bool has_next(void) {
-            if (is_first) {
-                return (this->current != NULL);
-            } else {
-                return (this->current != NULL && this->current->next != NULL);
-            }
+            return (this->current != NULL && this->current->next != NULL);
         }
 
-        Vertex next(void);
-        Vertex *next_p(void);
+        VertexLinkedList next(void);
+        VertexLinkedList *next_p(void);
+
+        Vertex vertex(void);
+        Vertex *vertex_p(void);
 
         VertexLinkedList &operator=(const VertexLinkedList &o) {
             current = o.current;
@@ -50,12 +49,10 @@ namespace ptdalgorithms {
         }
 
     private:
-        VertexLinkedList(Graph &graph, ptd_vertex_linked_list *c_list) : graph(graph) {
-            this->current = c_list->first;
-            this->is_first = true;
+        VertexLinkedList(Graph &graph, ptd_vertex_linked_list_item *c_list_item) : graph(graph) {
+            this->current = c_list_item;
         }
 
-        bool is_first;
         ptd_vertex_linked_list_item *current;
         Graph &graph;
 
@@ -161,11 +158,11 @@ namespace ptdalgorithms {
                             bool include_start = false);
 
         VertexLinkedList vertices_list() {
-            return VertexLinkedList(*this, this->c_graph()->vertices_list);
+            return VertexLinkedList(*this, this->c_graph()->vertices_list->first);
         }
 
         VertexLinkedList *vertices_list_p() {
-            return new VertexLinkedList(*this, this->c_graph()->vertices_list);
+            return new VertexLinkedList(*this, this->c_graph()->vertices_list->first);
         }
 
         PhaseTypeDistribution phase_type_distribution();
