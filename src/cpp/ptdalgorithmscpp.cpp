@@ -3,10 +3,9 @@
 #include <stack>
 #include <cerrno>
 #include <cstring>
-#include "../c/io.h"
 #include "ptdalgorithmscpp.h"
 
-static void assert_same_length(vector<size_t> state, struct ptd_graph *graph) {
+static void assert_same_length(vector<int> state, struct ptd_ph_graph *graph) {
     if (state.size() != graph->state_length) {
         stringstream message;
         message << "Vector `state` argument must have same size as graph state length. Was '";
@@ -16,50 +15,10 @@ static void assert_same_length(vector<size_t> state, struct ptd_graph *graph) {
     }
 }
 
-ptdalgorithms::VertexLinkedList ptdalgorithms::VertexLinkedList::next(void) {
-    if (this->current == NULL) {
-        throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-    }
-
-    if (this->current->next == NULL || this->current->next->vertex == NULL) {
-        throw std::runtime_error("No next vertex (is NULL). Did has_next return true?");
-    }
-
-    return ptdalgorithms::VertexLinkedList(graph, this->current->next);
-}
-
-ptdalgorithms::VertexLinkedList *ptdalgorithms::VertexLinkedList::next_p(void) {
-    if (this->current == NULL) {
-        return NULL;
-    }
-
-    if (this->current->next == NULL || this->current->next->vertex == NULL) {
-        return NULL;
-    }
-
-    return new ptdalgorithms::VertexLinkedList(graph, this->current->next);
-}
-
-ptdalgorithms::Vertex ptdalgorithms::VertexLinkedList::vertex(void) {
-    if (this->current == NULL || this->current->vertex == NULL) {
-        throw std::runtime_error("No vertex (is NULL). Did has_next return true?");
-    }
-
-    return ptdalgorithms::Vertex(graph, this->current->vertex);
-}
-
-ptdalgorithms::Vertex *ptdalgorithms::VertexLinkedList::vertex_p(void) {
-    if (this->current == NULL || this->current->vertex == NULL) {
-        return NULL;
-    }
-
-    return new ptdalgorithms::Vertex(graph, this->current->vertex);
-}
-
-ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<size_t> state) {
+ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<int> state) {
     assert_same_length(state, this->rf_graph->graph);
 
-    size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
+    int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
     Vertex vertex = ptdalgorithms::Vertex(*this, c_state);
@@ -73,10 +32,10 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<size_t> state) 
     return vertex;
 }
 
-ptdalgorithms::Vertex *ptdalgorithms::Graph::create_vertex_p(vector<size_t> state) {
+ptdalgorithms::Vertex *ptdalgorithms::Graph::create_vertex_p(vector<int> state) {
     assert_same_length(state, this->rf_graph->graph);
 
-    size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
+    int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
     Vertex *vertex = new ptdalgorithms::Vertex(*this, c_state);
@@ -90,13 +49,13 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::create_vertex_p(vector<size_t> stat
     return vertex;
 }
 
-ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<size_t> state) {
+ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<int> state) {
     assert_same_length(state, this->rf_graph->graph);
 
-    size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
+    int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    struct ptd_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_ph_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     if (vertex == NULL) {
         throw runtime_error(
@@ -109,13 +68,13 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<size_t> state) {
     return ptdalgorithms::Vertex(*this, vertex);
 }
 
-ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<size_t> state) {
+ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<int> state) {
     assert_same_length(state, this->rf_graph->graph);
 
-    size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
+    int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    struct ptd_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_ph_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     if (vertex == NULL) {
         throw runtime_error(
@@ -128,20 +87,20 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<size_t> state)
     return new ptdalgorithms::Vertex(*this, vertex);
 }
 
-bool ptdalgorithms::Graph::vertex_exists(std::vector<size_t> state) {
+bool ptdalgorithms::Graph::vertex_exists(std::vector<int> state) {
     assert_same_length(state, this->rf_graph->graph);
 
-    size_t *c_state = (size_t *) calloc(state.size(), sizeof(*c_state));
+    int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    struct ptd_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_ph_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
 
     free(c_state);
 
     return (vertex != NULL);
 }
 
-ptdalgorithms::Vertex ptdalgorithms::Graph::find_or_create_vertex(vector<size_t> state) {
+ptdalgorithms::Vertex ptdalgorithms::Graph::find_or_create_vertex(vector<int> state) {
     if (vertex_exists(state)) {
         return find_vertex(state);
     } else {
@@ -149,7 +108,7 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::find_or_create_vertex(vector<size_t>
     }
 }
 
-ptdalgorithms::Vertex *ptdalgorithms::Graph::find_or_create_vertex_p(vector<size_t> state) {
+ptdalgorithms::Vertex *ptdalgorithms::Graph::find_or_create_vertex_p(vector<int> state) {
     if (vertex_exists(state)) {
         return find_vertex_p(state);
     } else {
@@ -157,33 +116,20 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::find_or_create_vertex_p(vector<size
     }
 }
 
-ptdalgorithms::Vertex ptdalgorithms::Graph::start_vertex() {
-    return Vertex(*this, this->rf_graph->graph->start_vertex);
+ptdalgorithms::Vertex ptdalgorithms::Graph::starting_vertex() {
+    return Vertex(*this, this->rf_graph->graph->starting_vertex);
 }
 
-ptdalgorithms::Vertex *ptdalgorithms::Graph::start_vertex_p() {
-    return new Vertex(*this, this->rf_graph->graph->start_vertex);
+ptdalgorithms::Vertex *ptdalgorithms::Graph::starting_vertex_p() {
+    return new Vertex(*this, this->rf_graph->graph->starting_vertex);
 }
 
 std::vector<ptdalgorithms::Vertex> ptdalgorithms::Graph::vertices() {
     std::vector<Vertex> vec;
-    std::stack<struct avl_node *> s;
 
-    s.push((struct avl_node *) rf_graph->tree->root);
-
-    while (!s.empty()) {
-        struct avl_node *v = s.top();
-        s.pop();
-
-        if (v == NULL) {
-            continue;
-        }
-
-        vec.push_back(Vertex(*this, ((struct ptd_vertex *) v->entry)));
-        s.push(v->left);
-        s.push(v->right);
+    for (size_t i = 0; i < c_graph()->vertices_length; ++i) {
+        vec.push_back(Vertex(*this, c_graph()->vertices[i]));
     }
-
 
     return vec;
 }
@@ -204,11 +150,11 @@ ptdalgorithms::PhaseTypeDistribution ptdalgorithms::Graph::phase_type_distributi
     return PhaseTypeDistribution(*this, matrix);
 }
 
-static int (*cpp_visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &vertex);
+/*static int (*cpp_visit_func)(ptdalgorithms::Graph &graph, ptdalgorithms::Vertex &vertex);
 
 static ptdalgorithms::Graph *cpp_graph;
 
-static int visit_from_cpp(struct ptd_vertex *vertex) {
+static int visit_from_cpp(struct ptd_ph_vertex *vertex) {
     ptdalgorithms::Vertex t(*cpp_graph, vertex);
 
     return cpp_visit_func(*cpp_graph, t);
@@ -231,20 +177,20 @@ void ptdalgorithms::Graph::visit_vertices(
                 msg
         );
     }
-}
+}*/
 
-void ptdalgorithms::Vertex::add_edge(Vertex &to, long double weight) {
+void ptdalgorithms::Vertex::add_edge(Vertex &to, double weight) {
     if (this->vertex == to.vertex) {
         throw new std::invalid_argument(
                 "The edge to add is between the same vertex\n"
         );
     }
 
-    ptd_add_edge(this->vertex, to.vertex, weight);
+    ptd_ph_graph_add_edge(this->vertex, to.vertex, weight);
 }
 
-std::vector<size_t> ptdalgorithms::Vertex::state() {
-    return std::vector<size_t>(
+std::vector<int> ptdalgorithms::Vertex::state() {
+    return std::vector<int>(
             this->vertex->state,
             this->vertex->state + this->vertex->graph->state_length
     );
@@ -255,9 +201,9 @@ std::vector<ptdalgorithms::Edge> ptdalgorithms::Vertex::edges() {
 
     for (size_t i = 0; i < this->vertex->edges_length; ++i) {
         Edge edge_i(
-                this->vertex->edges[i].to,
+                this->vertex->edges[i]->to,
                 graph,
-                this->vertex->edges[i].weight
+                this->vertex->edges[i]->weight
         );
 
         vector.push_back(edge_i);
@@ -283,7 +229,7 @@ List internal_vertices(SEXP phase_type_graph) {
     Rcpp::XPtr<PTDGraph> graph(phase_type_graph);
 
     ptd_label_vertices(graph->graph);
-    queue<struct ptd_vertex *> q = ptd_enqueue_vertices(graph->graph);
+    queue<struct ptd_ph_vertex *> q = ptd_enqueue_vertices(graph->graph);
 
     // Remove start vertex
     q.pop();
@@ -291,7 +237,7 @@ List internal_vertices(SEXP phase_type_graph) {
     List list(q.size());
 
     while (!q.empty()) {
-        struct ptd_vertex *vertex = q.front();
+        struct ptd_ph_vertex *vertex = q.front();
         q.pop();
 
         list[vertex->index - 1] = Rcpp::XPtr<PTDVertex>(
@@ -306,7 +252,7 @@ List internal_vertices(SEXP phase_type_graph) {
 
 Rcpp::Function *custom_visit_function;
 
-int custom_visit(struct ptd_vertex *vertex) {
+int custom_visit(struct ptd_ph_vertex *vertex) {
     fprintf(stderr, "foo\n");
     SEXP v = Rcpp::XPtr<PTDVertex>(
             new PTDVertex(

@@ -4,13 +4,10 @@
 #include <cstring>
 #include <errno.h>
 #include "../c/ptdalgorithms.h"
-#ifdef PTD_RCPP
-#include <Rcpp.h>
-#endif // PTD_RCPP
 
 struct rf_graph {
     ptd_avl_tree_t *tree;
-    struct ptd_graph *graph;
+    struct ptd_ph_graph *graph;
     size_t *references;
 };
 
@@ -23,52 +20,9 @@ namespace ptdalgorithms {
 
     class Graph;
 
-    class VertexLinkedList;
-
-    class VertexLinkedList {
-    public:
-#ifdef PTD_RCPPXXX
-        VertexLinkedList(SEXP rcpp_vertexsexp) : graph((Rcpp::XPtr<VertexLinkedList>(rcpp_vertexsexp))->graph) {
-            throw std::runtime_error("SEXP constructor not implemented. Please report this bug.\n");
-        }
-#endif // PTD_RCPPXXX
-        bool has_next(void) {
-            return (this->current != NULL && this->current->next != NULL);
-        }
-
-        VertexLinkedList next(void);
-        VertexLinkedList *next_p(void);
-
-        Vertex vertex(void);
-        Vertex *vertex_p(void);
-
-        VertexLinkedList &operator=(const VertexLinkedList &o) {
-            current = o.current;
-
-            return *this;
-        }
-
-    private:
-        VertexLinkedList(Graph &graph, ptd_vertex_linked_list_item *c_list_item) : graph(graph) {
-            this->current = c_list_item;
-        }
-
-        ptd_vertex_linked_list_item *current;
-        Graph &graph;
-
-        friend class Vertex;
-
-        friend class Graph;
-    };
-
     class Graph {
     public:
-#ifdef PTD_RCPP
-        Graph(SEXP rcpp_graph_sexp) {
-            throw std::runtime_error("SEXP constructor not implemented. Please report this bug.\n");
-        }
-#endif // PTD_RCPP
-        Graph(struct ptd_graph *graph) {
+        Graph(struct ptd_ph_graph *graph) {
             this->rf_graph = (struct rf_graph *) malloc(sizeof(*this->rf_graph));
             this->rf_graph->references = (size_t *) malloc(sizeof(*this->rf_graph->references));
             *this->rf_graph->references = 1;
@@ -93,7 +47,7 @@ namespace ptdalgorithms {
             this->rf_graph->references = (size_t *) malloc(sizeof(*this->rf_graph->references));
             *this->rf_graph->references = 1;
             fprintf(stderr, "Creating graph\n");
-            this->rf_graph->graph = ptd_graph_create(state_length);
+            this->rf_graph->graph = ptd_ph_graph_create(state_length);
 
             if (this->rf_graph->graph == NULL) {
                 throw std::runtime_error("Failed to create ptd_graph\n");
@@ -112,33 +66,32 @@ namespace ptdalgorithms {
 
 
             if (*this->rf_graph->references == 0) {
-                fprintf(stderr, "Destroying graph %i \n", (int)( *(this->rf_graph->references)));
+                fprintf(stderr, "Destroying graph %i \n", (int) (*(this->rf_graph->references)));
                 ptd_avl_tree_vertex_destroy(this->rf_graph->tree);
-                ptd_graph_vertices_destroy(this->rf_graph->graph);
-                ptd_graph_destroy(this->rf_graph->graph);
+                ptd_ph_graph_destroy(this->rf_graph->graph);
                 free(this->rf_graph->references);
             }
 
             free(this->rf_graph);
         }
 
-        Vertex create_vertex(std::vector<size_t> state);
+        Vertex create_vertex(std::vector<int> state);
 
-        Vertex *create_vertex_p(std::vector<size_t> state);
+        Vertex *create_vertex_p(std::vector<int> state);
 
-        Vertex find_vertex(std::vector<size_t> state);
+        Vertex find_vertex(std::vector<int> state);
 
-        Vertex *find_vertex_p(std::vector<size_t> state);
+        Vertex *find_vertex_p(std::vector<int> state);
 
-        bool vertex_exists(std::vector<size_t> state);
+        bool vertex_exists(std::vector<int> state);
 
-        Vertex find_or_create_vertex(std::vector<size_t> state);
+        Vertex find_or_create_vertex(std::vector<int> state);
 
-        Vertex *find_or_create_vertex_p(std::vector<size_t> state);
+        Vertex *find_or_create_vertex_p(std::vector<int> state);
 
-        Vertex start_vertex();
+        Vertex starting_vertex();
 
-        Vertex *start_vertex_p();
+        Vertex *starting_vertex_p();
 
         std::vector<Vertex> vertices();
 
@@ -146,34 +99,25 @@ namespace ptdalgorithms {
             return c_graph()->state_length;
         }
 
-        void index_topological() {
-            ptd_index_topological(rf_graph->graph);
-        }
-
-        void index_invert() {
-            ptd_index_invert(rf_graph->graph);
-        }
-
         void visit_vertices(int (*visit_func)(Graph &graph, Vertex &vertex),
                             bool include_start = false);
 
-        VertexLinkedList vertices_list() {
-            return VertexLinkedList(*this, this->c_graph()->vertices_list->first);
-        }
-
-        VertexLinkedList *vertices_list_p() {
-            return new VertexLinkedList(*this, this->c_graph()->vertices_list->first);
-        }
 
         PhaseTypeDistribution phase_type_distribution();
 
     public:
         Graph &operator=(const Graph &o) {
+            if (this == &o) {
+                return *this;
+            }
+
+            (*this).rf_graph = (struct rf_graph *) malloc(sizeof(*this->rf_graph));
+
             *this->rf_graph->references -= 1;
 
             if (*this->rf_graph->references == 0) {
                 ptd_avl_tree_vertex_destroy_free(this->rf_graph->tree);
-                ptd_graph_destroy(this->rf_graph->graph);
+                ptd_ph_graph_destroy(this->rf_graph->graph);
                 free(this->rf_graph->references);
             }
 
@@ -189,11 +133,16 @@ namespace ptdalgorithms {
             return *this;
         }
 
-        struct ptd_graph *c_graph() {
+        struct ptd_ph_graph *c_graph() {
             return rf_graph->graph;
         }
 
     private:
+        Graph(struct rf_graph *rf_graph) {
+            this->rf_graph = rf_graph;
+            rf_graph->references++;
+        }
+
         struct rf_graph *rf_graph;
 
         friend class VertexLinkedList;
@@ -203,30 +152,29 @@ namespace ptdalgorithms {
 
     class Vertex {
     private:
-        Vertex(Graph &graph, size_t *state) : graph(graph) {
-            this->vertex = ptd_vertex_create_state(graph.rf_graph->graph, state);
+        Vertex(Graph &graph, int *state) : graph(graph) {
+            this->vertex = ptd_ph_vertex_create_state(graph.rf_graph->graph, state);
 
             if (this->vertex == NULL) {
-                throw std::runtime_error("Failed to create ptd_vertex\n");
+                throw std::runtime_error("Failed to create ptd_ph_vertex\n");
             }
         }
 
     public:
-#ifdef PTD_RCPPXXX
-        Vertex(SEXP rcpp_vertexsexp) : graph((Rcpp::XPtr<Vertex>(rcpp_vertexsexp))->graph) {
-            throw std::runtime_error("SEXP constructor not implemented. Please report this bug.\n");
-        }
-#endif // PTD_RCPPXXX
-        Vertex(Graph &graph, struct ptd_vertex *vertex) : graph(graph) {
+        Vertex(Graph &graph, struct ptd_ph_vertex *vertex) : graph(graph) {
             this->vertex = vertex;
+        }
+
+        Vertex(const Vertex &o) : graph(o.graph) {
+            this->vertex = o.vertex;
         }
 
         ~Vertex() {
         }
 
-        void add_edge(Vertex &to, long double weight);
+        void add_edge(Vertex &to, double weight);
 
-        std::vector<size_t> state();
+        std::vector<int> state();
 
         std::vector<Edge> edges();
 
@@ -236,53 +184,45 @@ namespace ptdalgorithms {
 
         Vertex &operator=(const Vertex &o) {
             vertex = o.vertex;
-            graph = o.graph;
+            graph = Graph(o.graph.rf_graph);
 
             return *this;
         }
 
-        struct ptd_vertex *c_vertex() {
+        struct ptd_ph_vertex *c_vertex() {
             return vertex;
         }
 
-        long double rate() {
-            return vertex->rate;
-        }
-
-        void *getData() {
-            return vertex->data;
-        }
-
-        void setData(void *data) {
-            vertex->data = data;
+        double rate() {
+            return ptd_ph_vertex_rate(vertex);
         }
 
     private:
         Graph &graph;
 
-        struct ptd_vertex *vertex;
+        struct ptd_ph_vertex *vertex;
 
         friend class Graph;
     };
 
     struct Edge {
     private:
-        Edge(struct ptd_vertex *vertex, Graph &graph, long double weight) : graph(graph) {
+        Edge(struct ptd_ph_vertex *vertex, Graph &graph, double weight) : graph(graph) {
             this->_weight = weight;
             this->_vertex = vertex;
         }
 
     private:
         Graph &graph;
-        struct ptd_vertex *_vertex;
-        long double _weight;
+        struct ptd_ph_vertex *_vertex;
+        double _weight;
 
     public:
         Vertex to() {
             return Vertex(graph, _vertex);
         }
 
-        long double weight() {
+        double weight() {
             return _weight;
         }
 
@@ -319,14 +259,14 @@ namespace ptdalgorithms {
         }
 
         size_t length;
-        long double **sub_intensity_matrix;
-        long double *initial_probability_vector;
+        double **sub_intensity_matrix;
+        double *initial_probability_vector;
         vector<Vertex> vertices;
 
         friend class Graph;
     };
 
-    class Models {
+    /*class Models {
     public:
         static Graph kingman(size_t n) {
             char msg[1024];
@@ -346,7 +286,7 @@ namespace ptdalgorithms {
 
             return Graph(kingman);
         }
-    };
+    };*/
 }
 
 #endif //PTDALGORITHMS_PTDCPP_H

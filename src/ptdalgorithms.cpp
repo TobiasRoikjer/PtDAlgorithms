@@ -126,7 +126,7 @@ List vertex_as_list(Vertex *vertex) {
   );
 }
 
-List vertex_as_list(Graph &graph, struct ptd_vertex *c_vertex) {
+List vertex_as_list(Graph &graph, struct ptd_ph_vertex *c_vertex) {
   Vertex *vertex = new Vertex(graph, c_vertex);
   
   return vertex_as_list(vertex);
