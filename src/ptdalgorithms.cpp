@@ -1,53 +1,86 @@
 #define PTD_RCPP 1
 
-/*void *create_matrix(double **mat, size_t length) {
- NumericMatrix *full = new NumericMatrix(length, length);
 
-for (size_t k = 0; k < length; ++k) {
-for (size_t j = 0; j < length; ++j) {
-(*full)(k, j) = mat[k][j];
-}
-}
+#include <Rcpp.h>
 
-return full;
+using namespace Rcpp;
+
+void *create_matrix(double **mat, size_t length) {
+  double **res = (double**)calloc(length, sizeof(*res));
+  
+  for (size_t k = 0; k < length; ++k) {
+    res[k] = (double*) calloc(length, sizeof(**res));
+    
+    for (size_t j = 0; j < length; ++j) {
+      res[k][j] = mat[k][j];
+    }
+  }
+  
+  return (void*)res;
 }
 
 void *matrix_invert(void *matrix, size_t size) {
-NumericMatrix *r_mat = (NumericMatrix*)matrix;
-Function f("solve");   
-
-return f(*r_mat);
+  double **mat = (double**)matrix;
+  NumericMatrix r_mat(size, size);
+  
+  for (size_t k = 0; k < size; ++k) {
+    for (size_t j = 0; j < size; ++j) {
+      r_mat(k, j) = mat[k][j];
+    }
+  }
+  
+  Function f("solve");
+  NumericMatrix inverted = f(r_mat);
+  
+  double **res = (double**)calloc(size, sizeof(*res));
+  
+  for (size_t k = 0; k < size; ++k) {
+    res[k] = (double*) calloc(size, sizeof(**res));
+    
+    for (size_t j = 0; j < size; ++j) {
+      res[k][j] = inverted(k,j);
+    }
+  }
+  
+  return (void*)res;
 }
 
 double matrix_get(void *matrix, size_t i, size_t j) {
-NumericMatrix *r_mat = (NumericMatrix*)matrix;
-
-return (*r_mat)(i, j);
+  double **mat = (double**)matrix;
+  
+  return mat[i][j];
 }
 
 void matrix_set(void *matrix, size_t i, size_t j, double x) {
-NumericMatrix *r_mat = (NumericMatrix*)matrix;
-
-(*r_mat)(i, j) = x;
+  double **mat = (double**)matrix;
+  mat[i][j] = x;
 }
 
 void *matrix_init(size_t size) {
-NumericMatrix *full = new NumericMatrix(size, size);
-
-return full;
+  double **res = (double**)calloc(size, sizeof(*res));
+  
+  for (size_t k = 0; k < size; ++k) {
+    res[k] = (double*) calloc(size, sizeof(**res));
+  }
+  
+  return (void*)res;
 }
 
-void matrix_destroy(void *matrix) {
-NumericMatrix *r_mat = (NumericMatrix*)matrix;
-
-delete r_mat;
-}*/
+void matrix_destroy(void *matrix, size_t size) {
+  double **mat = (double**)matrix;
+  
+  for (size_t k = 0; k < size; ++k) {
+    free(mat[k]);
+  }
+  
+  free(mat);
+}
 
 #include "ptdalgorithms_types.h"
 #include "../api/c/ptdalgorithms.h"
 #include "../api/cpp/ptdalgorithmscpp.h"
-//#include "c/ptdalgorithms.cpp"
-//#include "cpp/ptdalgorithmscpp.cpp"
+#include "c/ptdalgorithms.cpp"
+#include "cpp/ptdalgorithmscpp.cpp"
 
 #include <Rcpp.h>
 using namespace Rcpp;
@@ -328,6 +361,30 @@ NumericVector expected_waiting_time(SEXP phase_type_graph) {
   
   return wrap(graph->expected_waiting_time());
 }
+
+// [[Rcpp::export]]
+NumericVector moment_rewards(SEXP phase_type_graph, NumericVector rewards) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  if ((int)rewards.size() != (int)graph->c_graph()->vertices_length) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: Rewards must match the number of vertices. Expected %i, got %i",
+      (int)graph->c_graph()->vertices_length,
+      (int)rewards.size()
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  return wrap(graph->moment_rewards(as<std::vector<double> >(rewards)));
+}
+
 
 // [[Rcpp::export]]
 bool graph_is_acyclic(SEXP phase_type_graph) {

@@ -1,6 +1,6 @@
-setwd("~/school/PtDAlgorithms/test")
-Rcpp::sourceCpp('../src/ptdalgorithms.cpp')
-
+#setwd("~/school/PtDAlgorithms/test")
+#Rcpp::sourceCpp('../src/ptdalgorithms.cpp')
+devtools::install_github("TobiasRoikjer/PtDalgorithms")
 n <- 10
 graph <- create_graph(n)
 index <- 1
@@ -69,3 +69,13 @@ ptd3 <- graph_as_matrix(graph)
 e <- as.numeric(ptd3$IPV %*% solve(-ptd3$SIM) %*% rep(1, length(ptd3$IPV)))
 e2 <- sum(expected_waiting_time(graph))
 stopifnot(abs(e-e2) < 0.0001)
+
+v <- as.numeric(ptd3$IPV %*% solve(-ptd3$SIM)%*% solve(-ptd3$SIM) %*% rep(1, length(ptd3$IPV)))
+rw <- moment_rewards(graph, rep(1, vertices_length(graph)))
+v2 <- sum(expected_waiting_time(graph)*rw)
+
+stopifnot(abs(v-v2) < 0.0001)
+reward_transform(graph, rw)
+
+v3 <- sum(expected_waiting_time(graph))
+stopifnot(abs(v-v3) < 0.0001)
