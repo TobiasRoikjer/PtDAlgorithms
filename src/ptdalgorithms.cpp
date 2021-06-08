@@ -1,5 +1,48 @@
 #define PTD_RCPP 1
 
+/*void *create_matrix(double **mat, size_t length) {
+ NumericMatrix *full = new NumericMatrix(length, length);
+
+for (size_t k = 0; k < length; ++k) {
+for (size_t j = 0; j < length; ++j) {
+(*full)(k, j) = mat[k][j];
+}
+}
+
+return full;
+}
+
+void *matrix_invert(void *matrix, size_t size) {
+NumericMatrix *r_mat = (NumericMatrix*)matrix;
+Function f("solve");   
+
+return f(*r_mat);
+}
+
+double matrix_get(void *matrix, size_t i, size_t j) {
+NumericMatrix *r_mat = (NumericMatrix*)matrix;
+
+return (*r_mat)(i, j);
+}
+
+void matrix_set(void *matrix, size_t i, size_t j, double x) {
+NumericMatrix *r_mat = (NumericMatrix*)matrix;
+
+(*r_mat)(i, j) = x;
+}
+
+void *matrix_init(size_t size) {
+NumericMatrix *full = new NumericMatrix(size, size);
+
+return full;
+}
+
+void matrix_destroy(void *matrix) {
+NumericMatrix *r_mat = (NumericMatrix*)matrix;
+
+delete r_mat;
+}*/
+
 #include "ptdalgorithms_types.h"
 #include "../api/c/ptdalgorithms.h"
 #include "../api/cpp/ptdalgorithmscpp.h"
@@ -11,83 +54,7 @@ using namespace Rcpp;
 using namespace ptdalgorithms;
 
 
-void *create_matrix(long double **mat, size_t length) {
-  throw std::runtime_error(
-      "Not implemented"
-  );
-  
-  return NULL;
-}
-void *matrix_invert(void *matrix, size_t size) {
-  throw std::runtime_error(
-      "Not implemented"
-  );
-  
-  return NULL;
-}
-
-double matrix_get(void *matrix, size_t i, size_t j) {
-  throw std::runtime_error(
-      "Not implemented"
-  );
-  
-  return 0;
-}
-  
 // TODO: Make all functions exists as Cpp method calls
-
-/*** R
-n <- 15
-graph <- create_graph(n)
-
-vertices_list <- list_vertices(graph)
-
-while (!is.null(vertices_list)) {
-  vertex <- list_vertex(vertices_list)
-  
-    if (vertex$vertex == start_vertex(graph)$vertex) {
-      start <- create_vertex(graph, c(n, rep(0, n-1)))
-      add_edge(start_vertex(graph), start, 1)
-      vertices_list <- list_next(vertices_list)
-      next()
-    }
-    
-    for (i in 1:n) {
-      for (j in i:n) {
-        rate <- 0
-        state <- vertex$state
-
-        if (i == j) {
-          if (state[i] < 2) {
-            next;
-          }
-          
-          rate <- state[i] * (state[i] - 1) / 2
-        } else {
-          if (state[i] < 1 || state[j] < 1) {
-            next;
-          }
-          
-          rate <- state[i] * state[j]
-        }
-        
-        child_state <- state
-        child_state[i] <- child_state[i] - 1
-        child_state[j] <- child_state[j] - 1
-        child_state[i+j] <- child_state[i+j] + 1
-        
-        child <- find_or_create_vertex(graph, child_state)
-          
-        add_edge(vertex, child, rate)
-      }
-    }
-  
-  vertices_list <- list_next(vertices_list)
-}
-
-print(graph_as_matrix(graph))
-*/
-
 
 SEXP get_first_list_entry(SEXP e, std::string message) {
   if (Rf_isList(e) || Rf_isNewList(e)) {
@@ -116,11 +83,12 @@ SEXP get_first_list_entry(SEXP e, std::string message) {
 }
 
 List vertex_as_list(Vertex *vertex) {
-  vector<size_t> state = vertex->state();
+  vector<int> state = vertex->state();
   IntegerVector state_vec(state.begin(), state.end());
   
   return List::create(
     Named("state") = state_vec,
+    _["rate"] = vertex->rate(),
     _["vertex"] = (size_t)vertex->c_vertex(),
     _["xptr_vertex"] = Rcpp::XPtr<Vertex>(vertex)
   );
@@ -131,7 +99,6 @@ List vertex_as_list(Graph &graph, struct ptd_ph_vertex *c_vertex) {
   
   return vertex_as_list(vertex);
 }
-
 
 SEXP list_as_vertex(SEXP list) {
   if (!Rf_isList(list) && !Rf_isNewList(list)) {
@@ -155,9 +122,17 @@ SEXP list_as_vertex(SEXP list) {
 }
 
 // [[Rcpp::export]]
+SEXP create_graph(size_t state_length) {
+  return Rcpp::XPtr<Graph>(
+    new Graph(
+        state_length
+    )
+  );
+}
+
+// [[Rcpp::export]]
 List edges(SEXP phase_type_vertex) {
-  phase_type_vertex = get_first_list_entry(phase_type_vertex, (char*)"edges");
-  
+  phase_type_vertex = list_as_vertex(phase_type_vertex);
   Rcpp::XPtr<Vertex> vertex(phase_type_vertex);
   vector<Edge> edges = vertex->edges();
   List r_edges(edges.size());
@@ -175,13 +150,66 @@ List edges(SEXP phase_type_vertex) {
 }
 
 // [[Rcpp::export]]
-SEXP create_graph(size_t state_length) {
-  return Rcpp::XPtr<Graph>(
-    new Graph(
-        state_length
-    )
-  );
+List vertices(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  std::vector<Vertex*> vertices = graph->vertices_p();
+  List res(vertices.size());
+  
+  for (size_t i = 0; i < vertices.size(); i++) {
+    res[i] = vertex_as_list(vertices[i]);
+  }
+  
+  return res;
 }
+
+// [[Rcpp::export]]
+int vertices_length(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  return (int)graph->c_graph()->vertices_length;
+}
+
+// [[Rcpp::export]]
+List vertex_at(SEXP phase_type_graph, int index) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  if (index <= 0) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: Index must be 1 or above, was %i",
+      index
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  if (index - 1 >= (int)graph->c_graph()->vertices_length) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: Wanted to return vertex at %i, but graph has only %i vertices",
+      index,
+      (int)graph->c_graph()->vertices_length
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  ptd_ph_vertex *vertex = graph->c_graph()->vertices[index - 1];
+  
+  return vertex_as_list(new Vertex(*graph, vertex));
+}
+
+
 
 // [[Rcpp::export]]
 void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double weight) {
@@ -195,36 +223,30 @@ void add_edge(SEXP phase_type_vertex_from, SEXP phase_type_vertex_to, double wei
 }
 
 // [[Rcpp::export]]
-SEXP create_vertex(SEXP phase_type_graph, IntegerVector state) {
+List starting_vertex(SEXP phase_type_graph) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
-  Vertex *vertex = graph->create_vertex_p(as<std::vector<size_t> >(state));
+  Vertex *vertex = graph->starting_vertex_p();
   
   return vertex_as_list(vertex);
 }
 
 // [[Rcpp::export]]
-void index_topological(SEXP phase_type_graph) {
+SEXP create_vertex(SEXP phase_type_graph, IntegerVector state) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
+  Vertex *vertex = graph->create_vertex_p(as<std::vector<int> >(state));
   
-  graph->index_topological();
-}
-
-// [[Rcpp::export]]
-void index_invert(SEXP phase_type_graph) {
-  Rcpp::XPtr<Graph> graph(phase_type_graph);
-  
-  graph->index_invert();
+  return vertex_as_list(vertex);
 }
 
 // [[Rcpp::export]]
 SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
   
-  if (!graph->vertex_exists(as<std::vector<size_t> >(state))) {
+  if (!graph->vertex_exists(as<std::vector<int> >(state))) {
     return List::get_na();
   }
   
-  Vertex *found = graph->find_vertex_p(as<std::vector<size_t> >(state));
+  Vertex *found = graph->find_vertex_p(as<std::vector<int> >(state));
   
   return vertex_as_list(found);
 }
@@ -233,17 +255,9 @@ SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
 // [[Rcpp::export]]
 List find_or_create_vertex(SEXP phase_type_graph, IntegerVector state) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
-  Vertex *found = graph->find_or_create_vertex_p(as<std::vector<size_t> >(state));
+  Vertex *found = graph->find_or_create_vertex_p(as<std::vector<int> >(state));
   
   return vertex_as_list(found);
-}
-
-// [[Rcpp::export]]
-List start_vertex(SEXP phase_type_graph) {
-  Rcpp::XPtr<Graph> graph(phase_type_graph);
-  Vertex *vertex = graph->start_vertex_p();
-  
-  return vertex_as_list(vertex);
 }
 
 List _graph_as_matrix(SEXP phase_type_graph) {
@@ -261,13 +275,16 @@ List _graph_as_matrix(SEXP phase_type_graph) {
     }
   }
   
-  List vertices(dist.length);
+  NumericMatrix states(dist.length, graph->state_length());
   Graph g = *graph;
+  
   for (size_t i = 0; i < dist.length; i++) {
-    vertices[i] = vertex_as_list(&dist.vertices[i]);
+    for (size_t j = 0; j < graph->state_length(); j++) {
+      states(i,j) = dist.vertices[i].state()[j];
+    }
   }
   
-  return List::create(Named("vertices") = vertices , _["SIM"] = SIM, _["IPV"] = IPV);
+  return List::create(Named("states") = states , _["SIM"] = SIM, _["IPV"] = IPV);
 }
 
 // [[Rcpp::export]]
@@ -275,41 +292,46 @@ List graph_as_matrix(SEXP phase_type_graph) {
   return(_graph_as_matrix(phase_type_graph));
 }
 
-
 // [[Rcpp::export]]
-SEXP list_vertices(SEXP phase_type_graph) {
+void reward_transform(SEXP phase_type_graph, NumericVector rewards) {
   Rcpp::XPtr<Graph> graph(phase_type_graph);
   
-  return Rcpp::XPtr<VertexLinkedList>(
-      graph->vertices_list_p()
-  );
-}
-
-// [[Rcpp::export]]
-bool list_has_next(SEXP vertex_list) {
-  Rcpp::XPtr<VertexLinkedList> list(vertex_list);
-  
-  return list->has_next();
-}
-
-// [[Rcpp::export]]
-List list_vertex(SEXP vertex_list) {
-  Rcpp::XPtr<VertexLinkedList> list(vertex_list);
-  return vertex_as_list(list->vertex_p());
-}
-
-
-// [[Rcpp::export]]
-SEXP list_next(SEXP vertex_list) {
-  Rcpp::XPtr<VertexLinkedList> list(vertex_list);
-  
-  VertexLinkedList *next = list->next_p();
-  
-  if (next == NULL) {
-    return List::get_na();
+  if ((int)rewards.size() != (int)graph->c_graph()->vertices_length) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: Rewards must match the number of vertices. Expected %i, got %i",
+      (int)graph->c_graph()->vertices_length,
+      (int)rewards.size()
+    );
+    
+    throw std::runtime_error(
+        message
+    );
   }
   
-  return Rcpp::XPtr<VertexLinkedList>(
-      next
-  );
+  graph->reward_transform(as<std::vector<double> >(rewards));
+}
+
+// [[Rcpp::export]]
+NumericVector expected_visits(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  return wrap(graph->expected_visits());
+}
+
+// [[Rcpp::export]]
+NumericVector expected_waiting_time(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  return wrap(graph->expected_waiting_time());
+}
+
+// [[Rcpp::export]]
+bool graph_is_acyclic(SEXP phase_type_graph) {
+  Rcpp::XPtr<Graph> graph(phase_type_graph);
+  
+  return graph->is_acyclic();
 }

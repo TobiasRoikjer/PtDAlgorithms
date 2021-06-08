@@ -78,11 +78,16 @@ struct ptd_ph_graph;
 struct ptd_ph_edge;
 struct ptd_ph_vertex;
 
+struct ptd_ph_scc_graph;
+struct ptd_ph_scc_edge;
+struct ptd_ph_scc_vertex;
+
 struct ptd_ph_graph {
     size_t vertices_length;
     struct ptd_ph_vertex **vertices;
     struct ptd_ph_vertex *starting_vertex;
     size_t state_length;
+    struct ptd_ph_scc_graph *scc_graph;
 };
 
 struct ptd_ph_edge {
@@ -119,15 +124,21 @@ struct ptd_ph_edge *ptd_ph_graph_add_edge(
         double weight
 );
 
+double *ptd_ph_graph_expected_visits(struct ptd_ph_graph *graph);
+
+double *ptd_ph_graph_moment_rewards(struct ptd_ph_graph *graph, double *rewards);
+
+double *ptd_ph_graph_expected_waiting_time(struct ptd_ph_graph *graph);
+
+bool ptd_ph_graph_is_acyclic(struct ptd_ph_graph *graph);
+
 struct ptd_ph_vertex **ptd_ph_graph_topological_sort(struct ptd_ph_graph *graph);
 
 double *ptd_ph_graph_acyclic_visit_probability(struct ptd_ph_graph *graph);
 
 double *ptd_ph_graph_acyclic_moment_rewards(struct ptd_ph_graph *graph, double *rewards);
 
-struct ptd_ph_scc_graph;
-struct ptd_ph_scc_edge;
-struct ptd_ph_scc_vertex;
+int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards);
 
 struct ptd_ph_scc_graph {
     size_t vertices_length;
@@ -153,6 +164,8 @@ struct ptd_ph_scc_vertex {
     double **external_expected_visits;
 };
 
+int ptd_ph_precompute_strongly_connected_components(struct ptd_ph_graph *graph);
+
 struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph_graph *graph);
 
 void ptd_ph_scc_graph_destroy(struct ptd_ph_scc_graph *scc_graph);
@@ -166,8 +179,6 @@ double *ptd_ph_graph_cyclic_expected_visits(struct ptd_ph_scc_graph *scc_graph);
 double *ptd_ph_graph_cyclic_moment_rewards(
         struct ptd_ph_scc_graph *scc_graph, double *rewards
 );
-
-int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards);
 
 typedef struct ptd_avl_tree {
     void *root;

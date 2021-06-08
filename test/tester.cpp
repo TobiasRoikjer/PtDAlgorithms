@@ -419,10 +419,14 @@ void test_acyclic_expected_visits() {
     ptd_ph_graph_add_edge(F, T, 1);
 
     double *exp = ptd_ph_graph_acyclic_visit_probability(graph);
+    double *exp2 = ptd_ph_graph_expected_visits(graph);
 
     for (size_t i = 0; i < graph->vertices_length; ++i) {
         fprintf(stderr, "%p: %f\n", (void *) graph->vertices[i], exp[i]);
+        assert(abs(exp[i]-exp2[i]) < 0.00001);
     }
+
+    free(exp2);
 
     assert(exp[0] == 1.0f); // S
     assert(exp[1] <= 1.1f); // T
@@ -605,11 +609,15 @@ void test_cyclic_expected_entry_visits() {
     assert(abs(scc_probs[8] - 1) < 0.01);
 
     double *exp_visits = ptd_ph_graph_cyclic_expected_visits(scc_graph);
+    double *exp_visits2 = ptd_ph_graph_expected_visits(graph);
 
     for (size_t l = 0; l < graph->vertices_length; ++l) {
         fprintf(stderr, "Vertex %p, expected visits %f\n", (void *) graph->vertices[l],
                 exp_visits[graph->vertices[l]->index]);
+        assert(abs(exp_visits[l]-exp_visits2[l]) < 0.00001);
     }
+
+    free(exp_visits2);
 
     assert(abs(exp_visits[S->index] - 1) < 0.01);
     assert(abs(exp_visits[T->index] - 1) < 0.01);
@@ -710,6 +718,128 @@ void test_cyclic_expected_entry_visits() {
     assert(abs(e-e2) < 0.0001);
 }
 
+void test_is_acyclic() {
+    struct ptd_ph_graph *graph = ptd_ph_graph_create(4);
+
+    struct ptd_ph_vertex *S = graph->starting_vertex;
+    fprintf(stderr, "S: %p\n", (void *) S);
+    struct ptd_ph_vertex *T = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "T: %p\n", (void *) T);
+
+    struct ptd_ph_vertex *A = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "A: %p\n", (void *) A);
+    struct ptd_ph_vertex *B = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "B: %p\n", (void *) B);
+    struct ptd_ph_vertex *C = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "C: %p\n", (void *) C);
+    struct ptd_ph_vertex *D = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "D: %p\n", (void *) D);
+    struct ptd_ph_vertex *E = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "E: %p\n", (void *) E);
+    struct ptd_ph_vertex *F = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "F: %p\n", (void *) F);
+    struct ptd_ph_vertex *G = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "G: %p\n", (void *) G);
+    struct ptd_ph_vertex *H = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "H: %p\n", (void *) H);
+    struct ptd_ph_vertex *I = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "I: %p\n", (void *) I);
+    struct ptd_ph_vertex *J = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "J %p\n", (void *) J);
+    struct ptd_ph_vertex *K = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "K %p\n", (void *) K);
+    struct ptd_ph_vertex *L = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "L %p\n", (void *) L);
+
+    ptd_ph_graph_add_edge(S, A, 0.5);
+    ptd_ph_graph_add_edge(S, C, 0.5);
+    ptd_ph_graph_add_edge(A, C, 4);
+    ptd_ph_graph_add_edge(A, B, 2);
+    ptd_ph_graph_add_edge(B, D, 10);
+    ptd_ph_graph_add_edge(D, F, 5);
+    ptd_ph_graph_add_edge(C, F, 15);
+    ptd_ph_graph_add_edge(C, G, 15);
+    ptd_ph_graph_add_edge(G, F, 15);
+    ptd_ph_graph_add_edge(F, T, 1);
+
+    assert(ptd_ph_graph_is_acyclic(graph) == true);
+    ptd_ph_graph_add_edge(A, T, 1);
+    assert(ptd_ph_graph_is_acyclic(graph) == true);
+    ptd_ph_graph_add_edge(A, G, 1);
+    assert(ptd_ph_graph_is_acyclic(graph) == true);
+    ptd_ph_graph_add_edge(F, A, 1);
+    assert(ptd_ph_graph_is_acyclic(graph) == false);
+
+    ptd_ph_graph_destroy(graph);
+}
+
+void test_phase_type() {
+    struct ptd_ph_graph *graph = ptd_ph_graph_create(4);
+
+    struct ptd_ph_vertex *S = graph->starting_vertex;
+    fprintf(stderr, "S: %p\n", (void *) S);
+    struct ptd_ph_vertex *T = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "T: %p\n", (void *) T);
+
+    struct ptd_ph_vertex *A = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "A: %p\n", (void *) A);
+    struct ptd_ph_vertex *B = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "B: %p\n", (void *) B);
+    struct ptd_ph_vertex *C = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "C: %p\n", (void *) C);
+    struct ptd_ph_vertex *D = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "D: %p\n", (void *) D);
+    struct ptd_ph_vertex *E = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "E: %p\n", (void *) E);
+    struct ptd_ph_vertex *F = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "F: %p\n", (void *) F);
+    struct ptd_ph_vertex *G = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "G: %p\n", (void *) G);
+    struct ptd_ph_vertex *H = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "H: %p\n", (void *) H);
+    struct ptd_ph_vertex *I = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "I: %p\n", (void *) I);
+    struct ptd_ph_vertex *J = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "J %p\n", (void *) J);
+    struct ptd_ph_vertex *K = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "K %p\n", (void *) K);
+    struct ptd_ph_vertex *L = ptd_ph_vertex_create(graph);
+    fprintf(stderr, "L %p\n", (void *) L);
+
+    ptd_ph_graph_add_edge(S, A, 0.5);
+    ptd_ph_graph_add_edge(S, C, 0.5);
+    ptd_ph_graph_add_edge(A, C, 4);
+    ptd_ph_graph_add_edge(A, B, 2);
+    ptd_ph_graph_add_edge(B, D, 10);
+    ptd_ph_graph_add_edge(D, F, 5);
+    ptd_ph_graph_add_edge(C, F, 15);
+    ptd_ph_graph_add_edge(C, G, 15);
+    ptd_ph_graph_add_edge(G, F, 15);
+    ptd_ph_graph_add_edge(F, T, 1);
+
+    ptd_phase_type_distribution_t *ph = ptd_graph_as_phase_type_distribution(graph);
+
+    for (size_t i = 0; i < ph->length; ++i) {
+        for (size_t j = 0; j < ph->length; ++j) {
+            fprintf(stderr, "%f ", ph->sub_intensity_matrix[i][j]);
+        }
+
+        fprintf(stderr, "\n");
+    }
+
+    assert(abs(ph->sub_intensity_matrix[0][0]-(-6)) < 0.0001);
+    assert(abs(ph->sub_intensity_matrix[0][1]-2) < 0.0001);
+    assert(abs(ph->sub_intensity_matrix[0][2]-4) < 0.0001);
+    assert(abs(ph->sub_intensity_matrix[1][0]-0) < 0.0001);
+    assert(abs(ph->sub_intensity_matrix[2][0]-0) < 0.0001);
+    assert(abs(ph->sub_intensity_matrix[3][0]-0) < 0.0001);
+    assert(abs(ph->sub_intensity_matrix[4][0]-0) < 0.0001);
+    assert(abs(ph->sub_intensity_matrix[5][0]-0) < 0.0001);
+
+    ptd_phase_type_distribution_destroy(ph);
+    ptd_ph_graph_destroy(graph);
+}
+
 int main(int argc, char **argv) {
     test_basic_graph();
     test_basic_ptd_ph_graph();
@@ -717,4 +847,6 @@ int main(int argc, char **argv) {
     test_basic_ptd_ph_graph_scc();
     test_acyclic_expected_visits();
     test_cyclic_expected_entry_visits();
+    test_is_acyclic();
+    test_phase_type();
 }

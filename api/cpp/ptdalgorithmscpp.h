@@ -20,6 +20,8 @@ namespace ptdalgorithms {
 
     class Graph;
 
+    class SccGraph;
+
     class Graph {
     public:
         Graph(struct ptd_ph_graph *graph) {
@@ -46,7 +48,6 @@ namespace ptdalgorithms {
             this->rf_graph = (struct rf_graph *) malloc(sizeof(*this->rf_graph));
             this->rf_graph->references = (size_t *) malloc(sizeof(*this->rf_graph->references));
             *this->rf_graph->references = 1;
-            fprintf(stderr, "Creating graph\n");
             this->rf_graph->graph = ptd_ph_graph_create(state_length);
 
             if (this->rf_graph->graph == NULL) {
@@ -58,15 +59,12 @@ namespace ptdalgorithms {
             if (this->rf_graph->tree == NULL) {
                 throw std::runtime_error("Failed to create ptd_avl_tree\n");
             }
-
         }
 
         ~Graph() {
             *(this->rf_graph->references) -= 1;
 
-
             if (*this->rf_graph->references == 0) {
-                fprintf(stderr, "Destroying graph %i \n", (int) (*(this->rf_graph->references)));
                 ptd_avl_tree_vertex_destroy(this->rf_graph->tree);
                 ptd_ph_graph_destroy(this->rf_graph->graph);
                 free(this->rf_graph->references);
@@ -95,16 +93,25 @@ namespace ptdalgorithms {
 
         std::vector<Vertex> vertices();
 
+        std::vector<Vertex*> vertices_p();
+
         size_t state_length() {
             return c_graph()->state_length;
         }
 
-        void visit_vertices(int (*visit_func)(Graph &graph, Vertex &vertex),
-                            bool include_start = false);
-
-
         PhaseTypeDistribution phase_type_distribution();
 
+        bool is_acyclic() {
+            return ptd_ph_graph_is_acyclic(c_graph());
+        }
+
+        std::vector<double> expected_visits();
+
+        std::vector<double> expected_waiting_time();
+
+        std::vector<double> moment_rewards(std::vector<double> rewards);
+
+        void reward_transform(std::vector<double> rewards);
     public:
         Graph &operator=(const Graph &o) {
             if (this == &o) {

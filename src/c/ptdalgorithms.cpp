@@ -21,7 +21,7 @@ extern double matrix_get(void *matrix, size_t i, size_t j);
 
 extern void *matrix_init(size_t size);
 
-extern void matrix_destroy(void *matrix);
+extern void matrix_destroy(void *matrix, size_t size);
 
 #ifdef PTD_USE_GSL
 
@@ -73,11 +73,86 @@ void *matrix_init(size_t size) {
     return gsl_matrix_calloc(size, size);
 }
 
-void matrix_destroy(void *matrix) {
+void matrix_destroy(void *matrix, size_t size) {
     gsl_matrix_free((gsl_matrix *) matrix);
 }
 
 #else // PTD_USE_GSL
+
+#include <Rcpp.h>
+
+using namespace Rcpp;
+
+void *create_matrix(double **mat, size_t length) {
+  double **res = (double**)calloc(length, sizeof(*res));
+  
+  for (size_t k = 0; k < length; ++k) {
+    res[k] = (double*) calloc(length, sizeof(**res));
+    
+    for (size_t j = 0; j < length; ++j) {
+      res[k][j] = mat[k][j];
+    }
+  }
+
+  return (void*)res;
+}
+
+void *matrix_invert(void *matrix, size_t size) {
+  double **mat = (double**)matrix;
+  NumericMatrix r_mat(size, size);
+  
+  for (size_t k = 0; k < size; ++k) {
+    for (size_t j = 0; j < size; ++j) {
+      r_mat(k, j) = mat[k][j];
+    }
+  }
+  
+  Function f("solve");
+  NumericMatrix inverted = f(r_mat);
+  
+  double **res = (double**)calloc(size, sizeof(*res));
+  
+  for (size_t k = 0; k < size; ++k) {
+    res[k] = (double*) calloc(size, sizeof(**res));
+    
+    for (size_t j = 0; j < size; ++j) {
+      res[k][j] = inverted(k,j);
+    }
+  }
+
+  return (void*)res;
+}
+
+double matrix_get(void *matrix, size_t i, size_t j) {
+  double **mat = (double**)matrix;
+
+  return mat[i][j];
+}
+
+void matrix_set(void *matrix, size_t i, size_t j, double x) {
+  double **mat = (double**)matrix;
+  mat[i][j] = x;
+}
+
+void *matrix_init(size_t size) {
+  double **res = (double**)calloc(size, sizeof(*res));
+  
+  for (size_t k = 0; k < size; ++k) {
+    res[k] = (double*) calloc(size, sizeof(**res));
+  }
+  
+  return (void*)res;
+}
+
+void matrix_destroy(void *matrix, size_t size) {
+  double **mat = (double**)matrix;
+  
+  for (size_t k = 0; k < size; ++k) {
+    free(mat[k]);
+  }
+  
+  free(mat);
+}
 
 #endif // PTD_USE_GSL
 
@@ -560,21 +635,10 @@ struct ptd_ph_vertex *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, c
             avl_tree->vec_length * sizeof(int)
     );
 
-    /*fprintf(stderr, "finding vertex ");
-    fprintf(stderr, "%zu %zu %zu %zu",
-            key[0],
-            key[1],
-            key[2],
-            key[3]
-    );*/
-
 
     if (avl_vertex == NULL) {
-        //fprintf(stderr, " NOT EXISTS\n");
         return NULL;
     }
-
-    //fprintf(stderr, " EXISTS\n");
 
     return (struct ptd_ph_vertex *) avl_vertex->entry;
 }
@@ -733,6 +797,18 @@ struct ptd_ph_edge *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const
     }
 }
 
+int ptd_ph_precompute_strongly_connected_components(struct ptd_ph_graph *graph) {
+    if (graph->scc_graph == NULL) {
+        graph->scc_graph = ptd_ph_find_strongly_connected_components(graph);
+
+        if (graph->scc_graph == NULL) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 stack<struct ptd_ph_vertex *> *scc_stack2;
 vector<struct ptd_ph_scc_vertex *> *scc_components2;
 size_t scc_index2;
@@ -741,7 +817,7 @@ size_t *low_links2;
 bool *scc_on_stack2;
 static bool *visited;
 
-int strongconnect2(struct ptd_ph_vertex *vertex) {
+static int strongconnect2(struct ptd_ph_vertex *vertex) {
     scc_indices2[vertex->index] = scc_index2;
     low_links2[vertex->index] = scc_index2;
     visited[vertex->index] = true;
@@ -998,6 +1074,11 @@ struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph
 
             for (size_t k = 0; k < scc->internal_vertices_length; ++k) {
                 scc->internal_expected_visits[j][k] = -matrix_get(inverted_matrix, j, k);
+                if (scc->internal_expected_visits[j][k] < 0) {
+                    fprintf(stderr, "ERROR! <0 (a)\n");
+
+
+                }
             }
         }
 
@@ -1016,6 +1097,10 @@ struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph
                 scc->external_expected_visits[j][k] = -matrix_get(
                         inverted_matrix, j, k + scc->internal_vertices_length
                 );
+
+                if (scc->external_expected_visits[j][k] < 0) {
+                    fprintf(stderr, "ERROR! <0 (b)\n");
+                }
             }
         }
 
@@ -1027,8 +1112,8 @@ struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph
             scc->external_vertices[j]->index = old_indices[j + scc->internal_vertices_length];
         }
 
-        matrix_destroy(inverted_matrix);
-        matrix_destroy(matrix);
+        matrix_destroy(inverted_matrix, length);
+        matrix_destroy(matrix, length);
         free(old_indices);
     }
 
@@ -1045,6 +1130,10 @@ struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph
 }
 
 void ptd_ph_scc_graph_destroy(struct ptd_ph_scc_graph *scc_graph) {
+    if (scc_graph == NULL) {
+        return;
+    }
+
     for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
         struct ptd_ph_scc_vertex *scc = scc_graph->vertices[i];
 
@@ -1163,13 +1252,15 @@ ptd_phase_type_distribution_t *ptd_graph_as_phase_type_distribution(struct ptd_p
         for (size_t i = 0; i < vertex->edges_length; ++i) {
             struct ptd_ph_edge *edge = vertex->edges[i];
 
-            if (edge->to->index != 0) {
+            if (edge->to->edges_length != 0) {
                 res->sub_intensity_matrix[indices[vertex->index]][indices[edge->to->index]] += edge->weight;
             }
 
             res->sub_intensity_matrix[indices[vertex->index]][indices[vertex->index]] -= edge->weight;
         }
     }
+
+    free(indices);
 
     return res;
 }
@@ -1640,6 +1731,7 @@ struct ptd_ph_graph *ptd_ph_graph_create(size_t state_length) {
     graph->vertices_length = 0;
     graph->state_length = state_length;
     graph->vertices = NULL;
+    graph->scc_graph = NULL;
     graph->starting_vertex = ptd_ph_vertex_create(graph);
 
     return graph;
@@ -1651,6 +1743,7 @@ void ptd_ph_graph_destroy(struct ptd_ph_graph *graph) {
     }
 
     free(graph->vertices);
+    ptd_ph_scc_graph_destroy(graph->scc_graph);
     memset(graph, 0, sizeof(*graph));
     free(graph);
 }
@@ -1671,6 +1764,10 @@ struct ptd_ph_vertex *ptd_ph_vertex_create_state(struct ptd_ph_graph *graph, int
             (struct ptd_directed_graph *) graph,
             (struct ptd_directed_vertex *) vertex
     );
+
+
+    ptd_ph_scc_graph_destroy(graph->scc_graph);
+    graph->scc_graph = NULL;
 
     return vertex;
 }
@@ -1710,6 +1807,9 @@ struct ptd_ph_edge *ptd_ph_graph_add_edge(
             (struct ptd_directed_vertex *) from,
             (struct ptd_directed_edge *) edge
     );
+
+    ptd_ph_scc_graph_destroy(from->graph->scc_graph);
+    from->graph->scc_graph = NULL;
 
     return edge;
 }
@@ -1771,8 +1871,6 @@ static struct ptd_directed_vertex **ptd_graph_topological_sort(struct ptd_direct
 
     for (size_t i = 0; i < graph->vertices_length; ++i) {
         if (nparents[i] != 0) {
-            fprintf(stderr, "ERROR: graph is not acyclic\n");
-
             free(nparents);
             free(visited);
             free(res);
@@ -1785,6 +1883,16 @@ static struct ptd_directed_vertex **ptd_graph_topological_sort(struct ptd_direct
     free(visited);
 
     return res;
+}
+
+bool ptd_ph_graph_is_acyclic(struct ptd_ph_graph *graph) {
+    struct ptd_ph_vertex **sorted = ptd_ph_graph_topological_sort(graph);
+
+    bool is_acyclic = (sorted != NULL);
+
+    free(sorted);
+
+    return is_acyclic;
 }
 
 struct ptd_ph_vertex **ptd_ph_graph_topological_sort(struct ptd_ph_graph *graph) {
@@ -1988,6 +2096,8 @@ struct edge_cmp {
     }
 };
 
+#define REWARD_EPSILON 0.000001
+
 int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards) {
     vector<set<struct ptd_ph_vertex *> > parents(graph->vertices_length);
     double *rates = (double *) calloc(graph->vertices_length, sizeof(*rates));
@@ -2000,7 +2110,7 @@ int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards) {
         for (size_t j = 0; j < vertex->edges_length; ++j) {
             parents[vertex->edges[j]->to->index].insert(vertex);
 
-            if (rewards[i] != 0 && vertex != graph->starting_vertex && vertex->edges_length != 0) {
+            if (rewards[i] > REWARD_EPSILON && vertex != graph->starting_vertex && vertex->edges_length != 0) {
                 vertex->edges[j]->weight /= rewards[i];
             }
 
@@ -2017,7 +2127,7 @@ int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards) {
             continue;
         }
 
-        if (rewards[i] == 0) {
+        if (rewards[i] <= REWARD_EPSILON) {
             vector<struct ptd_ph_vertex *> ps(parents[i].begin(), parents[i].end());
 
             for (size_t k = 0; k < ps.size(); ++k) {
@@ -2086,7 +2196,7 @@ int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards) {
     for (size_t i = 0; i < graph->vertices_length; ++i) {
         if (rates[i] != 0 &&
             graph->starting_vertex->index != i &&
-            rewards[i] == 0) {
+            rewards[i] <= REWARD_EPSILON) {
             continue;
         }
 
@@ -2117,7 +2227,7 @@ int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards) {
     graph->starting_vertex->index = 0;
 
     for (size_t i = 1; i < old_length; ++i) {
-        if (rewards[i] == 0 && rates[i] != 0) {
+        if (rewards[i] <= REWARD_EPSILON && rates[i] != 0) {
             continue;
         }
 
@@ -2130,5 +2240,45 @@ int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards) {
 
     free(rates);
 
+    ptd_ph_scc_graph_destroy(graph->scc_graph);
+    graph->scc_graph = NULL;
+
     return 0;
+}
+
+double *ptd_ph_graph_expected_visits(struct ptd_ph_graph *graph) {
+    if (ptd_ph_graph_is_acyclic(graph)) {
+        return ptd_ph_graph_acyclic_visit_probability(graph);
+    } else {
+        ptd_ph_precompute_strongly_connected_components(graph);
+
+        return ptd_ph_graph_cyclic_expected_visits(graph->scc_graph);
+    }
+}
+
+double *ptd_ph_graph_expected_waiting_time(struct ptd_ph_graph *graph) {
+    double *res = ptd_ph_graph_expected_visits(graph);
+
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        struct ptd_ph_vertex *vertex = graph->vertices[i];
+        double rate = ptd_ph_vertex_rate(vertex);
+
+        if (rate != 0 && vertex != graph->starting_vertex) {
+            res[i] /= ptd_ph_vertex_rate(vertex);
+        } else {
+            res[i] = 0;
+        }
+    }
+
+    return res;
+}
+
+double *ptd_ph_graph_moment_rewards(struct ptd_ph_graph *graph, double *rewards) {
+    if (ptd_ph_graph_is_acyclic(graph)) {
+        return ptd_ph_graph_acyclic_moment_rewards(graph, rewards);
+    } else {
+        ptd_ph_precompute_strongly_connected_components(graph);
+
+        return ptd_ph_graph_cyclic_moment_rewards(graph->scc_graph, rewards);
+    }
 }
