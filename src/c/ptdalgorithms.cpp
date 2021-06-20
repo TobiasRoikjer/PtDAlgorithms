@@ -17,7 +17,7 @@ extern void *matrix_invert(void *matrix, size_t size);
 
 extern double matrix_get(void *matrix, size_t i, size_t j);
 
-extern double matrix_get(void *matrix, size_t i, size_t j);
+extern void matrix_set(void *matrix, size_t i, size_t j, double x);
 
 extern void *matrix_init(size_t size);
 
@@ -931,6 +931,12 @@ struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph
             scc->external_vertices[set_index] = *itr;
             set_index++;
         }
+    }
+
+    for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
+        struct ptd_ph_scc_vertex *scc = scc_graph->vertices[i];
+        size_t length = scc->internal_vertices_length + scc->external_vertices_length;
+        fprintf(stderr, "Must invert matrix of size %zu. SCC is number %zu out of %zu:\n", length, i, scc_graph->vertices_length);
     }
 
     for (size_t i = 0; i < scc_graph->vertices_length; ++i) {

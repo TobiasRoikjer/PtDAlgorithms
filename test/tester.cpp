@@ -840,13 +840,266 @@ void test_phase_type() {
     ptd_ph_graph_destroy(graph);
 }
 
+void test_kingman() {
+    size_t n = 80;
+    struct ptd_ph_graph *kingman_graph = ptd_ph_graph_create(n);
+    ptd_avl_tree_t *avl_tree = ptd_avl_tree_create(n);
+    int *istate = (int *) calloc(kingman_graph->state_length, sizeof(int));
+    istate[0] = (int)n;
+    ptd_ph_graph_add_edge(kingman_graph->starting_vertex, ptd_ph_vertex_create_state(kingman_graph, istate), 1);
+
+    for (size_t k = 1; k < kingman_graph->vertices_length; k++) {
+        struct ptd_ph_vertex *vertex = kingman_graph->vertices[k];
+        int *state = (int *) calloc(kingman_graph->state_length, sizeof(int));
+        memcpy(state, vertex->state, kingman_graph->state_length * sizeof(int));
+
+        for (size_t i = 0; i < kingman_graph->state_length; ++i) {
+            for (size_t j = i; j < kingman_graph->state_length; ++j) {
+                double weight;
+
+                if (i == j) {
+                    if (state[i] < 2) {
+                        continue;
+                    }
+
+                    weight = state[i] * (state[i] - 1) / 2;
+                } else {
+                    if (state[i] < 1 || state[j] < 1) {
+                        continue;
+                    }
+
+                    weight = state[i] * state[j];
+                }
+
+                state[i]--;
+                state[j]--;
+                state[(i + j + 2) - 1]++;
+
+                struct ptd_ph_vertex *child = ptd_avl_tree_vertex_find(avl_tree, state);
+
+                if (child == NULL) {
+                    int *child_state = (int *) calloc(kingman_graph->state_length, sizeof(int));
+
+                    memcpy(child_state, state, kingman_graph->state_length * sizeof(int));
+
+                    child = ptd_ph_vertex_create_state(kingman_graph, child_state);
+
+                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child);
+                }
+
+                state[i]++;
+                state[j]++;
+                state[(i + j + 2) - 1]--;
+
+                ptd_ph_graph_add_edge(vertex, child, weight);
+            }
+        }
+
+        free(state);
+    }
+
+    fprintf(stderr, "%zu\n", kingman_graph->vertices_length);
+}
+
+struct conf {
+    int locus1;
+    int locus2;
+    int population;
+};
+
+struct conf index_to_conf(int s, int i) {
+    int d = s + 1;
+    int p = i / (d*d);
+    int a = (i - p*d*d) / d;
+    int b = (i - p*d*d) % d;
+
+    return((struct conf) {.locus1 = a, .locus2=b, .population=p+1});
+}
+
+int conf_to_index(int s, int locus1, int locus2, int population) {
+    int d = s + 1;
+    int i = (population-1)*d*d + locus1*d + locus2;
+
+    return(i);
+}
+
+void test_2p2l() {
+    int s = 5;
+    int p = 2;
+
+    size_t n = (size_t)p*(s+1)*(s+1);
+    struct ptd_ph_graph *graph = ptd_ph_graph_create(n);
+    ptd_avl_tree_t *avl_tree = ptd_avl_tree_create(n);
+
+    struct ptd_ph_vertex *first_vertex = ptd_ph_vertex_create(graph);
+    first_vertex->state[conf_to_index(s, 1, 1, 1)] = s;
+    ptd_ph_graph_add_edge(graph->starting_vertex, first_vertex, 1);
+
+    for (int index = 1; index < graph->vertices_length; index++) {
+        struct ptd_ph_vertex *vertex = graph->vertices[index];
+        int count = 0;
+
+        for (size_t i = 0; i < n; ++i) {
+            count += vertex->state[i];
+        }
+
+        if (count <= 1) {
+            // Only one lineage, stop
+            continue;
+        }
+
+        for (int i = 0; i < n; ++i) {
+            struct conf conf_i = index_to_conf(s, i);
+
+            // coalescence
+            for (int j = i; j < n; ++j) {
+                struct conf conf_j = index_to_conf(s, j);
+
+                if (conf_i.population != conf_j.population) {
+                    continue;
+                }
+
+                double rate;
+
+                if (i == j) {
+                    if (vertex->state[i] < 2) {
+                        continue;
+                    }
+
+                    rate = vertex->state[i] * (vertex->state[i] - 1) / 2;
+                } else {
+                    if (vertex->state[i] < 1 || vertex->state[j] < 1) {
+                        continue;
+                    }
+
+                    rate = vertex->state[i] * vertex->state[j];
+                }
+
+                int *child_state = (int *) calloc(n, sizeof(int));
+                memcpy(child_state, vertex->state, sizeof(*child_state)*n);
+                child_state[i] -= 1;
+                child_state[j] -= 1;
+
+                int k = conf_to_index(s, conf_i.locus1+conf_j.locus1, conf_i.locus2+conf_j.locus2, conf_i.population);
+                child_state[k] += 1;
+
+                struct ptd_ph_vertex *child_vertex = ptd_avl_tree_vertex_find(avl_tree, child_state);
+
+                if (child_vertex == NULL) {
+                    child_vertex = ptd_ph_vertex_create_state(graph, child_state);
+
+                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child_vertex);
+                } else {
+                    free(child_state);
+                }
+
+                ptd_ph_graph_add_edge(vertex, child_vertex, rate);
+            }
+
+            if (vertex->state[i] > 0 && conf_i.locus1 > 0 && conf_i.locus2 > 0) {
+                // recombination
+                double rate = 1;
+
+                int k = conf_to_index(s, conf_i.locus1, 0, conf_i.population);
+                int l = conf_to_index(s, 0, conf_i.locus2, conf_i.population);
+                int *child_state = (int *) calloc(n, sizeof(int));
+                memcpy(child_state, vertex->state, sizeof(*child_state)*n);
+                child_state[i] -= 1;
+                child_state[k] += 1;
+                child_state[l] += 1;
+
+                struct ptd_ph_vertex *child_vertex = ptd_avl_tree_vertex_find(avl_tree, child_state);
+
+                if (child_vertex == NULL) {
+                    child_vertex = ptd_ph_vertex_create_state(graph, child_state);
+
+                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child_vertex);
+                } else {
+                    free(child_state);
+                }
+
+                ptd_ph_graph_add_edge(vertex, child_vertex, rate);
+            }
+
+            if (vertex->state[i] > 0) {
+                // migration
+                double rate = 0.1;
+
+                int *child_state = (int *) calloc(n, sizeof(int));
+                memcpy(child_state, vertex->state, sizeof(*child_state)*n);
+
+                int m;
+
+                if (conf_i.population == 1) {
+                    m = 2;
+                } else {
+                    m = 1;
+                }
+
+                int k = conf_to_index(s, conf_i.locus1, conf_i.locus2, m);
+                child_state[i] -= 1;
+                child_state[k] += 1;
+
+                struct ptd_ph_vertex *child_vertex = ptd_avl_tree_vertex_find(avl_tree, child_state);
+
+                if (child_vertex == NULL) {
+                    child_vertex = ptd_ph_vertex_create_state(graph, child_state);
+
+                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child_vertex);
+                } else {
+                    free(child_state);
+                }
+
+                ptd_ph_graph_add_edge(vertex, child_vertex, rate);
+            }
+        }
+    }
+    fprintf(stderr, "Done creating graph. It has %zu vertices\n", graph->vertices_length);
+
+    double *e = ptd_ph_graph_expected_waiting_time(graph);
+    double wt = 0;
+
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        wt += e[i];
+    }
+
+    fprintf(stderr, "Exp waiting time: %f\n", wt);
+
+    /*double *rewards = (double*) calloc(graph->vertices_length, sizeof(*rewards));
+    int relevant_index1 = conf_to_index(s, 3, 1, 1);
+    int relevant_index2 = conf_to_index(s, 3, 1, 2);
+
+
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        rewards[i] = graph->vertices[i]->state[relevant_index1] != 0 || graph->vertices[i]->state[relevant_index2] != 0 ? 1 : 0;
+    }
+
+    ptd_ph_graph_reward_transform(graph, rewards);
+
+    double *e = ptd_ph_graph_expected_waiting_time(graph);
+    double wt = 0;
+
+    for (size_t i = 0; i < graph->vertices_length; ++i) {
+        wt += e[i];
+    }
+
+    fprintf(stderr, "Exp waiting time: %f\n", wt);
+
+    free(e);*/
+
+    ptd_avl_tree_vertex_destroy(avl_tree);
+    ptd_ph_graph_destroy(graph);
+}
+
 int main(int argc, char **argv) {
-    test_basic_graph();
+    /*test_basic_graph();
     test_basic_ptd_ph_graph();
     test_basic_ptd_ph_graph_edges();
     test_basic_ptd_ph_graph_scc();
     test_acyclic_expected_visits();
     test_cyclic_expected_entry_visits();
     test_is_acyclic();
-    test_phase_type();
+    test_phase_type();*/
+    //test_kingman();
+    test_2p2l();
 }
