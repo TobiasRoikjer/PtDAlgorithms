@@ -9,6 +9,27 @@
 #include <set>
 #include "ptdalgorithms.h"
 
+static void _ptd_avl_tree_destroy(struct ptd_avl_node *avl_vertex);
+
+struct ptd_avl_tree *ptd_avl_tree_create(size_t key_length) {
+    struct ptd_avl_tree *avl_tree = (struct ptd_avl_tree *) malloc(sizeof(struct ptd_avl_tree));
+
+    if (avl_tree == NULL) {
+        return NULL;
+    }
+
+    avl_tree->root = NULL;
+    avl_tree->key_length = key_length;
+
+    return avl_tree;
+}
+
+void ptd_avl_tree_destroy(struct ptd_avl_tree *avl_tree) {
+    _ptd_avl_tree_destroy((struct ptd_avl_node *) avl_tree->root);
+    avl_tree->root = NULL;
+    free(avl_tree);
+}
+
 // TODO: name these ptd_...
 
 extern void *create_matrix(double **mat, size_t length);
@@ -27,7 +48,6 @@ extern void matrix_destroy(void *matrix, size_t size);
 
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_linalg.h>
-#include <ptd.h>
 
 void *create_matrix(double **mat, size_t length) {
     gsl_matrix *full = gsl_matrix_alloc(length, length);
@@ -91,9 +111,9 @@ void matrix_destroy(void *matrix, size_t size) {
 *  B: parent
 *  D: child_right
 */
-struct avl_node *rotate_left_right(struct avl_node *parent, struct avl_node *child) {
-    struct avl_node *child_right_left, *child_right_right;
-    struct avl_node *child_right = child->right;
+static struct ptd_avl_node *rotate_left_right(struct ptd_avl_node *parent, struct ptd_avl_node *child) {
+    struct ptd_avl_node *child_right_left, *child_right_right;
+    struct ptd_avl_node *child_right = child->right;
     child_right_left = child_right->left;
     child->right = child_right_left;
 
@@ -139,9 +159,9 @@ struct avl_node *rotate_left_right(struct avl_node *parent, struct avl_node *chi
 *  B: parent
 *  D: child_left
 */
-struct avl_node *rotate_right_left(struct avl_node *parent, struct avl_node *child) {
-    struct avl_node *child_left_right, *child_left_left;
-    struct avl_node *child_left = child->left;
+static struct ptd_avl_node *rotate_right_left(struct ptd_avl_node *parent, struct ptd_avl_node *child) {
+    struct ptd_avl_node *child_left_right, *child_left_left;
+    struct ptd_avl_node *child_left = child->left;
 
     child_left_right = child_left->right;
 
@@ -186,8 +206,8 @@ struct avl_node *rotate_right_left(struct avl_node *parent, struct avl_node *chi
 *    B   (left) A   C
 *      C   ->
 */
-struct avl_node *rotate_left(struct avl_node *parent, struct avl_node *child) {
-    struct avl_node *child_left;
+static struct ptd_avl_node *rotate_left(struct ptd_avl_node *parent, struct ptd_avl_node *child) {
+    struct ptd_avl_node *child_left;
 
     child_left = child->left;
     parent->right = child_left;
@@ -216,8 +236,8 @@ struct avl_node *rotate_left(struct avl_node *parent, struct avl_node *child) {
 *    B    (right) C   A
 *  C        ->
 */
-struct avl_node *rotate_right(struct avl_node *parent, struct avl_node *child) {
-    struct avl_node *child_right;
+static struct ptd_avl_node *rotate_right(struct ptd_avl_node *parent, struct ptd_avl_node *child) {
+    struct ptd_avl_node *child_right;
 
     child_right = child->right;
     parent->left = child_right;
@@ -240,15 +260,15 @@ struct avl_node *rotate_right(struct avl_node *parent, struct avl_node *child) {
     return child;
 }
 
-struct avl_node *avl_vec_vertex_create(char *key, void *entry, struct avl_node *parent) {
-    struct avl_node *vertex;
+static struct ptd_avl_node *ptd_avl_node_create(const int *key, const void *entry, struct ptd_avl_node *parent) {
+    struct ptd_avl_node *vertex;
 
-    if ((vertex = (struct avl_node *) malloc(sizeof(*vertex))) == NULL) {
+    if ((vertex = (struct ptd_avl_node *) malloc(sizeof(*vertex))) == NULL) {
         return NULL;
     }
 
-    vertex->key = key;
-    vertex->entry = entry;
+    vertex->key = (int *) key;
+    vertex->entry = (void *) entry;
     vertex->left = NULL;
     vertex->right = NULL;
     vertex->parent = parent;
@@ -257,18 +277,18 @@ struct avl_node *avl_vec_vertex_create(char *key, void *entry, struct avl_node *
     return vertex;
 }
 
-void avl_vec_vertex_destroy(struct avl_node *vertex) {
+static void ptd_avl_node_destroy(struct ptd_avl_node *vertex) {
     if (vertex == NULL) {
         return;
     }
 
-    avl_vec_vertex_destroy(vertex->left);
-    avl_vec_vertex_destroy(vertex->right);
+    ptd_avl_node_destroy(vertex->left);
+    ptd_avl_node_destroy(vertex->right);
 
     free(vertex);
 }
 
-static void avl_free(struct avl_node *vertex) {
+static void avl_free(struct ptd_avl_node *vertex) {
     if (vertex == NULL) {
         return;
     }
@@ -278,13 +298,13 @@ static void avl_free(struct avl_node *vertex) {
     free(vertex);
 }
 
-const struct avl_node *
-avl_vec_find(const struct avl_node *rootptr, const char *key, const size_t vec_length) {
+const struct ptd_avl_node *
+avl_vec_find(const struct ptd_avl_node *rootptr, const char *key, const size_t vec_length) {
     if (rootptr == NULL) {
         return NULL;
     }
 
-    const struct avl_node *vertex = rootptr;
+    const struct ptd_avl_node *vertex = rootptr;
 
     while (true) {
         int res = memcmp(key, vertex->key, vec_length);
@@ -307,9 +327,9 @@ avl_vec_find(const struct avl_node *rootptr, const char *key, const size_t vec_l
     }
 }
 
-int find_or_insert_vec(struct avl_node **out, struct avl_node *rootptr, char *key, void *entry,
+int find_or_insert_vec(struct ptd_avl_node **out, struct ptd_avl_node *rootptr, int *key, void *entry,
                        const size_t vec_length) {
-    if ((*out = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
+    if ((*out = ptd_avl_node_create(key, entry, NULL)) == NULL) {
         return -1;
     }
 
@@ -317,7 +337,7 @@ int find_or_insert_vec(struct avl_node **out, struct avl_node *rootptr, char *ke
         return 1;
     }
 
-    struct avl_node *vertex = rootptr;
+    struct ptd_avl_node *vertex = rootptr;
 
     while (true) {
         int res = memcmp(key, vertex->key, vec_length);
@@ -348,10 +368,10 @@ int find_or_insert_vec(struct avl_node **out, struct avl_node *rootptr, char *ke
     return 0;
 }
 
-int avl_rebalance_tree(struct avl_node **root, struct avl_node *child) {
-    struct avl_node *pivot, *rotated_parent;
+int avl_rebalance_tree(struct ptd_avl_node **root, struct ptd_avl_node *child) {
+    struct ptd_avl_node *pivot, *rotated_parent;
 
-    for (struct avl_node *parent = child->parent; parent != NULL; parent = child->parent) {
+    for (struct ptd_avl_node *parent = child->parent; parent != NULL; parent = child->parent) {
         if (child == parent->right) {
             if (parent->balance > 0) {
                 pivot = parent->parent;
@@ -413,34 +433,8 @@ int avl_rebalance_tree(struct avl_node **root, struct avl_node *child) {
     return 0;
 }
 
-int avl_vec_insert(struct avl_node **root, char *key, void *entry, const size_t vec_length) {
-    struct avl_node *child;
 
-    if (*root == NULL) {
-        if ((*root = avl_vec_vertex_create(key, entry, NULL)) == NULL) {
-            return -1;
-        }
-
-        return 0;
-    }
-
-    int res = find_or_insert_vec(&child, *root, key, entry, vec_length);
-
-    if (res == -1) {
-        return -1;
-    }
-
-    if (res == 0) {
-        return 0;
-    }
-
-    avl_rebalance_tree(root, child);
-
-    return 0;
-}
-
-
-static size_t avl_vec_get_size(struct avl_node *vertex) {
+static size_t avl_vec_get_size(struct ptd_avl_node *vertex) {
     if (vertex == NULL) {
         return 0;
     }
@@ -448,26 +442,14 @@ static size_t avl_vec_get_size(struct avl_node *vertex) {
     return 1 + avl_vec_get_size(vertex->left) + avl_vec_get_size(vertex->right);
 }
 
-ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length) {
-    ptd_avl_tree_t *avl_tree = (ptd_avl_tree_t *) malloc(sizeof(ptd_avl_tree_t));
 
-    if (avl_tree == NULL) {
-        return NULL;
-    }
-
-    avl_tree->root = NULL;
-    avl_tree->vec_length = vec_length;
-
-    return avl_tree;
-}
-
-void _ptd_avl_tree_vertex_destroy(struct avl_node *avl_vertex) {
+static void _ptd_avl_tree_destroy(struct ptd_avl_node *avl_vertex) {
     if (avl_vertex == NULL) {
         return;
     }
 
-    _ptd_avl_tree_vertex_destroy(avl_vertex->left);
-    _ptd_avl_tree_vertex_destroy(avl_vertex->right);
+    _ptd_avl_tree_destroy(avl_vertex->left);
+    _ptd_avl_tree_destroy(avl_vertex->right);
 
     avl_vertex->left = NULL;
     avl_vertex->right = NULL;
@@ -475,247 +457,80 @@ void _ptd_avl_tree_vertex_destroy(struct avl_node *avl_vertex) {
     free(avl_vertex);
 }
 
-void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_vertex_destroy((struct avl_node *) avl_tree->root);
-    avl_tree->root = NULL;
-    free(avl_tree);
-}
-
-void _ptd_avl_tree_vertex_destroy_free(struct avl_node *avl_vertex) {
-    if (avl_vertex == NULL) {
-        return;
-    }
-
-    _ptd_avl_tree_vertex_destroy_free(avl_vertex->left);
-    _ptd_avl_tree_vertex_destroy_free(avl_vertex->right);
-
-    ptd_ph_vertex_destroy((struct ptd_ph_vertex *) avl_vertex->entry);
-    avl_vertex->left = NULL;
-    avl_vertex->right = NULL;
-    avl_vertex->entry = NULL;
-    free(avl_vertex);
-}
-
-void ptd_avl_tree_vertex_destroy_free(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_vertex_destroy_free((struct avl_node *) avl_tree->root);
-    avl_tree->root = NULL;
-    free(avl_tree);
-}
-
-
-void _ptd_avl_tree_edge_destroy(struct avl_node *avl_vertex) {
-    if (avl_vertex == NULL) {
-        return;
-    }
-
-    _ptd_avl_tree_edge_destroy(avl_vertex->left);
-    _ptd_avl_tree_edge_destroy(avl_vertex->right);
-
-    avl_vertex->left = NULL;
-    avl_vertex->right = NULL;
-    free(avl_vertex->entry);
-    avl_vertex->entry = NULL;
-    free(avl_vertex);
-}
-
-void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree) {
-    _ptd_avl_tree_edge_destroy((struct avl_node *) avl_tree->root);
-    avl_tree->root = NULL;
-    free(avl_tree);
-}
 
 size_t ptd_avl_tree_max_depth(void *avl_vec_vertex) {
-    if ((struct avl_node *) avl_vec_vertex == NULL) {
+    if ((struct ptd_avl_node *) avl_vec_vertex == NULL) {
         return 0;
     }
 
     return max(
-            ptd_avl_tree_max_depth((void *) ((struct avl_node *) avl_vec_vertex)->left) + 1,
-            ptd_avl_tree_max_depth((void *) ((struct avl_node *) avl_vec_vertex)->left) + 1
+            ptd_avl_tree_max_depth((void *) ((struct ptd_avl_node *) avl_vec_vertex)->left) + 1,
+            ptd_avl_tree_max_depth((void *) ((struct ptd_avl_node *) avl_vec_vertex)->left) + 1
     );
 }
 
 
-int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const int *key, const struct ptd_ph_vertex *vertex) {
-    int res;
+struct ptd_avl_node *ptd_avl_tree_find_or_insert(struct ptd_avl_tree *avl_tree, const int *key, const void *entry) {
+    struct ptd_avl_node *new_node = ptd_avl_node_create(key, entry, NULL);
 
-    struct avl_node *root = (struct avl_node *) avl_tree->root;
-    res = avl_vec_insert(&root, (char *) key, (void *) vertex, avl_tree->vec_length * sizeof(int));
-
-    if (res != 0) {
-        return res;
-    }
-
-    avl_tree->root = root;
-
-    return 0;
-}
-
-struct ptd_ph_vertex *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const int *key) {
-    const struct avl_node *avl_vertex = avl_vec_find(
-            (struct avl_node *) avl_tree->root,
-            (char *) key,
-            avl_tree->vec_length * sizeof(int)
-    );
-
-
-    if (avl_vertex == NULL) {
+    if (new_node == NULL) {
         return NULL;
     }
 
-    return (struct ptd_ph_vertex *) avl_vertex->entry;
-}
+    if (avl_tree->root == NULL) {
+        avl_tree->root = new_node;
 
-int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const int *key, struct ptd_ph_vertex *vertex,
-                                          double weight) {
-    struct avl_node *root = (struct avl_node *) avl_tree->root;
-    struct avl_node *child;
-
-    if (root == NULL) {
-        struct ptd_ph_edge *edge = (struct ptd_ph_edge *) malloc(sizeof(*edge));
-        edge->weight = weight;
-        edge->to = vertex;
-
-        if ((root = avl_vec_vertex_create((char *) key, (void *) edge, NULL)) == NULL) {
-            return -1;
-        }
-
-        avl_tree->root = root;
-
-        return 0;
+        return new_node;
     }
 
-    struct avl_node *parent = root;
+    struct ptd_avl_node *vertex = avl_tree->root;
 
     while (true) {
-        int res = memcmp(parent->key, key, avl_tree->vec_length * sizeof(int));
+        int res = memcmp(key, vertex->key, sizeof(int) * avl_tree->key_length);
 
         if (res < 0) {
-            if (parent->left == NULL) {
-                struct ptd_ph_edge *edge = (struct ptd_ph_edge *) malloc(sizeof(*edge));
-                edge->weight = weight;
-                edge->to = vertex;
-
-                child = avl_vec_vertex_create((char *) key, edge, parent);
-
-                if (child == NULL) {
-                    return -1;
-                }
-
-                parent->left = child;
-
+            if (vertex->left == NULL) {
+                vertex->left = new_node;
                 break;
             } else {
-                parent = parent->left;
+                vertex = vertex->left;
             }
         } else if (res > 0) {
-            if (parent->right == NULL) {
-                struct ptd_ph_edge *edge = (struct ptd_ph_edge *) malloc(sizeof(*edge));
-                edge->weight = weight;
-                edge->to = vertex;
-
-                child = avl_vec_vertex_create((char *) key, edge, parent);
-
-                if (child == NULL) {
-                    return -1;
-                }
-
-                parent->right = child;
-
+            if (vertex->right == NULL) {
+                vertex->right = new_node;
                 break;
             } else {
-                parent = parent->right;
+                vertex = vertex->right;
             }
         } else {
-            ((struct ptd_ph_edge *) parent->entry)->weight += weight;
-
-            return 0;
+            free(new_node);
+            return vertex;
         }
     }
 
-    avl_rebalance_tree(&root, child);
-    avl_tree->root = root;
+    new_node->parent = vertex;
 
-    return 0;
+    avl_rebalance_tree(&avl_tree->root, new_node);
 
-
-    return 0;
+    return new_node;
 }
 
-int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const int *key) {
-    struct avl_node *root = (struct avl_node *) avl_tree->root;
-
-    if (root == NULL) {
-        return 0;
-    }
-
-    struct avl_node *parent = root;
-
-    enum DIR {
-        NONE, LEFT, RIGHT
-    };
-    DIR dir = NONE;
+struct ptd_avl_node *ptd_avl_tree_find(const struct ptd_avl_tree *avl_tree, const int *key) {
+    struct ptd_avl_node *vertex = avl_tree->root;
 
     while (true) {
-        int res = memcmp(parent->key, key, avl_tree->vec_length * sizeof(int));
-
-        if (res < 0) {
-            if (parent->left == NULL) {
-                return 0;
-            } else {
-                parent = parent->left;
-                dir = LEFT;
-            }
-        } else if (res > 0) {
-            if (parent->right == NULL) {
-                return 0;
-            } else {
-                parent = parent->right;
-                dir = RIGHT;
-            }
-        } else {
-            break;
-        }
-    }
-
-    if (parent->parent != NULL) {
-        if (dir == LEFT) {
-            parent->parent->left = NULL;
-        }
-
-        avl_rebalance_tree((struct avl_node **) &avl_tree->root, parent->parent);
-    } else {
-        if (parent->left != NULL) {
-            avl_tree->root = parent->left;
-        } else if (parent->right != NULL) {
-            avl_tree->root = parent->right;
-        } else {
-            avl_tree->root = NULL;
-            return 0;
-        }
-
-        avl_rebalance_tree((struct avl_node **) &avl_tree->root, (struct avl_node *) avl_tree->root);
-    }
-
-    return 0;
-}
-
-struct ptd_ph_edge *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const int *key) {
-    struct avl_node *parent = (struct avl_node *) avl_tree->root;
-
-    while (true) {
-        if (parent == NULL) {
+        if (vertex == NULL) {
             return NULL;
         }
 
-        int res = memcmp(parent->key, (char *) key, avl_tree->vec_length * sizeof(int));
+        int res = memcmp(key, vertex->key, sizeof(int) * avl_tree->key_length);
 
         if (res < 0) {
-            parent = parent->left;
+            vertex = vertex->left;
         } else if (res > 0) {
-            parent = parent->right;
+            vertex = vertex->right;
         } else {
-            return (struct ptd_ph_edge *) parent->entry;
+            return vertex;
         }
     }
 }
@@ -804,6 +619,7 @@ static int strongconnect2(struct ptd_ph_vertex *vertex) {
     return 0;
 }
 
+//TODO: Do not invert if just a single vertex...
 struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph_graph *graph) {
     struct ptd_ph_scc_graph *scc_graph = (struct ptd_ph_scc_graph *) malloc(
             sizeof(*scc_graph)
@@ -936,7 +752,8 @@ struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph
     for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
         struct ptd_ph_scc_vertex *scc = scc_graph->vertices[i];
         size_t length = scc->internal_vertices_length + scc->external_vertices_length;
-        fprintf(stderr, "Must invert matrix of size %zu. SCC is number %zu out of %zu:\n", length, i, scc_graph->vertices_length);
+        fprintf(stderr, "Must invert matrix of size %zu. SCC is number %zu out of %zu:\n", length, i,
+                scc_graph->vertices_length);
     }
 
     for (size_t i = 0; i < scc_graph->vertices_length; ++i) {
@@ -988,7 +805,30 @@ struct ptd_ph_scc_graph *ptd_ph_find_strongly_connected_components(struct ptd_ph
             matrix_set(matrix, j, j, -1);
         }
 
+        fprintf(stderr, "Trying to invert of size %zu. SCC is number %zu out of %zu:\n", length, i,
+                scc_graph->vertices_length);
+        /*for (size_t i = 0; i < length; ++i) {
+          for (size_t j = 0; j < length; ++j) {
+            fprintf(stderr, "%f ", matrix_get(matrix, i, j));
+          }
+          fprintf(stderr, "\n");
+        }
+        
+        fprintf(stderr, "Int %zu, ext %zu\n", scc->internal_vertices_length, scc->external_vertices_length);
+
+        
+        
+        
+        fprintf(stderr, "States:\n");
+        for (size_t i = 0; i < scc->internal_vertices_length; ++i) {
+          fprintf(stderr, "%zu:  ", i);
+          for (size_t j = 0; j < graph->key_length; ++j) {
+            fprintf(stderr, "%i ", scc->internal_vertices[i]->state[j]);
+          }
+          fprintf(stderr, "\n");
+        }*/
         void *inverted_matrix = matrix_invert(matrix, length);
+
 
         scc->internal_expected_visits = (double **) calloc(
                 scc->internal_vertices_length,
@@ -1240,15 +1080,15 @@ int ptd_ph_vertex_to_s(struct ptd_ph_vertex *vertex, char *buffer, size_t buffer
  */
 
 
-/*static ptd_avl_tree_t *avl_tree = NULL;
+/*static struct ptd_avl_tree *avl_tree = NULL;
 static struct ptd_ph_graph *kingman_graph = NULL;
 
 static int make_kingman(struct ptd_ph_vertex *vertex) {
-    int *state = (int *) calloc(kingman_graph->state_length, sizeof(int));
-    memcpy(state, vertex->state, kingman_graph->state_length * sizeof(int));
+    int *state = (int *) calloc(kingman_graph->key_length, sizeof(int));
+    memcpy(state, vertex->state, kingman_graph->key_length * sizeof(int));
 
-    for (size_t i = 0; i < kingman_graph->state_length; ++i) {
-        for (size_t j = i; j < kingman_graph->state_length; ++j) {
+    for (size_t i = 0; i < kingman_graph->key_length; ++i) {
+        for (size_t j = i; j < kingman_graph->key_length; ++j) {
             double weight;
 
             if (i == j) {
@@ -1269,20 +1109,20 @@ static int make_kingman(struct ptd_ph_vertex *vertex) {
             state[j]--;
             state[(i + j + 2) - 1]++;
 
-            struct ptd_ph_vertex *child = ptd_avl_tree_vertex_find(avl_tree, state);
+            struct ptd_ph_vertex *child = ptd_avl_tree_find(avl_tree, state);
 
             if (child == NULL) {
-                int *child_state = (int *) calloc(kingman_graph->state_length, sizeof(int));
+                int *child_state = (int *) calloc(kingman_graph->key_length, sizeof(int));
 
                 if (child_state == NULL) {
                     return -1;
                 }
 
-                memcpy(child_state, state, kingman_graph->state_length * sizeof(int));
+                memcpy(child_state, state, kingman_graph->key_length * sizeof(int));
 
                 child = ptd_ph_vertex_create_state(kingman_graph, child_state);
 
-                if (ptd_avl_tree_vertex_insert(avl_tree, child_state, child)) {
+                if (ptd_avl_tree_find_or_insert(avl_tree, child_state, child)) {
                     return -1;
                 }
             }
@@ -1310,7 +1150,7 @@ static int make_kingman(struct ptd_ph_vertex *vertex) {
     kingman_graph = ptd_ph_graph_create(n);
 
     if (kingman_graph == NULL) {
-        ptd_avl_tree_vertex_destroy(avl_tree);
+        ptd_avl_tree_destroy(avl_tree);
         return NULL;
     }
 
@@ -1318,26 +1158,26 @@ static int make_kingman(struct ptd_ph_vertex *vertex) {
 
     if (initial == NULL) {
         ptd_ph_graph_destroy(kingman_graph);
-        ptd_avl_tree_vertex_destroy(avl_tree);
+        ptd_avl_tree_destroy(avl_tree);
     }
 
     initial->state[0] = (int)n;
 
     if (ptd_ph_graph_add_edge(kingman_graph->starting_vertex, initial, 1) != 0) {
         ptd_ph_graph_destroy(kingman_graph);
-        ptd_avl_tree_vertex_destroy(avl_tree);
+        ptd_avl_tree_destroy(avl_tree);
 
         return NULL;
     }
 
     if (ptd_visit_vertices(kingman_graph, make_kingman, false) != 0) {
         ptd_graph_destroy(kingman_graph);
-        ptd_avl_tree_vertex_destroy(avl_tree);
+        ptd_avl_tree_destroy(avl_tree);
 
         return NULL;
     }
 
-    ptd_avl_tree_vertex_destroy(avl_tree);
+    ptd_avl_tree_destroy(avl_tree);
 
     return kingman_graph;
 }*/
@@ -1362,11 +1202,11 @@ static double mig[2];
 #define IDX_R 2
 
 static struct ptd_ph_vertex *add_child(int *state) {
-    struct ptd_ph_vertex *child = ptd_avl_tree_vertex_find(avl_tree, state);
+    struct ptd_ph_vertex *child = ptd_avl_tree_find(avl_tree, state);
 
     if (child == NULL) {
         int *child_state = (int *) calloc(
-                two_island_two_loci_recomb_graph->state_length,
+                two_island_two_loci_recomb_graph->key_length,
                 sizeof(int)
         );
 
@@ -1376,14 +1216,14 @@ static struct ptd_ph_vertex *add_child(int *state) {
 
         memcpy(
                 child_state, state,
-                two_island_two_loci_recomb_graph->state_length * sizeof(int)
+                two_island_two_loci_recomb_graph->key_length * sizeof(int)
         );
 
         child = ptd_ph_vertex_create_state(
                 two_island_two_loci_recomb_graph, child_state
         );
 
-        if (ptd_avl_tree_vertex_insert(avl_tree, child_state, child)) {
+        if (ptd_avl_tree_find_or_insert(avl_tree, child_state, child)) {
             return NULL;
         }
     }
@@ -1400,13 +1240,13 @@ static int visit_two_island_two_loci_recomb(struct ptd_ph_vertex *vertex) {
     }
 
     int *state = (int *) calloc(
-            two_island_two_loci_recomb_graph->state_length,
+            two_island_two_loci_recomb_graph->key_length,
             sizeof(int)
     );
 
     memcpy(
             state, vertex->state,
-            two_island_two_loci_recomb_graph->state_length * sizeof(int)
+            two_island_two_loci_recomb_graph->key_length * sizeof(int)
     );
 
     // Migration
@@ -1574,7 +1414,7 @@ struct ptd_graph *ptd_model_two_island_two_loci_recomb(
             false
     );
 
-    ptd_avl_tree_vertex_destroy(avl_tree);
+    ptd_avl_tree_destroy(avl_tree);
 
     return two_island_two_loci_recomb_graph;
 }
@@ -2057,6 +1897,8 @@ int ptd_ph_graph_reward_transform(struct ptd_ph_graph *graph, double *rewards) {
         }
 
         if (rewards[i] <= REWARD_EPSILON) {
+            DEBUG_PRINT("Reward transforming index %zu out of %zu\n",
+                    i, graph->vertices_length);
             vector<struct ptd_ph_vertex *> ps(parents[i].begin(), parents[i].end());
 
             for (size_t k = 0; k < ps.size(); ++k) {

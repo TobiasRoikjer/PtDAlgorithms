@@ -23,7 +23,18 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::create_vertex(vector<int> state) {
 
     Vertex vertex = ptdalgorithms::Vertex(*this, c_state);
 
-    if (ptd_avl_tree_vertex_insert(this->rf_graph->tree, c_state, vertex.vertex)) {
+    if (vertex_exists(state)) {
+        char buffer[1024];
+        ptd_ph_vertex_to_s(vertex.vertex, buffer, 1024);
+        char message[2048];
+        snprintf(message, 2048, "Vertex with state '%s' already exists\n", buffer);
+
+        throw runtime_error(
+                message
+        );
+    }
+
+    if (ptd_avl_tree_find_or_insert(this->rf_graph->tree, c_state, vertex.vertex) == NULL) {
         throw runtime_error(
                 "Failed to insert into AVL tree\n"
         );
@@ -40,7 +51,18 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::create_vertex_p(vector<int> state) 
 
     Vertex *vertex = new ptdalgorithms::Vertex(*this, c_state);
 
-    if (ptd_avl_tree_vertex_insert(this->rf_graph->tree, c_state, vertex->vertex)) {
+    if (vertex_exists(state)) {
+        char buffer[1024];
+        ptd_ph_vertex_to_s(vertex->vertex, buffer, 1024);
+        char message[2048];
+        snprintf(message, 2048, "Vertex with state '%s' already exists\n", buffer);
+
+        throw runtime_error(
+                message
+        );
+    }
+
+    if (ptd_avl_tree_find_or_insert(this->rf_graph->tree, c_state, vertex->vertex) == NULL) {
         throw runtime_error(
                 "Failed to insert into AVL tree\n"
         );
@@ -55,9 +77,9 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<int> state) {
     int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    struct ptd_ph_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_avl_node *node = ptd_avl_tree_find(this->rf_graph->tree, c_state);
 
-    if (vertex == NULL) {
+    if (node == NULL) {
         throw runtime_error(
                 "No such vertex found\n"
         );
@@ -65,7 +87,7 @@ ptdalgorithms::Vertex ptdalgorithms::Graph::find_vertex(vector<int> state) {
 
     free(c_state);
 
-    return ptdalgorithms::Vertex(*this, vertex);
+    return ptdalgorithms::Vertex(*this, (struct ptd_ph_vertex*) node->entry);
 }
 
 ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<int> state) {
@@ -74,9 +96,9 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<int> state) {
     int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    struct ptd_ph_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_avl_node *node = ptd_avl_tree_find(this->rf_graph->tree, c_state);
 
-    if (vertex == NULL) {
+    if (node == NULL) {
         throw runtime_error(
                 "No such vertex found\n"
         );
@@ -84,7 +106,7 @@ ptdalgorithms::Vertex *ptdalgorithms::Graph::find_vertex_p(vector<int> state) {
 
     free(c_state);
 
-    return new ptdalgorithms::Vertex(*this, vertex);
+    return new ptdalgorithms::Vertex(*this, (struct ptd_ph_vertex*) node->entry);
 }
 
 bool ptdalgorithms::Graph::vertex_exists(std::vector<int> state) {
@@ -93,11 +115,11 @@ bool ptdalgorithms::Graph::vertex_exists(std::vector<int> state) {
     int *c_state = (int *) calloc(state.size(), sizeof(*c_state));
     std::copy(state.begin(), state.end(), c_state);
 
-    struct ptd_ph_vertex *vertex = ptd_avl_tree_vertex_find(this->rf_graph->tree, c_state);
+    struct ptd_avl_node *node = ptd_avl_tree_find(this->rf_graph->tree, c_state);
 
     free(c_state);
 
-    return (vertex != NULL);
+    return (node != NULL);
 }
 
 ptdalgorithms::Vertex ptdalgorithms::Graph::find_or_create_vertex(vector<int> state) {

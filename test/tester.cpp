@@ -16,7 +16,7 @@ void assert(bool a) {
 void test_it_can_insert_avl() {
     struct ptd_ph_graph *graph = ptd_ph_graph_create(4);
     assert(graph != NULL);
-    ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
+    struct ptd_avl_tree *tree = ptd_avl_tree_create(4);
     assert(tree != NULL);
 
     struct ptd_ph_vertex *S = graph->starting_vertex;
@@ -58,26 +58,26 @@ void test_it_can_insert_avl() {
     D->state[1] = 1;
     E->state[0] = 1;
 
-    assert(ptd_avl_tree_vertex_find(tree, S->state) == NULL);
+    assert(ptd_avl_tree_find(tree, S->state) == NULL);
 
-    ptd_avl_tree_vertex_insert(tree, S->state, S);
-    assert(ptd_avl_tree_vertex_find(tree, S->state) == S);
+    ptd_avl_tree_find_or_insert(tree, S->state, S);
+    assert(ptd_avl_tree_find(tree, S->state)->entry == S);
 
-    assert(ptd_avl_tree_vertex_find(tree, A->state) == NULL);
-    ptd_avl_tree_vertex_insert(tree, A->state, A);
-    assert(ptd_avl_tree_vertex_find(tree, A->state) == A);
+    assert(ptd_avl_tree_find(tree, A->state) == NULL);
+    ptd_avl_tree_find_or_insert(tree, A->state, A);
+    assert(ptd_avl_tree_find(tree, A->state)->entry == A);
 
-    ptd_avl_tree_vertex_insert(tree, B->state, B);
-    assert(ptd_avl_tree_vertex_find(tree, B->state) == B);
-    ptd_avl_tree_vertex_insert(tree, C->state, C);
-    assert(ptd_avl_tree_vertex_find(tree, C->state) == C);
-    assert(ptd_avl_tree_vertex_find(tree, D->state) == NULL);
-    ptd_avl_tree_vertex_insert(tree, D->state, D);
-    assert(ptd_avl_tree_vertex_find(tree, D->state) == D);
-    ptd_avl_tree_vertex_insert(tree, E->state, E);
-    assert(ptd_avl_tree_vertex_find(tree, E->state) == E);
+    ptd_avl_tree_find_or_insert(tree, B->state, B);
+    assert(ptd_avl_tree_find(tree, B->state)->entry == B);
+    ptd_avl_tree_find_or_insert(tree, C->state, C);
+    assert(ptd_avl_tree_find(tree, C->state)->entry == C);
+    assert(ptd_avl_tree_find(tree, D->state) == NULL);
+    ptd_avl_tree_find_or_insert(tree, D->state, D);
+    assert(ptd_avl_tree_find(tree, D->state)->entry == D);
+    ptd_avl_tree_find_or_insert(tree, E->state, E);
+    assert(ptd_avl_tree_find(tree, E->state)->entry == E);
 
-    ptd_avl_tree_vertex_destroy(tree);
+    ptd_avl_tree_destroy(tree);
 //destroy_vertices();
     ptd_ph_graph_destroy(graph);
 }
@@ -85,15 +85,15 @@ void test_it_can_insert_avl() {
 
 void test_avl_is_balanced() {
     struct ptd_ph_graph *graph = ptd_ph_graph_create(4);
-    ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
+    struct ptd_avl_tree *tree = ptd_avl_tree_create(4);
     vector<struct ptd_ph_vertex *> vertices;
 
     for (size_t i = 0; i < 1024; ++i) {
         struct ptd_ph_vertex *vertex = ptd_ph_vertex_create(graph);
         assert(vertex != NULL);
         vertex->state[0] = rand();
-        ptd_avl_tree_vertex_insert(tree, vertex->state, vertex);
-        assert(ptd_avl_tree_vertex_find(tree, vertex->state) == vertex);
+        ptd_avl_tree_find_or_insert(tree, vertex->state, vertex);
+        assert(ptd_avl_tree_find(tree, vertex->state)->entry == vertex);
         vertices.push_back(vertex);
     }
 
@@ -104,95 +104,10 @@ void test_avl_is_balanced() {
     fprintf(stderr, "Depth: %zu\n", ptd_avl_tree_max_depth(tree->root));
     assert(ptd_avl_tree_max_depth(tree->root) < 16);
     assert(ptd_avl_tree_max_depth(tree->root) > 2);
-    ptd_avl_tree_vertex_destroy(tree);
+    ptd_avl_tree_destroy(tree);
     ptd_ph_graph_destroy(graph);
 }
 
-void test_avl_is_balanced_and_updated() {
-    struct ptd_ph_graph *graph = ptd_ph_graph_create(4);
-    ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
-
-    vector<struct ptd_ph_vertex *> vertices;
-
-    for (size_t i = 0; i < 100; ++i) {
-        for (size_t j = 0; j < 100; ++j) {
-            struct ptd_ph_vertex *vertex = ptd_ph_vertex_create(graph);
-            assert(vertex != NULL);
-            vertex->state[0] = (int)j;
-            assert(ptd_avl_tree_edge_insert_or_increment(tree, vertex->state, vertex, 1) == 0);
-            if (i == 0) {
-                assert(ptd_avl_tree_edge_find(tree, vertex->state)->to == vertex);
-            } else {
-                assert(ptd_avl_tree_edge_find(tree, vertex->state)->to != vertex);
-            }
-
-            assert(ptd_avl_tree_edge_find(tree, vertex->state)->weight == i + 1);
-            vertices.push_back(vertex);
-        }
-    }
-
-    for (size_t k = 0; k < vertices.size(); ++k) {
-        ptd_ph_vertex_destroy(vertices[k]);
-    }
-
-    fprintf(stderr, "Depth: %zu\n", ptd_avl_tree_max_depth(tree->root));
-    assert(ptd_avl_tree_max_depth(tree->root) < 16);
-    assert(ptd_avl_tree_max_depth(tree->root) > 2);
-    ptd_avl_tree_edge_destroy(tree);
-    ptd_ph_graph_destroy(graph);
-}
-
-
-void test_avl_is_balanced_and_removed() {
-    struct ptd_ph_graph *graph = ptd_ph_graph_create(4);
-    ptd_avl_tree_t *tree = ptd_avl_tree_create(4);
-
-    vector<struct ptd_ph_vertex *> vertices;
-
-
-    for (size_t i = 0; i < 100; ++i) {
-        struct ptd_ph_vertex *vertex = ptd_ph_vertex_create(graph);
-        assert(vertex != NULL);
-        vertex->state[0] = (int) i;
-        assert(ptd_avl_tree_edge_insert_or_increment(tree, vertex->state, vertex, 1) == 0);
-        assert(ptd_avl_tree_edge_find(tree, vertex->state)->to == vertex);
-        assert(ptd_avl_tree_edge_find(tree, vertex->state)->weight == 1);
-        ptd_avl_tree_edge_remove(tree, vertex->state);
-        vertices.push_back(vertex);
-    }
-
-    struct ptd_ph_vertex *vertex[100];
-
-    for (size_t i = 0; i < 100; ++i) {
-        vertex[i] = ptd_ph_vertex_create(graph);
-        assert(vertex[i] != NULL);
-        vertex[i]->state[0] = (size_t) i;
-        assert(ptd_avl_tree_edge_insert_or_increment(tree, vertex[i]->state, vertex[i], 1) == 0);
-        assert(ptd_avl_tree_edge_find(tree, vertex[i]->state)->to == vertex[i]);
-        assert(ptd_avl_tree_edge_find(tree, vertex[i]->state)->weight == 1);
-        vertices.push_back(vertex[i]);
-    }
-
-    for (size_t i = 0; i < 100; ++i) {
-        ptd_avl_tree_edge_remove(tree, vertex[i]->state);
-        for (size_t j = i + 1; j < 100; ++j) {
-            // TODO: Remove does not work!
-            assert(ptd_avl_tree_edge_find(tree, vertex[j]->state) != NULL);
-            assert(ptd_avl_tree_edge_find(tree, vertex[j]->state)->to == vertex[j]);
-            assert(ptd_avl_tree_edge_find(tree, vertex[j]->state)->weight == 1);
-        }
-    }
-
-    for (size_t k = 0; k < vertices.size(); ++k) {
-        ptd_ph_vertex_destroy(vertices[k]);
-    }
-
-    fprintf(stderr, "Depth: %zu\n", ptd_avl_tree_max_depth(tree->root));
-    assert(ptd_avl_tree_max_depth(tree->root) < 16);
-    assert(ptd_avl_tree_max_depth(tree->root) > 2);
-    ptd_avl_tree_edge_destroy(tree);
-    ptd_ph_graph_destroy(graph);
-}
 
 
 void test_basic_graph() {
@@ -841,9 +756,9 @@ void test_phase_type() {
 }
 
 void test_kingman() {
-    size_t n = 80;
+    size_t n = 25;
     struct ptd_ph_graph *kingman_graph = ptd_ph_graph_create(n);
-    ptd_avl_tree_t *avl_tree = ptd_avl_tree_create(n);
+    struct ptd_avl_tree *avl_tree = ptd_avl_tree_create(n);
     int *istate = (int *) calloc(kingman_graph->state_length, sizeof(int));
     istate[0] = (int)n;
     ptd_ph_graph_add_edge(kingman_graph->starting_vertex, ptd_ph_vertex_create_state(kingman_graph, istate), 1);
@@ -875,16 +790,19 @@ void test_kingman() {
                 state[j]--;
                 state[(i + j + 2) - 1]++;
 
-                struct ptd_ph_vertex *child = ptd_avl_tree_vertex_find(avl_tree, state);
+                struct ptd_ph_vertex *child;
+                struct ptd_avl_node *avl_node = ptd_avl_tree_find(avl_tree, state);
 
-                if (child == NULL) {
+                if (avl_node == NULL) {
                     int *child_state = (int *) calloc(kingman_graph->state_length, sizeof(int));
 
                     memcpy(child_state, state, kingman_graph->state_length * sizeof(int));
 
                     child = ptd_ph_vertex_create_state(kingman_graph, child_state);
 
-                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child);
+                    ptd_avl_tree_find_or_insert(avl_tree, child_state, child);
+                } else {
+                    child = (struct ptd_ph_vertex*) avl_node->entry;
                 }
 
                 state[i]++;
@@ -899,6 +817,8 @@ void test_kingman() {
     }
 
     fprintf(stderr, "%zu\n", kingman_graph->vertices_length);
+    ptd_avl_tree_destroy(avl_tree);
+    ptd_ph_graph_destroy(kingman_graph);
 }
 
 struct conf {
@@ -924,12 +844,12 @@ int conf_to_index(int s, int locus1, int locus2, int population) {
 }
 
 void test_2p2l() {
-    int s = 5;
+    int s = 3;
     int p = 2;
 
     size_t n = (size_t)p*(s+1)*(s+1);
     struct ptd_ph_graph *graph = ptd_ph_graph_create(n);
-    ptd_avl_tree_t *avl_tree = ptd_avl_tree_create(n);
+    struct ptd_avl_tree *avl_tree = ptd_avl_tree_create(n);
 
     struct ptd_ph_vertex *first_vertex = ptd_ph_vertex_create(graph);
     first_vertex->state[conf_to_index(s, 1, 1, 1)] = s;
@@ -983,14 +903,18 @@ void test_2p2l() {
                 int k = conf_to_index(s, conf_i.locus1+conf_j.locus1, conf_i.locus2+conf_j.locus2, conf_i.population);
                 child_state[k] += 1;
 
-                struct ptd_ph_vertex *child_vertex = ptd_avl_tree_vertex_find(avl_tree, child_state);
+                struct ptd_ph_vertex *child_vertex;
 
-                if (child_vertex == NULL) {
+                struct ptd_avl_node *avl_node = ptd_avl_tree_find(avl_tree, child_state);
+
+                if (avl_node == NULL) {
                     child_vertex = ptd_ph_vertex_create_state(graph, child_state);
 
-                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child_vertex);
+                    ptd_avl_tree_find_or_insert(avl_tree, child_state, child_vertex);
                 } else {
                     free(child_state);
+
+                    child_vertex = (struct ptd_ph_vertex*) avl_node->entry;
                 }
 
                 ptd_ph_graph_add_edge(vertex, child_vertex, rate);
@@ -1008,14 +932,18 @@ void test_2p2l() {
                 child_state[k] += 1;
                 child_state[l] += 1;
 
-                struct ptd_ph_vertex *child_vertex = ptd_avl_tree_vertex_find(avl_tree, child_state);
+                struct ptd_ph_vertex *child_vertex;
 
-                if (child_vertex == NULL) {
+                struct ptd_avl_node *avl_node = ptd_avl_tree_find(avl_tree, child_state);
+
+                if (avl_node == NULL) {
                     child_vertex = ptd_ph_vertex_create_state(graph, child_state);
 
-                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child_vertex);
+                    ptd_avl_tree_find_or_insert(avl_tree, child_state, child_vertex);
                 } else {
                     free(child_state);
+
+                    child_vertex = (struct ptd_ph_vertex*) avl_node->entry;
                 }
 
                 ptd_ph_graph_add_edge(vertex, child_vertex, rate);
@@ -1040,20 +968,25 @@ void test_2p2l() {
                 child_state[i] -= 1;
                 child_state[k] += 1;
 
-                struct ptd_ph_vertex *child_vertex = ptd_avl_tree_vertex_find(avl_tree, child_state);
+                struct ptd_ph_vertex *child_vertex;
 
-                if (child_vertex == NULL) {
+                struct ptd_avl_node *avl_node = ptd_avl_tree_find(avl_tree, child_state);
+
+                if (avl_node == NULL) {
                     child_vertex = ptd_ph_vertex_create_state(graph, child_state);
 
-                    ptd_avl_tree_vertex_insert(avl_tree, child_state, child_vertex);
+                    ptd_avl_tree_find_or_insert(avl_tree, child_state, child_vertex);
                 } else {
                     free(child_state);
+
+                    child_vertex = (struct ptd_ph_vertex*) avl_node->entry;
                 }
 
                 ptd_ph_graph_add_edge(vertex, child_vertex, rate);
             }
         }
     }
+
     fprintf(stderr, "Done creating graph. It has %zu vertices\n", graph->vertices_length);
 
     double *e = ptd_ph_graph_expected_waiting_time(graph);
@@ -1064,6 +997,8 @@ void test_2p2l() {
     }
 
     fprintf(stderr, "Exp waiting time: %f\n", wt);
+
+    free(e);
 
     /*double *rewards = (double*) calloc(graph->vertices_length, sizeof(*rewards));
     int relevant_index1 = conf_to_index(s, 3, 1, 1);
@@ -1087,19 +1022,19 @@ void test_2p2l() {
 
     free(e);*/
 
-    ptd_avl_tree_vertex_destroy(avl_tree);
+    ptd_avl_tree_destroy(avl_tree);
     ptd_ph_graph_destroy(graph);
 }
 
 int main(int argc, char **argv) {
-    /*test_basic_graph();
+    test_basic_graph();
     test_basic_ptd_ph_graph();
     test_basic_ptd_ph_graph_edges();
     test_basic_ptd_ph_graph_scc();
     test_acyclic_expected_visits();
     test_cyclic_expected_entry_visits();
     test_is_acyclic();
-    test_phase_type();*/
-    //test_kingman();
+    test_phase_type();
+    test_kingman();
     test_2p2l();
 }

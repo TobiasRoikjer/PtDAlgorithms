@@ -8,42 +8,41 @@
 #include <stdio.h>
 #include <stdexcept>
 
-#define DIE_ERROR(error_code, error, ...) do {     \
-char error_formatted[1024];                        \
-char error_formatted_line[1024];                   \
-                                                   \
-snprintf(error_formatted,                          \
-         sizeof(error_formatted),                  \
-         error, ##__VA_ARGS__);                    \
-snprintf(error_formatted_line,                     \
-         sizeof(error_formatted_line),             \
-         "%s @ %s (%d)", error_formatted,          \
-         __FILE__, __LINE__);                      \
-                                                   \
-fprintf(stderr, "%s\n", error_formatted_line);     \
-/*exit(error_code);*/throw std::runtime_error(error_formatted_line); \
-} while(0)
-
-#define DEBUG_PRINT(message, ...) do {             \
-char formatted[2048];                              \
-                                                   \
-snprintf(formatted,                                \
-         sizeof(formatted),                        \
-         message, ##__VA_ARGS__);                  \
-                                                   \
-fprintf(stderr, "%s", formatted);                  \
-} while(0)
-
 using namespace std;
 
-struct avl_node {
-    struct avl_node *left;
-    struct avl_node *right;
-    struct avl_node *parent;
+struct ptd_avl_node {
+    struct ptd_avl_node *left;
+    struct ptd_avl_node *right;
+    struct ptd_avl_node *parent;
     signed short balance;
-    char *key;
+    int *key;
     void *entry;
 };
+
+struct ptd_avl_tree {
+    struct ptd_avl_node *root;
+    size_t key_length;
+};
+
+struct ptd_ph_graph;
+struct ptd_ph_edge;
+struct ptd_ph_vertex;
+
+struct ptd_ph_scc_graph;
+struct ptd_ph_scc_edge;
+struct ptd_ph_scc_vertex;
+
+struct ptd_avl_tree *ptd_avl_tree_create(size_t key_length);
+
+void ptd_avl_tree_destroy(struct ptd_avl_tree *avl_tree);
+
+struct ptd_avl_node *ptd_avl_tree_find_or_insert(struct ptd_avl_tree *avl_tree, const int *key, const void *entry);
+
+struct ptd_avl_node *ptd_avl_tree_find(const struct ptd_avl_tree *avl_tree, const int *key);
+
+struct ptd_ph_vertex *ptd_avl_tree_find_vertex(const struct ptd_avl_tree *avl_tree, const int *key);
+
+size_t ptd_avl_tree_max_depth(void *avl_vec_vertex);
 
 struct ptd_directed_graph;
 struct ptd_directed_edge;
@@ -73,14 +72,6 @@ void ptd_directed_graph_destroy(struct ptd_directed_graph *graph);
 int ptd_directed_vertex_add(struct ptd_directed_graph *graph, struct ptd_directed_vertex *vertex);
 
 void ptd_directed_vertex_destroy(struct ptd_directed_vertex *vertex);
-
-struct ptd_ph_graph;
-struct ptd_ph_edge;
-struct ptd_ph_vertex;
-
-struct ptd_ph_scc_graph;
-struct ptd_ph_scc_edge;
-struct ptd_ph_scc_vertex;
 
 struct ptd_ph_graph {
     size_t vertices_length;
@@ -180,33 +171,6 @@ double *ptd_ph_graph_cyclic_moment_rewards(
         struct ptd_ph_scc_graph *scc_graph, double *rewards
 );
 
-typedef struct ptd_avl_tree {
-    void *root;
-    size_t vec_length;
-} ptd_avl_tree_t;
-
-ptd_avl_tree_t *ptd_avl_tree_create(size_t vec_length);
-
-void ptd_avl_tree_vertex_destroy(ptd_avl_tree_t *avl_tree);
-
-void ptd_avl_tree_vertex_destroy_free(ptd_avl_tree_t *avl_tree);
-
-void ptd_avl_tree_edge_destroy(ptd_avl_tree_t *avl_tree);
-
-int ptd_avl_tree_vertex_insert(ptd_avl_tree_t *avl_tree, const int *key, const struct ptd_ph_vertex *vertex);
-
-struct ptd_ph_vertex *ptd_avl_tree_vertex_find(const ptd_avl_tree_t *avl_tree, const int *key);
-
-int ptd_avl_tree_edge_insert_or_increment(ptd_avl_tree_t *avl_tree, const int *key, struct ptd_ph_vertex *vertex,
-                                          double weight);
-
-int ptd_avl_tree_edge_remove(ptd_avl_tree_t *avl_tree, const int *key);
-
-struct ptd_ph_edge *ptd_avl_tree_edge_find(const ptd_avl_tree_t *avl_tree, const int *key);
-
-//TODO: remove?
-size_t ptd_avl_tree_max_depth(void *avl_vec_vertex);
-
 typedef struct {
     size_t length;
     double *initial_probability_vector;
@@ -236,5 +200,32 @@ struct ptd_ph_graph *ptd_model_two_island_two_loci_recomb(
         double migration_rate2,
         double recombination_rate
 );
+
+
+#define DIE_ERROR(error_code, error, ...) do {     \
+char error_formatted[1024];                        \
+char error_formatted_line[1024];                   \
+                                                   \
+snprintf(error_formatted,                          \
+         sizeof(error_formatted),                  \
+         error, ##__VA_ARGS__);                    \
+snprintf(error_formatted_line,                     \
+         sizeof(error_formatted_line),             \
+         "%s @ %s (%d)", error_formatted,          \
+         __FILE__, __LINE__);                      \
+                                                   \
+fprintf(stderr, "%s\n", error_formatted_line);     \
+/*exit(error_code);*/throw std::runtime_error(error_formatted_line); \
+} while(0)
+
+#define DEBUG_PRINT(message, ...) do {             \
+/*char formatted[2048];                              \
+                                                   \
+snprintf(formatted,                                \
+         sizeof(formatted),                        \
+         message, ##__VA_ARGS__);                  \
+                                                   \
+fprintf(stderr, "%s", formatted);*/                  \
+} while(0)
 
 #endif //PTDALGORITHMS_PTD_H

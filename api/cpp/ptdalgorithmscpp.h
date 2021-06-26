@@ -6,7 +6,7 @@
 #include "../c/ptdalgorithms.h"
 
 struct rf_graph {
-    ptd_avl_tree_t *tree;
+    struct ptd_avl_tree *tree;
     struct ptd_ph_graph *graph;
     size_t *references;
 };
@@ -65,7 +65,7 @@ namespace ptdalgorithms {
             *(this->rf_graph->references) -= 1;
 
             if (*this->rf_graph->references == 0) {
-                ptd_avl_tree_vertex_destroy(this->rf_graph->tree);
+                ptd_avl_tree_destroy(this->rf_graph->tree);
                 ptd_ph_graph_destroy(this->rf_graph->graph);
                 free(this->rf_graph->references);
             }
@@ -123,7 +123,7 @@ namespace ptdalgorithms {
             *this->rf_graph->references -= 1;
 
             if (*this->rf_graph->references == 0) {
-                ptd_avl_tree_vertex_destroy_free(this->rf_graph->tree);
+                ptd_avl_tree_destroy(this->rf_graph->tree);
                 ptd_ph_graph_destroy(this->rf_graph->graph);
                 free(this->rf_graph->references);
             }
