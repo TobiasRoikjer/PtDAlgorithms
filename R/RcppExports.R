@@ -286,6 +286,36 @@ graph_as_matrix <- function(phase_type_graph) {
     .Call(`_ptdalgorithms_graph_as_matrix`, phase_type_graph)
 }
 
+#' Converts the the matrix-based representation into a phase-type graph
+#' 
+#' @details
+#' Sometimes the user might want to use the fast graph algorithms,
+#' but have some state-space given as a matrix. Therefore we can construct
+#' a graph from a matrix. If desired, a discrete phase-type distribution
+#' should just have no self-loop given. Note that the function
+#' `graph_as_matrix` may reorder the vertices to make the graph represented
+#' as strongly connected components in an acyclic manner.
+#' 
+#' @seealso [ptdalgorithms::matrix_as_graph()]
+#'
+#' @return A graph object
+#'
+#' @param IPV The initial probability vector (alpha)
+#' @param SIM The sub-intensity matrix (S)
+#' @param rewards Optional. The state/rewards of each of the vertices.
+#' 
+#' @examples
+#' g <- matrix_as_graph(
+#'     c(0.5,0.3, 0),
+#'     matrix(c(-3, 0, 0, 2, -4, 1, 0, 1,-3), ncol=3),
+#'     matrix(c(1,4,5,9,2,7), ncol=2)
+#' )
+#' 
+#' graph_as_matrix(g)
+matrix_as_graph <- function(IPV, SIM, rewards = NULL) {
+    .Call(`_ptdalgorithms_matrix_as_graph`, IPV, SIM, rewards)
+}
+
 #' Clones the graph, returning a new identical graph
 #' 
 #' @details

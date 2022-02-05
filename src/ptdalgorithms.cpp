@@ -483,6 +483,135 @@ List graph_as_matrix(SEXP phase_type_graph) {
   return(_graph_as_matrix(phase_type_graph));
 }
 
+//' Converts the the matrix-based representation into a phase-type graph
+//' 
+//' @details
+//' Sometimes the user might want to use the fast graph algorithms,
+//' but have some state-space given as a matrix. Therefore we can construct
+//' a graph from a matrix. If desired, a discrete phase-type distribution
+//' should just have no self-loop given. Note that the function
+//' `graph_as_matrix` may reorder the vertices to make the graph represented
+//' as strongly connected components in an acyclic manner.
+//' 
+//' @seealso [ptdalgorithms::matrix_as_graph()]
+//'
+//' @return A graph object
+//'
+//' @param IPV The initial probability vector (alpha)
+//' @param SIM The sub-intensity matrix (S)
+//' @param rewards Optional. The state/rewards of each of the vertices.
+//' 
+//' @examples
+//' g <- matrix_as_graph(
+//'     c(0.5,0.3, 0),
+//'     matrix(c(-3, 0, 0, 2, -4, 1, 0, 1,-3), ncol=3),
+//'     matrix(c(1,4,5,9,2,7), ncol=2)
+//' )
+//' 
+//' graph_as_matrix(g)
+// [[Rcpp::export]]
+SEXP matrix_as_graph(NumericVector IPV, NumericMatrix SIM, Nullable<NumericMatrix> rewards = R_NilValue) {
+  NumericMatrix rw;
+  bool has_rewards;
+  
+  if (IPV.length() <= 0 || IPV.length() != SIM.ncol() || SIM.ncol() != SIM.nrow()) {
+    char message[1024];
+    
+    snprintf(
+      message,
+      1024, 
+      "Failed: IPV must have length > 0, was %i, and SIM must have same dimensions and be square, was %i, %i",
+      (int)IPV.length(), (int)SIM.nrow(), (int)SIM.ncol()
+    );
+    
+    throw std::runtime_error(
+        message
+    );
+  }
+  
+  if (rewards.isNotNull()) {
+    rw = NumericMatrix(rewards);
+    has_rewards = true;
+    
+    if (rw.nrow() != SIM.nrow()) {
+      char message[1024];
+      
+      snprintf(
+        message,
+        1024, 
+        "Failed: Rewards must have %i rows, had %i",
+        (int)SIM.nrow(), (int)rw.nrow()
+      );
+      
+      throw std::runtime_error(
+          message
+      );
+    }
+  } else {
+    has_rewards = false;
+  }
+  
+  size_t state_space_size = has_rewards ? rw.ncol() : 1;
+  
+  Graph *cppGraph = new Graph(state_space_size);
+  struct ptd_graph *graph = cppGraph->c_graph();
+  
+  for (int i = 0; i < SIM.nrow(); i++) {
+    if (has_rewards) {
+      int *state = (int*) calloc((size_t)rw.ncol(), sizeof(*state));
+      
+      for (int j = 0; j < rw.ncol(); j++) {
+        state[j] = rw.at(i, j);
+      }
+      
+      ptd_vertex_create_state(graph, state);
+    } else {
+      ptd_vertex_create(graph);
+    }
+  }
+  
+  struct ptd_vertex *absorbing_vertex = ptd_vertex_create(graph);
+  double sum_outgoing = 0;
+  
+  for (int i = 0; i < SIM.nrow(); i++) {
+    if (IPV[i] != 0) {
+      ptd_graph_add_edge(graph->starting_vertex, graph->vertices[i+1], IPV[i]);
+      sum_outgoing += IPV[i];
+    }
+  }
+  
+  if (sum_outgoing < 0.99999) {
+    ptd_graph_add_edge(graph->starting_vertex, absorbing_vertex, 1 - sum_outgoing);
+  }
+  
+  for (int i = 0; i < SIM.nrow(); i++) {
+    double s = 0;
+    
+    for (int j = 0; j < SIM.nrow(); j++) {
+      if (i == j) {
+        continue;
+      } 
+      
+      double weight = SIM.at(i, j);
+      
+      if (weight != 0) {
+        ptd_graph_add_edge(graph->vertices[i+1], graph->vertices[j+1], weight);
+        s += weight;
+      }
+    }
+    
+    double w = -(SIM.at(i, i) + s);
+    
+    if (w >= 0.000001) {
+      ptd_graph_add_edge(graph->vertices[i+1], absorbing_vertex, w);
+    }
+  }
+  
+  return Rcpp::XPtr<Graph>(
+    cppGraph
+  ); 
+}
+
 //' Clones the graph, returning a new identical graph
 //' 
 //' @details

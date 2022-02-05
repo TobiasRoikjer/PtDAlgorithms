@@ -160,6 +160,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// matrix_as_graph
+SEXP matrix_as_graph(NumericVector IPV, NumericMatrix SIM, Nullable<NumericMatrix> rewards);
+RcppExport SEXP _ptdalgorithms_matrix_as_graph(SEXP IPVSEXP, SEXP SIMSEXP, SEXP rewardsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type IPV(IPVSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type SIM(SIMSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericMatrix> >::type rewards(rewardsSEXP);
+    rcpp_result_gen = Rcpp::wrap(matrix_as_graph(IPV, SIM, rewards));
+    return rcpp_result_gen;
+END_RCPP
+}
 // clone_graph
 SEXP clone_graph(SEXP phase_type_graph);
 RcppExport SEXP _ptdalgorithms_clone_graph(SEXP phase_type_graphSEXP) {
@@ -663,6 +676,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ptdalgorithms_create_vertex", (DL_FUNC) &_ptdalgorithms_create_vertex, 2},
     {"_ptdalgorithms_find_vertex", (DL_FUNC) &_ptdalgorithms_find_vertex, 2},
     {"_ptdalgorithms_graph_as_matrix", (DL_FUNC) &_ptdalgorithms_graph_as_matrix, 1},
+    {"_ptdalgorithms_matrix_as_graph", (DL_FUNC) &_ptdalgorithms_matrix_as_graph, 3},
     {"_ptdalgorithms_clone_graph", (DL_FUNC) &_ptdalgorithms_clone_graph, 1},
     {"_ptdalgorithms_graph_as_dph_matrix", (DL_FUNC) &_ptdalgorithms_graph_as_dph_matrix, 1},
     {"_ptdalgorithms_reward_transform", (DL_FUNC) &_ptdalgorithms_reward_transform, 2},
