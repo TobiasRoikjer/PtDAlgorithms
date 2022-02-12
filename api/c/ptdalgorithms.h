@@ -197,8 +197,6 @@ double *ptd_dph_normalize_graph(struct ptd_graph *graph);
 
 double *ptd_expected_waiting_time(struct ptd_graph *graph, double *rewards);
 
-double *ptd_dph_expected_waiting_time(struct ptd_graph *graph, double *rewards);
-
 bool ptd_graph_is_acyclic(struct ptd_graph *graph);
 
 struct ptd_vertex **ptd_graph_topological_sort(struct ptd_graph *graph);

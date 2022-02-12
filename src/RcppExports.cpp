@@ -161,14 +161,14 @@ BEGIN_RCPP
 END_RCPP
 }
 // matrix_as_graph
-SEXP matrix_as_graph(NumericVector IPV, NumericMatrix SIM, Nullable<NumericMatrix> rewards);
+SEXP matrix_as_graph(NumericVector IPV, NumericMatrix SIM, Nullable <NumericMatrix> rewards);
 RcppExport SEXP _ptdalgorithms_matrix_as_graph(SEXP IPVSEXP, SEXP SIMSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericVector >::type IPV(IPVSEXP);
     Rcpp::traits::input_parameter< NumericMatrix >::type SIM(SIMSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericMatrix> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericMatrix> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(matrix_as_graph(IPV, SIM, rewards));
     return rcpp_result_gen;
 END_RCPP
@@ -242,62 +242,62 @@ BEGIN_RCPP
 END_RCPP
 }
 // expected_waiting_time
-NumericVector expected_waiting_time(SEXP phase_type_graph, Nullable<NumericVector> rewards);
+NumericVector expected_waiting_time(SEXP phase_type_graph, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_expected_waiting_time(SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(expected_waiting_time(phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
 }
-// dph_expected_waiting_time
-NumericVector dph_expected_waiting_time(SEXP phase_type_graph, Nullable<NumericVector> rewards);
-RcppExport SEXP _ptdalgorithms_dph_expected_waiting_time(SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
+// dph_expected_visits
+NumericVector dph_expected_visits(SEXP phase_type_graph, Nullable <NumericVector> rewards);
+RcppExport SEXP _ptdalgorithms_dph_expected_visits(SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
-    rcpp_result_gen = Rcpp::wrap(dph_expected_waiting_time(phase_type_graph, rewards));
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
+    rcpp_result_gen = Rcpp::wrap(dph_expected_visits(phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
 }
 // moments
-NumericVector moments(SEXP phase_type_graph, int power, Nullable<NumericVector> rewards);
+NumericVector moments(SEXP phase_type_graph, int power, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_moments(SEXP phase_type_graphSEXP, SEXP powerSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
     Rcpp::traits::input_parameter< int >::type power(powerSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(moments(phase_type_graph, power, rewards));
     return rcpp_result_gen;
 END_RCPP
 }
 // expectation
-double expectation(SEXP phase_type_graph, Nullable<NumericVector> rewards);
+double expectation(SEXP phase_type_graph, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_expectation(SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(expectation(phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
 }
 // variance
-double variance(SEXP phase_type_graph, Nullable<NumericVector> rewards);
+double variance(SEXP phase_type_graph, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_variance(SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(variance(phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
@@ -316,25 +316,25 @@ BEGIN_RCPP
 END_RCPP
 }
 // dph_expectation
-double dph_expectation(SEXP phase_type_graph, Nullable<NumericVector> rewards);
+double dph_expectation(SEXP phase_type_graph, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_dph_expectation(SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(dph_expectation(phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
 }
 // dph_variance
-double dph_variance(SEXP phase_type_graph, Nullable<NumericVector> rewards);
+double dph_variance(SEXP phase_type_graph, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_dph_variance(SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(dph_variance(phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
@@ -375,14 +375,14 @@ BEGIN_RCPP
 END_RCPP
 }
 // rph
-NumericVector rph(int n, SEXP phase_type_graph, Nullable<NumericVector> rewards);
+NumericVector rph(int n, SEXP phase_type_graph, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_rph(SEXP nSEXP, SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< int >::type n(nSEXP);
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(rph(n, phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
@@ -466,14 +466,14 @@ BEGIN_RCPP
 END_RCPP
 }
 // rdph
-NumericVector rdph(int n, SEXP phase_type_graph, Nullable<NumericVector> rewards);
+NumericVector rdph(int n, SEXP phase_type_graph, Nullable <NumericVector> rewards);
 RcppExport SEXP _ptdalgorithms_rdph(SEXP nSEXP, SEXP phase_type_graphSEXP, SEXP rewardsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< int >::type n(nSEXP);
     Rcpp::traits::input_parameter< SEXP >::type phase_type_graph(phase_type_graphSEXP);
-    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type rewards(rewardsSEXP);
+    Rcpp::traits::input_parameter< Nullable <NumericVector> >::type rewards(rewardsSEXP);
     rcpp_result_gen = Rcpp::wrap(rdph(n, phase_type_graph, rewards));
     return rcpp_result_gen;
 END_RCPP
@@ -684,7 +684,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ptdalgorithms_normalize_graph", (DL_FUNC) &_ptdalgorithms_normalize_graph, 1},
     {"_ptdalgorithms_normalize_dph_graph", (DL_FUNC) &_ptdalgorithms_normalize_dph_graph, 1},
     {"_ptdalgorithms_expected_waiting_time", (DL_FUNC) &_ptdalgorithms_expected_waiting_time, 2},
-    {"_ptdalgorithms_dph_expected_waiting_time", (DL_FUNC) &_ptdalgorithms_dph_expected_waiting_time, 2},
+    {"_ptdalgorithms_dph_expected_visits", (DL_FUNC) &_ptdalgorithms_dph_expected_visits, 2},
     {"_ptdalgorithms_moments", (DL_FUNC) &_ptdalgorithms_moments, 3},
     {"_ptdalgorithms_expectation", (DL_FUNC) &_ptdalgorithms_expectation, 2},
     {"_ptdalgorithms_variance", (DL_FUNC) &_ptdalgorithms_variance, 2},

@@ -15,11 +15,11 @@ dph_variance(phase_type_graph, rewards = NULL)
 The variance of the distribution
 }
 \description{
-This function invokes \code{\link[=dph_expected_waiting_times]{dph_expected_waiting_times()}}
+This function invokes \code{\link[=moments]{moments()}}
 twice to find the first and second moment
 }
 \seealso{
-\code{\link[=dph_expected_waiting_time]{dph_expected_waiting_time()}}
+\code{\link[=dph_expected_visits]{dph_expected_visits()}}
 
 \code{\link[=dph_covariance]{dph_covariance()}}
 

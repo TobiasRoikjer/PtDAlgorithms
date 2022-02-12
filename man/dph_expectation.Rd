@@ -15,11 +15,11 @@ dph_expectation(phase_type_graph, rewards = NULL)
 The expectation of the distribution
 }
 \description{
-This function invokes \code{\link[=dph_expected_waiting_times]{dph_expected_waiting_times()}}
+This function invokes \code{\link[=moments]{moments()}}
 and takes the first entry (from starting vertex)
 }
 \seealso{
-\code{\link[=dph_expected_waiting_time]{dph_expected_waiting_time()}}
+\code{\link[=dph_expected_visits]{dph_expected_visits()}}
 
 \code{\link[=expected_waiting_time]{expected_waiting_time()}}
 

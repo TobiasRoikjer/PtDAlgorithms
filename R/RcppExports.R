@@ -531,8 +531,8 @@ expected_waiting_time <- function(phase_type_graph, rewards = NULL) {
 #' @param phase_type_graph A reference to the graph created by [ptdalgorithms::create_graph()]
 #' @param rewards Optional rewards, which should be applied to the discrete phase-type distribution. Must have length equal to [ptdalgorithms::vertices_length()]
 #' 
-dph_expected_waiting_time <- function(phase_type_graph, rewards = NULL) {
-    .Call(`_ptdalgorithms_dph_expected_waiting_time`, phase_type_graph, rewards)
+dph_expected_visits <- function(phase_type_graph, rewards = NULL) {
+    .Call(`_ptdalgorithms_dph_expected_visits`, phase_type_graph, rewards)
 }
 
 #' Computes the first `k` moments of the phase-type distribution
@@ -683,7 +683,7 @@ covariance <- function(phase_type_graph, rewards1, rewards2) {
 #' Computes the expectation (mean) of the discrete phase-type distribution
 #' 
 #' @description
-#' This function invokes [ptdalgorithms::dph_expected_waiting_times()]
+#' This function invokes [ptdalgorithms::moments()]
 #' and takes the first entry (from starting vertex)
 #' 
 #' @return The expectation of the distribution
@@ -691,7 +691,7 @@ covariance <- function(phase_type_graph, rewards1, rewards2) {
 #' @param phase_type_graph A reference to the graph created by [ptdalgorithms::create_graph()]
 #' @param rewards Optional rewards, which should be applied to the discrete phase-type distribution. Must have length equal to [ptdalgorithms::vertices_length()]
 #' 
-#' @seealso [ptdalgorithms::dph_expected_waiting_time()]
+#' @seealso [ptdalgorithms::dph_expected_visits()]
 #' @seealso [ptdalgorithms::expected_waiting_time()]
 #' @seealso [ptdalgorithms::dph_variance()]
 #' @seealso [ptdalgorithms::dph_covariance()]
@@ -703,7 +703,7 @@ dph_expectation <- function(phase_type_graph, rewards = NULL) {
 #' Computes the variance of the discrete phase-type distribution
 #' 
 #' @description
-#' This function invokes [ptdalgorithms::dph_expected_waiting_times()]
+#' This function invokes [ptdalgorithms::moments()]
 #' twice to find the first and second moment
 #' 
 #' @return The variance of the distribution
@@ -711,7 +711,7 @@ dph_expectation <- function(phase_type_graph, rewards = NULL) {
 #' @param phase_type_graph A reference to the graph created by [ptdalgorithms::create_graph()]
 #' @param rewards Optional rewards, which should be applied to the discrete phase-type distribution. Must have length equal to [ptdalgorithms::vertices_length()]
 #' 
-#' @seealso [ptdalgorithms::dph_expected_waiting_time()]
+#' @seealso [ptdalgorithms::dph_expected_visits()]
 #' @seealso [ptdalgorithms::dph_covariance()]
 #' @seealso [ptdalgorithms::dph_expectation()]
 #' 
@@ -722,7 +722,7 @@ dph_variance <- function(phase_type_graph, rewards = NULL) {
 #' Computes the covariance of the discrete phase-type distribution
 #' 
 #' @description
-#' This function invokes [ptdalgorithms::dph_expected_waiting_times()]
+#' This function invokes [ptdalgorithms::moments())]
 #' twice to find the first and second moment for each of the two rewards
 #' 
 #' @return The covariance of the discrete distribution given the two rewards
@@ -731,7 +731,7 @@ dph_variance <- function(phase_type_graph, rewards = NULL) {
 #' @param rewards1 First vector of rewards, which should be applied to the discrete phase-type distribution. Must have length equal to [ptdalgorithms::vertices_length()]
 #' @param rewards2 Second vector of rewards, which should be applied to the discrete  phase-type distribution. Must have length equal to [ptdalgorithms::vertices_length()]
 #'
-#' @seealso [ptdalgorithms::dph_expected_waiting_time()]
+#' @seealso [ptdalgorithms::dph_expected_visits()]
 #' @seealso [ptdalgorithms::dph_expectation()]
 #' @seealso [ptdalgorithms::dph_variance()]
 #' 

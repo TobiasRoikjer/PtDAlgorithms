@@ -17,11 +17,13 @@ dph_covariance(phase_type_graph, rewards1, rewards2)
 The covariance of the discrete distribution given the two rewards
 }
 \description{
-This function invokes \code{\link[=dph_expected_waiting_times]{dph_expected_waiting_times()}}
+This function invokes [ptdalgorithms::moments())]
 twice to find the first and second moment for each of the two rewards
+
+[ptdalgorithms::moments())]: R:ptdalgorithms::moments())
 }
 \seealso{
-\code{\link[=dph_expected_waiting_time]{dph_expected_waiting_time()}}
+\code{\link[=dph_expected_visits]{dph_expected_visits()}}
 
 \code{\link[=dph_expectation]{dph_expectation()}}
 
