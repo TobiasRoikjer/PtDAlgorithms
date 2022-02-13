@@ -41,9 +41,9 @@ install(FILES ${CMAKE_BINARY_DIR}/ptdalgorithmscpp.pc
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pkgconfig)
 
 
-add_executable(testcpp test/testcpp.cpp)
-target_link_libraries (testcpp LINK_PUBLIC libptdalgorithmscpp)
+#add_executable(testcpp test/testcpp.cpp)
+#target_link_libraries (testcpp LINK_PUBLIC libptdalgorithmscpp)
 
-add_executable(tester test/tester.cpp)
-target_link_libraries (tester LINK_PUBLIC libptdalgorithms)
+#add_executable(tester test/tester.cpp)
+#target_link_libraries (tester LINK_PUBLIC libptdalgorithms)
 
