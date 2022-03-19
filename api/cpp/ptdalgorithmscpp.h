@@ -753,6 +753,10 @@ namespace ptdalgorithms {
             return Vertex(graph, _vertex);
         }
 
+	Vertex *to_p() {
+            return new Vertex(graph, _vertex);
+        }
+
         double weight() {
             return _weight;
         }
@@ -794,6 +798,10 @@ namespace ptdalgorithms {
     public:
         Vertex to() {
             return Vertex(graph, _vertex);
+        }
+
+	Vertex *to_p() {
+            return new Vertex(graph, _vertex);
         }
 
         double weight() {

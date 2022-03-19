@@ -391,11 +391,11 @@ List edges(SEXP phase_type_vertex) {
     List r_edges(edges.size());
 
     for (size_t i = 0; i < edges.size(); i++) {
-        Vertex child = edges[i].to();
+        Vertex *child = edges[i].to_p();
 
         r_edges[i] = List::create(
                 Named("weight") = edges[i].weight(),
-                _["child"] = vertex_as_list(&child)
+                _["child"] = vertex_as_list(child)
         );
     }
 
