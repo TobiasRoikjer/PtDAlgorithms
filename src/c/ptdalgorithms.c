@@ -4131,7 +4131,7 @@ struct ptd_probability_distribution_context *ptd_probability_distribution_contex
         struct ptd_graph *graph,
         int granularity
 ) {
-    double max_rate = 1024;
+    double max_rate = 512;
 
     for (size_t i = 0; i < graph->vertices_length; ++i) {
         double rate = 0;
@@ -4148,7 +4148,7 @@ struct ptd_probability_distribution_context *ptd_probability_distribution_contex
     }
 
     if (granularity == 0) {
-        granularity = max_rate;
+        granularity = max_rate * 2;
     }
 
     for (size_t i = 0; i < graph->vertices_length; ++i) {
