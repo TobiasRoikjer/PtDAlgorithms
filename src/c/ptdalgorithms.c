@@ -692,7 +692,61 @@ static int scc_edge_cmp(const void *a, const void *b) {
     }
 }
 
+static struct ptd_scc_vertex *single_vertex_as_scc(struct ptd_vertex *vertex) {
+    struct ptd_scc_vertex* r = (struct ptd_scc_vertex*) malloc(sizeof(*r));
+
+    r->index = vertex->index;
+    r->internal_vertices_length = 1;
+    r->internal_vertices = (struct ptd_vertex**) malloc(sizeof(struct ptd_vertex*));
+    r->internal_vertices[0] = vertex;
+    r->edges_length = vertex->edges_length;
+    if (vertex->edges_length != 0) {
+        r->edges = (struct ptd_scc_edge**) calloc(
+                r->edges_length,
+                sizeof(struct ptd_scc_edge*)
+        );
+    } else {
+        r->edges = NULL;
+    }
+
+    return r;
+}
+
+static struct ptd_scc_graph *ptd_find_strongly_connected_components_acyclic(struct ptd_graph *graph) {
+    struct ptd_scc_graph *scc_graph = (struct ptd_scc_graph *) malloc(
+            sizeof(*scc_graph)
+    );
+
+    scc_graph->graph = graph;
+
+    scc_graph->vertices = (struct ptd_scc_vertex **) calloc(
+            graph->vertices_length,
+            sizeof(struct ptd_scc_vertex *)
+    );
+
+    scc_graph->vertices_length = graph->vertices_length;
+
+    for (size_t i = 0; i < graph->vertices_length; i++) {
+        scc_graph->vertices[i] = single_vertex_as_scc(graph->vertices[i]);
+    }
+
+    for (size_t i = 0; i < graph->vertices_length; i++) {
+        for (size_t j = 0; j < graph->vertices[i]->edges_length; j++) {
+            size_t to_index = graph->vertices[i]->edges[j]->to->index;
+            scc_graph->vertices[i]->edges[j] = (struct ptd_scc_edge*) malloc(sizeof(struct ptd_scc_edge));
+
+            scc_graph->vertices[i]->edges[j]->to = scc_graph->vertices[to_index];
+        }
+    }
+
+    return scc_graph;
+}
+
 struct ptd_scc_graph *ptd_find_strongly_connected_components(struct ptd_graph *graph) {
+    if (ptd_graph_is_acyclic(graph)) {
+        return ptd_find_strongly_connected_components_acyclic(graph);
+    }
+
     struct ptd_scc_graph *scc_graph = (struct ptd_scc_graph *) malloc(
             sizeof(*scc_graph)
     );
