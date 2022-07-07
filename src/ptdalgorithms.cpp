@@ -309,7 +309,8 @@ int vertices_length(SEXP phase_type_graph) {
 //' Returns a vertex at a particular index.
 //' 
 //' @description
-//' This method is much faster than calling `ptdalgorithms::vertices()[i]`
+//' This method is much faster than calling `ptdalgorithms::vertices()[i]`.
+//' Uses 1-indexing like usual R, so first vertex is 1.
 //' 
 //' @return The vertex at index `index` in the graph
 //'
@@ -456,11 +457,12 @@ SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
 //' Used to convert to the traditional matrix-based formulation.
 //' Has three entries: `$SIM` the sub-intensity matrix, `$IPV` the initial
 //' probability vector, `$states` the state of each vertex. Does
-//' *not* have the same order as [ptdalgorithms::vertices()]
+//' *not* have the same order as [ptdalgorithms::vertices()]. The indices
+//' returned are 1-based, like the input to [ptdalgorithms::vertex_at()]
 //' 
 //' @seealso [ptdalgorithms::graph_as_dph_matrix()]
 //'
-//' @return A list of the sub-intensity matrix, states, and initial probability vector
+//' @return A list of the sub-intensity matrix, states, and initial probability vector, and graph indices matching the matrix (1-indexed)
 //'
 //' @param phase_type_graph A reference to the graph created by [ptdalgorithms::create_graph()]
 //' 
@@ -485,6 +487,8 @@ SEXP find_vertex(SEXP phase_type_graph, IntegerVector state) {
 //' #   [2,]    0   -10
 //' # $IPV
 //' #   [1] 1 0
+//' # $indices
+//' #   [1] 3 2
 // [[Rcpp::export]]
 List graph_as_matrix(SEXP phase_type_graph) {
     return (_graph_as_matrix(phase_type_graph));
@@ -645,10 +649,11 @@ SEXP clone_graph(SEXP phase_type_graph) {
 //' probability vector, `$states` the state of each vertex. Does
 //' *not* have the same order as [ptdalgorithms::vertices()]
 //' It is expected that all out-going edges have weights summing to 1 or
-//' less, and the remaining probability is considered as a self-transition.
+//' less, and the remaining probability is considered as a self-transition. The indices
+//' returned are 1-based, like the input to [ptdalgorithms::vertex_at()]
 //'
 //' @seealso [ptdalgorithms::graph_as_matrix()]
-//' @return A list of the sub-transition matrix, states, and initial probability vector
+//' @return A list of the sub-transition matrix, states, and initial probability vector, and graph indices matching the matrix (1-indexed) 
 //'
 //' @param phase_type_graph A reference to the graph created by [ptdalgorithms::create_graph()]
 //' 
@@ -674,6 +679,8 @@ SEXP clone_graph(SEXP phase_type_graph) {
 //' #   [2,]   0.0   0.5
 //' # $IPV
 //' #   [1] 0.5 0
+//' # $indices
+//' #   [1] 3 2
 // [[Rcpp::export]]
 List graph_as_dph_matrix(SEXP phase_type_graph) {
     List ph_res = _graph_as_matrix(phase_type_graph);
@@ -685,7 +692,7 @@ List graph_as_dph_matrix(SEXP phase_type_graph) {
         STM(i, i) = self_loop;
     }
 
-    return List::create(Named("states") = ph_res["states"], _["STM"] = STM, _["IPV"] = ph_res["IPV"]);
+    return List::create(Named("states") = ph_res["states"], _["STM"] = STM, _["IPV"] = ph_res["IPV"], _["indices"] = ph_res["indices"]);
 }
 
 //' Performs a reward transformation, returning a phase-type distribution to model the total accumulated reward until abosorption
@@ -1346,29 +1353,35 @@ SEXP list_as_vertex(SEXP list) {
 
 List _graph_as_matrix(SEXP phase_type_graph) {
     Rcpp::XPtr <Graph> graph(phase_type_graph);
-    PhaseTypeDistribution dist = graph->phase_type_distribution();
+    struct ptd_phase_type_distribution *dist = ptd_graph_as_phase_type_distribution(graph->c_graph());
 
-    NumericMatrix SIM(dist.length, dist.length);
-    NumericVector IPV(dist.length);
+    NumericMatrix SIM(dist->length, dist->length);
+    NumericVector IPV(dist->length);
 
-    for (size_t i = 0; i < dist.length; ++i) {
-        IPV(i) = dist.initial_probability_vector[i];
+    for (size_t i = 0; i < dist->length; ++i) {
+        IPV(i) = dist->initial_probability_vector[i];
 
-        for (size_t j = 0; j < dist.length; ++j) {
-            SIM(i, j) = dist.sub_intensity_matrix[i][j];
+        for (size_t j = 0; j < dist->length; ++j) {
+            SIM(i, j) = dist->sub_intensity_matrix[i][j];
         }
     }
 
-    NumericMatrix states(dist.length, graph->state_length());
-    Graph g = *graph;
+    size_t state_length = graph->state_length();
+    NumericMatrix states(dist->length, state_length);
 
-    for (size_t i = 0; i < dist.length; i++) {
-        for (size_t j = 0; j < graph->state_length(); j++) {
-            states(i, j) = dist.vertices[i].state()[j];
+    for (size_t i = 0; i < dist->length; i++) {
+        for (size_t j = 0; j < state_length; j++) {
+            states(i, j) = dist->vertices[i]->state[j];
         }
     }
 
-    return List::create(Named("states") = states, _["SIM"] = SIM, _["IPV"] = IPV);
+    NumericVector indices(dist->length);
+    for (size_t i = 0; i < dist->length; i++) {
+        indices[i] = dist->vertices[i]->index + 1;
+    }
+
+    ptd_phase_type_distribution_destroy(dist);
+    return List::create(Named("states") = states, _["SIM"] = SIM, _["IPV"] = IPV, _["indices"] = indices);
 }
 
 //' Computes the defect, i.e. the probability of immediately transitioning to the absorbing state, of the phase-type distribution

@@ -853,6 +853,10 @@ namespace ptdalgorithms {
             ptd_phase_type_distribution_destroy(distribution);
         }
 
+        struct ptd_phase_type_distribution *c_distribution() {
+            return this->distribution;
+        }
+
         size_t length;
         double **sub_intensity_matrix;
         double *initial_probability_vector;

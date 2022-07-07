@@ -10,7 +10,7 @@ graph_as_matrix(phase_type_graph)
 \item{phase_type_graph}{A reference to the graph created by \code{\link[=create_graph]{create_graph()}}}
 }
 \value{
-A list of the sub-intensity matrix, states, and initial probability vector
+A list of the sub-intensity matrix, states, and initial probability vector, and graph indices matching the matrix (1-indexed)
 }
 \description{
 Converts the graph-based phase-type distribution into a traditional sub-intensity matrix and initial probability vector
@@ -19,7 +19,8 @@ Converts the graph-based phase-type distribution into a traditional sub-intensit
 Used to convert to the traditional matrix-based formulation.
 Has three entries: \verb{$SIM} the sub-intensity matrix, \verb{$IPV} the initial
 probability vector, \verb{$states} the state of each vertex. Does
-\emph{not} have the same order as \code{\link[=vertices]{vertices()}}
+\emph{not} have the same order as \code{\link[=vertices]{vertices()}}. The indices
+returned are 1-based, like the input to \code{\link[=vertex_at]{vertex_at()}}
 }
 \examples{
 graph <- ptdalgorithms::create_graph(4)
@@ -42,6 +43,8 @@ ptdalgorithms::graph_as_matrix(graph) #>
 #   [2,]    0   -10
 # $IPV
 #   [1] 1 0
+# $indices
+#   [1] 3 2
 }
 \seealso{
 \code{\link[=graph_as_dph_matrix]{graph_as_dph_matrix()}}

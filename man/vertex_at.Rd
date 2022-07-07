@@ -15,5 +15,6 @@ vertex_at(phase_type_graph, index)
 The vertex at index \code{index} in the graph
 }
 \description{
-This method is much faster than calling \code{ptdalgorithms::vertices()[i]}
+This method is much faster than calling \code{ptdalgorithms::vertices()[i]}.
+Uses 1-indexing like usual R, so first vertex is 1.
 }

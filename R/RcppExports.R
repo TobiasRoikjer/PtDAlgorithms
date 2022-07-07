@@ -178,7 +178,8 @@ vertices_length <- function(phase_type_graph) {
 #' Returns a vertex at a particular index.
 #' 
 #' @description
-#' This method is much faster than calling `ptdalgorithms::vertices()[i]`
+#' This method is much faster than calling `ptdalgorithms::vertices()[i]`.
+#' Uses 1-indexing like usual R, so first vertex is 1.
 #' 
 #' @return The vertex at index `index` in the graph
 #'
@@ -253,11 +254,12 @@ find_vertex <- function(phase_type_graph, state) {
 #' Used to convert to the traditional matrix-based formulation.
 #' Has three entries: `$SIM` the sub-intensity matrix, `$IPV` the initial
 #' probability vector, `$states` the state of each vertex. Does
-#' *not* have the same order as [ptdalgorithms::vertices()]
+#' *not* have the same order as [ptdalgorithms::vertices()]. The indices
+#' returned are 1-based, like the input to [ptdalgorithms::vertex_at()]
 #' 
 #' @seealso [ptdalgorithms::graph_as_dph_matrix()]
 #'
-#' @return A list of the sub-intensity matrix, states, and initial probability vector
+#' @return A list of the sub-intensity matrix, states, and initial probability vector, and graph indices matching the matrix (1-indexed)
 #'
 #' @param phase_type_graph A reference to the graph created by [ptdalgorithms::create_graph()]
 #' 
@@ -282,6 +284,8 @@ find_vertex <- function(phase_type_graph, state) {
 #' #   [2,]    0   -10
 #' # $IPV
 #' #   [1] 1 0
+#' # $indices
+#' #   [1] 3 2
 graph_as_matrix <- function(phase_type_graph) {
     .Call(`_ptdalgorithms_graph_as_matrix`, phase_type_graph)
 }
