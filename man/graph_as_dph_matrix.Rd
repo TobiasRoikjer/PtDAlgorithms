@@ -10,7 +10,7 @@ graph_as_dph_matrix(phase_type_graph)
 \item{phase_type_graph}{A reference to the graph created by \code{\link[=create_graph]{create_graph()}}}
 }
 \value{
-A list of the sub-transition matrix, states, and initial probability vector
+A list of the sub-transition matrix, states, and initial probability vector, and graph indices matching the matrix (1-indexed)
 }
 \description{
 Converts the graph-based \emph{discrete} phase-type distribution into a traditional sub-transition matrix and initial probability vector
@@ -21,7 +21,8 @@ Has three entries: \verb{$STM} the sub-transition matrix, \verb{$IPV} the initia
 probability vector, \verb{$states} the state of each vertex. Does
 \emph{not} have the same order as \code{\link[=vertices]{vertices()}}
 It is expected that all out-going edges have weights summing to 1 or
-less, and the remaining probability is considered as a self-transition.
+less, and the remaining probability is considered as a self-transition. The indices
+returned are 1-based, like the input to \code{\link[=vertex_at]{vertex_at()}}
 }
 \examples{
 graph <- ptdalgorithms::create_graph(4)
@@ -45,6 +46,8 @@ ptdalgorithms::graph_as_dph_matrix(graph) #>
 #   [2,]   0.0   0.5
 # $IPV
 #   [1] 0.5 0
+# $indices
+#   [1] 3 2
 }
 \seealso{
 \code{\link[=graph_as_matrix]{graph_as_matrix()}}
