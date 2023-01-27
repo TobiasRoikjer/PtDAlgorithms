@@ -3,6 +3,8 @@
 This software library provides fast and scalable algorithms for constructing and computing properties of for the statistical
 distributions: continuous and discrete phase-type distributions, rewarded phase-type distributions, and the general multivariate phase-type distributions. The library can compute the moments (e.g. expectation, variance, covariance), the distribution function (pdf, cdf, pmf), the stopping time probability in the Markov jump process or Markov chain, and the distribution function of time-inhomogeneous phase-type distribution, as well as the expectation of rewarded time-inhomogeneous phase-type distributions.
 
+This code is the basis for our paper: `Røikjer, Tobias, Asger Hobolth, and Kasper Munch. "Graph-based algorithms for phase-type distributions." Statistics and Computing 32.6 (2022): 103.`
+
 The algorithms in the package are emperically multiple orders of magnitude faster than the traditional matrix-based equations for phase-type distributions of matrix inversion, matrix multiplication, and the matrix exponential. It can handle billions of vertices (states) and edges (transitions).
 
 The code is written in C, but exposes an interface to both C and R through a C++ layer.
